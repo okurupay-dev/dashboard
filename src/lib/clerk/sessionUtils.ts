@@ -35,10 +35,15 @@ export const useUserMetadata = () => {
     approved: (publicMeta.approved as boolean) || defaultMetadata.approved
   };
   
+  // Development bypass: auto-approve if no metadata is set (for testing)
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  const hasNoMetadata = !publicMeta.approved && !publicMeta.role && !publicMeta.merchantId;
+  const isApproved = metadata.approved === true || (isDevelopment && hasNoMetadata);
+
   return {
     isLoaded: true,
     metadata,
-    isApproved: metadata.approved === true,
+    isApproved,
     role: metadata.role,
     merchantId: metadata.merchantId
   };
