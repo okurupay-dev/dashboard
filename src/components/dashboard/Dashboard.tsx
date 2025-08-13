@@ -159,12 +159,13 @@ const Dashboard = () => {
   const userContext = useUserContext();
   const [selectedLocation, setSelectedLocation] = useState<string>('all');
   
-  // Fetch user-specific data using the new hooks
-  const { stats, loading: statsLoading, error: statsError } = useDashboardStats();
-  const { transactions, loading: transactionsLoading, error: transactionsError } = useUserTransactions(5);
-  const { portfolio, loading: portfolioLoading, error: portfolioError } = useUserPortfolio();
+  // TODO: Enable API data fetching once database is set up
+  // const { stats, loading: statsLoading, error: statsError } = useDashboardStats();
+  // const { transactions, loading: transactionsLoading, error: transactionsError } = useUserTransactions(5);
+  // const { portfolio, loading: portfolioLoading, error: portfolioError } = useUserPortfolio();
   
-  // Fallback to sample data if API data is not available (for development)
+  // Using sample data for now since there's no database yet
+  // This will be replaced with API data once backend is ready
   const data = {
     user: {
       id: userContext?.userId || 'user-123',
@@ -184,9 +185,10 @@ const Dashboard = () => {
         { address: '0x8765...4321', name: 'Secondary Contract', rules: 1, explorer: 'https://etherscan.io/address/0x8765' }
       ]
     },
-    stats: stats || sampleData.stats,
-    recentTransactions: transactions || sampleData.recentTransactions,
-    cryptos: portfolio || sampleData.cryptos
+    // Using sample data directly for now
+    stats: sampleData.stats,
+    recentTransactions: sampleData.recentTransactions,
+    cryptos: sampleData.cryptos
   };
   
   // Navigation handlers for Quick Actions
