@@ -17,6 +17,8 @@ export const ClerkProvider: React.FC<ClerkProviderProps> = ({ children }) => {
       publishableKey={CLERK_PUBLISHABLE_KEY}
       routerPush={(to) => navigate(to)}
       routerReplace={(to) => navigate(to, { replace: true })}
+      signInFallbackRedirectUrl="/"
+      signUpFallbackRedirectUrl="/"
       appearance={{
         variables: {
           colorPrimary: '#6366f1', // Indigo color to match your button
@@ -25,7 +27,7 @@ export const ClerkProvider: React.FC<ClerkProviderProps> = ({ children }) => {
           logoPlacement: undefined, // We'll use our own logo instead
           showOptionalFields: false,
           socialButtonsPlacement: undefined, // Disable social buttons
-          socialButtonsVariant: 'iconButton',
+          socialButtonsVariant: undefined, // Remove social button variant
           logoImageUrl: '', // No Clerk logo
           helpPageUrl: '',
         },
@@ -33,6 +35,9 @@ export const ClerkProvider: React.FC<ClerkProviderProps> = ({ children }) => {
           formButtonPrimary: 'bg-indigo-600 hover:bg-indigo-700',
           card: 'bg-white',
           rootBox: 'w-full',
+          socialButtons: 'hidden', // Hide social buttons completely
+          socialButtonsBlockButton: 'hidden',
+          socialButtonsIconButton: 'hidden',
         },
       }}
     >
