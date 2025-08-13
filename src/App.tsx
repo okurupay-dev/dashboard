@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
-import { ClerkProvider, SignedIn, SignedOut, RedirectToSignIn } from '@clerk/clerk-react';
+import { ClerkProvider, SignedIn, SignedOut, RedirectToSignIn, useUser } from '@clerk/clerk-react';
 import DashboardLayout from './components/layout/DashboardLayout';
 import Dashboard from './components/dashboard/Dashboard';
 import Transactions from './components/transactions/Transactions';
@@ -13,18 +13,27 @@ import CustomSignIn from './components/auth/ClerkSignIn';
 import PendingReview from './components/auth/PendingReview';
 import { useUserMetadata } from './lib/clerk/sessionUtils';
 
-// Component to check if user is approved and route accordingly
+// Component to check if user is authenticated and approved
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isLoaded, metadata, isApproved } = useUserMetadata();
+  const { user, isLoaded } = useUser();
+  const { metadata, isApproved } = useUserMetadata();
   
+  // Show loading while Clerk is initializing
   if (!isLoaded) {
     return <div>Loading...</div>;
   }
   
+  // If user is not signed in, redirect to sign-in page
+  if (!user) {
+    return <Navigate to="/signin" replace />;
+  }
+  
+  // If user is signed in but not approved, show pending review
   if (!isApproved) {
     return <Navigate to="/pending-review" replace />;
   }
   
+  // User is authenticated and approved - show protected content
   return <>{children}</>;
 };
 

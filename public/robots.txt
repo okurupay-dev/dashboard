@@ -1,3 +1,7 @@
 # https://www.robotstxt.org/robotstxt.html
 User-agent: *
-Disallow:
+Disallow: /
+Allow: /signin
+
+# Only allow indexing of the sign-in page
+# All dashboard content remains private
