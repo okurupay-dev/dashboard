@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom utilities */
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.transform-style-3d {
+  transform-style: preserve-3d;
+}
+
+/* Keep this file under 50KB for optimal performance */
+body {
+  background: white;
+  color: #000;
+  min-height: 100vh;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+.image-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* Okuru brand specific styles */
+.okuru-primary-bg {
+  background-color: #4F46E5;
+}
+
+.okuru-secondary-bg {
+  background-color: #10B981;
+}
+
+.okuru-accent {
+  color: #F59E0B;
+}
+
+.card {
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  background-color: white;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Add animation classes */
+.fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
