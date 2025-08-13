@@ -5,7 +5,7 @@ import { Button } from '../ui/button';
 import { Transaction, TransactionStatus, TransactionFilter } from './types';
 import TransactionDetailsModal from './TransactionDetailsModal';
 
-// Sample transaction data
+// Sample transaction data - expanded for pagination demo
 const sampleTransactions: Transaction[] = [
   {
     id: 'TX12345678',
@@ -160,6 +160,11 @@ const Transactions: React.FC = () => {
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [dateRange, setDateRange] = useState<{ from: string; to: string }>({ from: '', to: '' });
   const [isExporting, setIsExporting] = useState(false);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const pageSizeOptions = [10, 25, 50, 100];
 
   // Filter transactions based on status, search term, and date range
   const filteredTransactions = transactions.filter(transaction => {
@@ -178,6 +183,27 @@ const Transactions: React.FC = () => {
     
     return matchesFilter && matchesSearch && matchesDateRange;
   });
+
+  // Pagination calculations
+  const totalTransactions = filteredTransactions.length;
+  const totalPages = Math.ceil(totalTransactions / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedTransactions = filteredTransactions.slice(startIndex, endIndex);
+
+  // Reset to first page when filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [filter, searchTerm, dateRange]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize);
+    setCurrentPage(1); // Reset to first page when page size changes
+  };
 
   const handleViewTransaction = (transaction: Transaction) => {
     setSelectedTransaction(transaction);
@@ -297,8 +323,8 @@ const Transactions: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {filteredTransactions.length > 0 ? (
-                  filteredTransactions.map((transaction) => (
+                {paginatedTransactions.length > 0 ? (
+                  paginatedTransactions.map((transaction) => (
                     <tr key={transaction.id} className="hover:bg-gray-50">
                       <td className="py-3 px-4 font-medium">{transaction.id}</td>
                       <td className="py-3 px-4">{transaction.date}</td>
@@ -337,6 +363,114 @@ const Transactions: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Pagination Controls */}
+      {totalTransactions > 0 && (
+        <Card className="mt-4">
+          <CardContent className="p-4">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+              {/* Results info and page size selector */}
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                <div className="text-sm text-gray-600">
+                  Showing {startIndex + 1} to {Math.min(endIndex, totalTransactions)} of {totalTransactions} transactions
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">Show:</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                    className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {pageSizeOptions.map(size => (
+                      <option key={size} value={size}>{size}</option>
+                    ))}
+                  </select>
+                  <span className="text-sm text-gray-600">per page</span>
+                </div>
+              </div>
+
+              {/* Pagination buttons */}
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  {/* Previous button */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1"
+                  >
+                    Previous
+                  </Button>
+
+                  {/* Page numbers */}
+                  <div className="flex items-center gap-1">
+                    {/* First page */}
+                    {currentPage > 3 && (
+                      <>
+                        <Button
+                          variant={1 === currentPage ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handlePageChange(1)}
+                          className="px-3 py-1 min-w-[40px]"
+                        >
+                          1
+                        </Button>
+                        {currentPage > 4 && <span className="px-2 text-gray-500">...</span>}
+                      </>
+                    )}
+
+                    {/* Current page and surrounding pages */}
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+                      if (pageNum <= totalPages) {
+                        return (
+                          <Button
+                            key={pageNum}
+                            variant={pageNum === currentPage ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => handlePageChange(pageNum)}
+                            className="px-3 py-1 min-w-[40px]"
+                          >
+                            {pageNum}
+                          </Button>
+                        );
+                      }
+                      return null;
+                    })}
+
+                    {/* Last page */}
+                    {currentPage < totalPages - 2 && (
+                      <>
+                        {currentPage < totalPages - 3 && <span className="px-2 text-gray-500">...</span>}
+                        <Button
+                          variant={totalPages === currentPage ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handlePageChange(totalPages)}
+                          className="px-3 py-1 min-w-[40px]"
+                        >
+                          {totalPages}
+                        </Button>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Next button */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1"
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Transaction Details Modal */}
       {selectedTransaction && (
