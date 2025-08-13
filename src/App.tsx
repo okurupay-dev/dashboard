@@ -10,13 +10,10 @@ import Terminals from './components/terminals/Terminals';
 import Staff from './components/staff/Staff';
 import Automations from './components/automations/Automations';
 import CustomSignIn from './components/auth/ClerkSignIn';
-import PendingReview from './components/auth/PendingReview';
-import { useUserMetadata } from './lib/clerk/sessionUtils';
 
-// Component to check if user is authenticated and approved
+// Component to check if user is authenticated
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoaded } = useUser();
-  const { metadata, isApproved } = useUserMetadata();
   
   // Show loading while Clerk is initializing
   if (!isLoaded) {
@@ -28,12 +25,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     return <Navigate to="/signin" replace />;
   }
   
-  // If user is signed in but not approved, show pending review
-  if (!isApproved) {
-    return <Navigate to="/pending-review" replace />;
-  }
-  
-  // User is authenticated and approved - show protected content
+  // User is authenticated - show protected content
+  // (No approval check needed since invitations are only sent to pre-approved users)
   return <>{children}</>;
 };
 
@@ -58,11 +51,7 @@ function App() {
             </div>
           } />
           
-          <Route path="/pending-review" element={
-            <div>
-              <PendingReview />
-            </div>
-          } />
+
           
           {/* Protected routes */}
           <Route path="/" element={
