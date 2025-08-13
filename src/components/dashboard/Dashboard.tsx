@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useUserContext } from '../../lib/api/dataService';
+import { useDashboardStats, useUserTransactions, useUserPortfolio } from '../../hooks/useUserData';
 import StatsCards from './StatsCards';
 import TransactionsTable from './TransactionsTable';
 import CryptoCards from './CryptoCards';
@@ -154,8 +156,38 @@ const sampleData = {
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [data, setData] = useState(sampleData);
+  const userContext = useUserContext();
   const [selectedLocation, setSelectedLocation] = useState<string>('all');
+  
+  // Fetch user-specific data using the new hooks
+  const { stats, loading: statsLoading, error: statsError } = useDashboardStats();
+  const { transactions, loading: transactionsLoading, error: transactionsError } = useUserTransactions(5);
+  const { portfolio, loading: portfolioLoading, error: portfolioError } = useUserPortfolio();
+  
+  // Fallback to sample data if API data is not available (for development)
+  const data = {
+    user: {
+      id: userContext?.userId || 'user-123',
+      name: 'John Merchant',
+      notifications: 1
+    },
+    merchant: {
+      name: 'Crypto Cafe',
+      logo: '/merchant-logo.png',
+      locations: [
+        { id: 'loc-001', name: 'Downtown' },
+        { id: 'loc-002', name: 'Uptown' },
+        { id: 'loc-003', name: 'Midtown' }
+      ],
+      contracts: [
+        { address: '0x1234...5678', name: 'Main Contract', rules: 3, explorer: 'https://etherscan.io/address/0x1234' },
+        { address: '0x8765...4321', name: 'Secondary Contract', rules: 1, explorer: 'https://etherscan.io/address/0x8765' }
+      ]
+    },
+    stats: stats || sampleData.stats,
+    recentTransactions: transactions || sampleData.recentTransactions,
+    cryptos: portfolio || sampleData.cryptos
+  };
   
   // Navigation handlers for Quick Actions
   const handleCreateAutomation = () => {
