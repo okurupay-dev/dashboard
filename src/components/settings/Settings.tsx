@@ -186,10 +186,10 @@ const Settings: React.FC = () => {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Settings</h1>
+    <div className="p-4 sm:p-6 max-w-6xl mx-auto">
+      <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 sm:mb-8">Settings</h1>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
         {/* User Profile Section */}
         <Card>
           <CardHeader>
@@ -198,10 +198,10 @@ const Settings: React.FC = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
               <input
                 type="text"
-                className="w-full p-2 border rounded-md bg-gray-50"
+                className="w-full p-3 sm:p-2 border rounded-lg bg-gray-50 text-base sm:text-sm"
                 value={profile.name}
                 disabled
                 title="Name is managed by Okuru"
@@ -209,10 +209,10 @@ const Settings: React.FC = () => {
               <p className="text-xs text-gray-500 mt-1">Name is managed by Okuru</p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
               <input
                 type="email"
-                className="w-full p-2 border rounded-md bg-gray-50"
+                className="w-full p-3 sm:p-2 border rounded-lg bg-gray-50 text-base sm:text-sm"
                 value={profile.email}
                 disabled
                 title="Email is managed by Okuru"
@@ -220,10 +220,10 @@ const Settings: React.FC = () => {
               <p className="text-xs text-gray-500 mt-1">Email is managed by Okuru</p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
               <input
                 type="text"
-                className="w-full p-2 border rounded-md bg-gray-50"
+                className="w-full p-3 sm:p-2 border rounded-lg bg-gray-50 text-base sm:text-sm"
                 value={profile.role}
                 disabled
                 title="Role is managed by Okuru"
@@ -231,9 +231,9 @@ const Settings: React.FC = () => {
               <p className="text-xs text-gray-500 mt-1">Role is managed by Okuru</p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Theme</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Theme</label>
               <select
-                className="w-full p-2 border rounded-md"
+                className="w-full p-3 sm:p-2 border rounded-lg text-base sm:text-sm appearance-none bg-white"
                 value={profile.theme}
                 onChange={(e) => setProfile({ ...profile, theme: e.target.value as 'light' | 'dark' | 'system' })}
               >
@@ -243,9 +243,9 @@ const Settings: React.FC = () => {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Language</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Language</label>
               <select
-                className="w-full p-2 border rounded-md"
+                className="w-full p-3 sm:p-2 border rounded-lg text-base sm:text-sm appearance-none bg-white"
                 value={profile.language}
                 onChange={(e) => setProfile({ ...profile, language: e.target.value })}
               >
@@ -257,9 +257,9 @@ const Settings: React.FC = () => {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Timezone</label>
               <select
-                className="w-full p-2 border rounded-md"
+                className="w-full p-3 sm:p-2 border rounded-lg text-base sm:text-sm appearance-none bg-white"
                 value={profile.timezone}
                 onChange={(e) => setProfile({ ...profile, timezone: e.target.value })}
               >
@@ -275,7 +275,7 @@ const Settings: React.FC = () => {
             <Button 
               onClick={handleSavePreferences} 
               disabled={saving}
-              className="w-full"
+              className="w-full mt-4 py-3 text-base font-medium"
             >
               {saving ? 'Saving...' : 'Save Preferences'}
             </Button>
@@ -290,66 +290,66 @@ const Settings: React.FC = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Business Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Business Name</label>
               <input
                 type="text"
-                className="w-full p-2 border rounded-md bg-gray-50"
+                className="w-full p-3 sm:p-2 border rounded-lg bg-gray-50 text-base sm:text-sm"
                 value={companyProfile.businessName}
                 disabled
                 title="Managed by Okuru"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Business Address</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Business Address</label>
               <input
                 type="text"
-                className="w-full p-2 border rounded-md bg-gray-50"
+                className="w-full p-3 sm:p-2 border rounded-lg bg-gray-50 text-base sm:text-sm"
                 value={companyProfile.businessAddress}
                 disabled
                 title="Managed by Okuru"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Website</label>
               <input
                 type="url"
-                className="w-full p-2 border rounded-md bg-gray-50"
+                className="w-full p-3 sm:p-2 border rounded-lg bg-gray-50 text-base sm:text-sm"
                 value={companyProfile.businessWebsite}
                 disabled
                 title="Managed by Okuru"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Business Type</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Business Type</label>
               <input
                 type="text"
-                className="w-full p-2 border rounded-md bg-gray-50"
+                className="w-full p-3 sm:p-2 border rounded-lg bg-gray-50 text-base sm:text-sm"
                 value={companyProfile.businessType}
                 disabled
                 title="Managed by Okuru"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Business Phone</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Business Phone</label>
               <input
                 type="tel"
-                className="w-full p-2 border rounded-md bg-gray-50"
+                className="w-full p-3 sm:p-2 border rounded-lg bg-gray-50 text-base sm:text-sm"
                 value={companyProfile.businessPhone}
                 disabled
                 title="Managed by Okuru"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Business Email</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Business Email</label>
               <input
                 type="email"
-                className="w-full p-2 border rounded-md bg-gray-50"
+                className="w-full p-3 sm:p-2 border rounded-lg bg-gray-50 text-base sm:text-sm"
                 value={companyProfile.businessEmail}
                 disabled
                 title="Managed by Okuru"
               />
             </div>
-            <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
               <p className="text-sm text-blue-800">
                 <strong>Note:</strong> Company information is managed by Okuru. 
                 Contact support if you need to update these details.
@@ -359,92 +359,92 @@ const Settings: React.FC = () => {
         </Card>
 
         {/* Notification Settings */}
-        <Card className="lg:col-span-2">
+        <Card className="xl:col-span-2">
           <CardHeader>
             <CardTitle>Notification Preferences</CardTitle>
             <p className="text-sm text-gray-600">Choose how you want to receive notifications</p>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
               <div className="space-y-4">
-                <h4 className="font-medium text-gray-900">Notification Types</h4>
-                <div className="space-y-3">
-                  <label className="flex items-center">
+                <h4 className="font-medium text-gray-900 text-base">Notification Types</h4>
+                <div className="space-y-4">
+                  <label className="flex items-center p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
                     <input
                       type="checkbox"
-                      className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                      className="w-4 h-4 sm:w-5 sm:h-5 rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
                       checked={notificationSettings.transactionAlerts}
                       onChange={(e) => setNotificationSettings({
                         ...notificationSettings,
                         transactionAlerts: e.target.checked
                       })}
                     />
-                    <span className="ml-2 text-sm text-gray-700">Transaction Alerts</span>
+                    <span className="ml-3 text-sm sm:text-base text-gray-700">Transaction Alerts</span>
                   </label>
-                  <label className="flex items-center">
+                  <label className="flex items-center p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
                     <input
                       type="checkbox"
-                      className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                      className="w-4 h-4 sm:w-5 sm:h-5 rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
                       checked={notificationSettings.securityAlerts}
                       onChange={(e) => setNotificationSettings({
                         ...notificationSettings,
                         securityAlerts: e.target.checked
                       })}
                     />
-                    <span className="ml-2 text-sm text-gray-700">Security Alerts</span>
+                    <span className="ml-3 text-sm sm:text-base text-gray-700">Security Alerts</span>
                   </label>
-                  <label className="flex items-center">
+                  <label className="flex items-center p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
                     <input
                       type="checkbox"
-                      className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                      className="w-4 h-4 sm:w-5 sm:h-5 rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
                       checked={notificationSettings.marketingUpdates}
                       onChange={(e) => setNotificationSettings({
                         ...notificationSettings,
                         marketingUpdates: e.target.checked
                       })}
                     />
-                    <span className="ml-2 text-sm text-gray-700">Marketing Updates</span>
+                    <span className="ml-3 text-sm sm:text-base text-gray-700">Marketing Updates</span>
                   </label>
                 </div>
               </div>
               <div className="space-y-4">
-                <h4 className="font-medium text-gray-900">Delivery Methods</h4>
-                <div className="space-y-3">
-                  <label className="flex items-center">
+                <h4 className="font-medium text-gray-900 text-base">Delivery Methods</h4>
+                <div className="space-y-4">
+                  <label className="flex items-center p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
                     <input
                       type="checkbox"
-                      className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                      className="w-4 h-4 sm:w-5 sm:h-5 rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
                       checked={notificationSettings.email}
                       onChange={(e) => setNotificationSettings({
                         ...notificationSettings,
                         email: e.target.checked
                       })}
                     />
-                    <span className="ml-2 text-sm text-gray-700">Email</span>
+                    <span className="ml-3 text-sm sm:text-base text-gray-700">Email</span>
                   </label>
-                  <label className="flex items-center">
+                  <label className="flex items-center p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
                     <input
                       type="checkbox"
-                      className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                      className="w-4 h-4 sm:w-5 sm:h-5 rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
                       checked={notificationSettings.push}
                       onChange={(e) => setNotificationSettings({
                         ...notificationSettings,
                         push: e.target.checked
                       })}
                     />
-                    <span className="ml-2 text-sm text-gray-700">Push Notifications</span>
+                    <span className="ml-3 text-sm sm:text-base text-gray-700">Push Notifications</span>
                   </label>
-                  <label className="flex items-center">
+                  <label className="flex items-center p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
                     <input
                       type="checkbox"
-                      className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                      className="w-4 h-4 sm:w-5 sm:h-5 rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
                       checked={notificationSettings.sms}
                       onChange={(e) => setNotificationSettings({
                         ...notificationSettings,
                         sms: e.target.checked
                       })}
                     />
-                    <span className="ml-2 text-sm text-gray-700">SMS</span>
+                    <span className="ml-3 text-sm sm:text-base text-gray-700">SMS</span>
                   </label>
                 </div>
               </div>
