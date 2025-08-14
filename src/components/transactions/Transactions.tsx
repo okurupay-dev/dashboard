@@ -1,12 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useUser } from '@clerk/clerk-react';
 import { Badge } from '../ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Transaction, TransactionStatus, TransactionFilter } from './types';
 import TransactionDetailsModal from './TransactionDetailsModal';
+import { transactionService } from '../../lib/supabase/services';
+import { getUserMetadata } from '../../lib/clerk/sessionUtils';
 
-// Sample transaction data - expanded for pagination demo
-const sampleTransactions: Transaction[] = [
+// Fallback transaction data for loading states
+const fallbackTransactions: Transaction[] = [
   {
     id: 'TX12345678',
     date: 'Aug 13, 2025 12:42 PM',
@@ -153,36 +156,123 @@ const StatusBadge: React.FC<{ status: TransactionStatus }> = ({ status }) => {
   );
 };
 
-const Transactions: React.FC = () => {
-  const [transactions, setTransactions] = useState<Transaction[]>(sampleTransactions);
-  const [filter, setFilter] = useState<TransactionFilter>('all');
-  const [searchTerm, setSearchTerm] = useState('');
+const Transactions = () => {
+  const { user } = useUser();
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [filter, setFilter] = useState<{
+    status: string;
+    location: string;
+    dateRange: string;
+  }>({
+    status: 'all',
+    location: 'all',
+    dateRange: 'all'
+  });
+  
+  const itemsPerPage = 10;
+  const [pageSize, setPageSize] = useState(10);
+  const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState<{ from: string; to: string }>({ from: '', to: '' });
   const [isExporting, setIsExporting] = useState(false);
-  
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
   const pageSizeOptions = [10, 25, 50, 100];
 
-  // Filter transactions based on status, search term, and date range
-  const filteredTransactions = transactions.filter(transaction => {
-    const matchesFilter = filter === 'all' || transaction.status === filter;
-    const matchesSearch = 
-      transaction.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.date.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.crypto.toLowerCase().includes(searchTerm.toLowerCase());
+  // Load transactions from Supabase
+  useEffect(() => {
+    const loadTransactions = async () => {
+      if (!user) return;
+      
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const metadata = getUserMetadata(user);
+        if (!metadata?.merchantId || !metadata?.approved) {
+          console.log('User metadata not ready, using fallback data');
+          setTransactions(fallbackTransactions);
+          setFilteredTransactions(fallbackTransactions);
+          setLoading(false);
+          return;
+        }
+
+        const userContext = {
+          userId: user.id,
+          merchantId: metadata.merchantId,
+          role: metadata.role as 'admin' | 'merchant' | 'staff',
+          approved: metadata.approved
+        };
+
+        // Load transactions from API
+        const transactionData = await transactionService.getTransactions(userContext, 1, 100); // Load more for pagination
+        
+        if (transactionData?.transactions) {
+          // Transform API data to match Transaction interface
+          const transformedTransactions: Transaction[] = transactionData.transactions.map(tx => ({
+            id: tx.transaction_id,
+            date: new Date(tx.created_at).toLocaleString(),
+            amount: tx.amount_fiat,
+            crypto: `${tx.amount_crypto} ${tx.crypto_currency}`,
+            status: tx.status as TransactionStatus,
+            location: tx.locations?.name || 'Unknown',
+            locationId: tx.location_id,
+            terminal: tx.terminals?.name || 'Unknown',
+            terminalId: tx.terminal_id,
+            staff: tx.users?.name || 'Unknown',
+            chain: tx.blockchain || 'Unknown',
+            txHash: tx.tx_hash || '',
+            confirmations: tx.confirmations || 0,
+            fee: tx.fee || 0,
+            tip: tx.tip || 0
+          }));
+          
+          setTransactions(transformedTransactions);
+          setFilteredTransactions(transformedTransactions);
+        } else {
+          setTransactions(fallbackTransactions);
+          setFilteredTransactions(fallbackTransactions);
+        }
+      } catch (err) {
+        console.error('Error loading transactions:', err);
+        setError('Failed to load transactions');
+        setTransactions(fallbackTransactions);
+        setFilteredTransactions(fallbackTransactions);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTransactions();
+  }, [user]);
+
+  // Apply filtering to transactions
+  useEffect(() => {
+    const filtered = transactions.filter(transaction => {
+      const matchesStatus = filter.status === 'all' || transaction.status === filter.status;
+      const matchesLocation = filter.location === 'all' || transaction.location === filter.location;
+      
+      return matchesStatus && matchesLocation;
+    });
     
-    // Simple date range filtering (in a real app, use proper date objects)
-    let matchesDateRange = true;
-    if (dateRange.from && dateRange.to) {
-      // This is a simplified check - in a real app use proper date comparison
-      matchesDateRange = transaction.date >= dateRange.from && transaction.date <= dateRange.to;
-    }
-    
-    return matchesFilter && matchesSearch && matchesDateRange;
-  });
+    setFilteredTransactions(filtered);
+  }, [transactions, filter]);
+
+  // Filter handlers
+  const handleStatusFilter = (status: string) => {
+    setFilter(prev => ({ ...prev, status }));
+  };
+
+  const handleLocationFilter = (location: string) => {
+    setFilter(prev => ({ ...prev, location }));
+  };
+
+  const handleDateRangeFilter = (dateRange: string) => {
+    setFilter(prev => ({ ...prev, dateRange }));
+  };
 
   // Pagination calculations
   const totalTransactions = filteredTransactions.length;
@@ -273,30 +363,30 @@ const Transactions: React.FC = () => {
           
           <div className="flex flex-wrap gap-2">
             <Button 
-              variant={filter === 'all' ? 'default' : 'outline'}
-              onClick={() => setFilter('all')}
-              className="min-w-[100px]"
+              variant={filter.status === 'all' ? 'default' : 'outline'} 
+              size="sm" 
+              onClick={() => handleStatusFilter('all')}
             >
               All
             </Button>
             <Button 
-              variant={filter === 'completed' ? 'default' : 'outline'}
-              onClick={() => setFilter('completed')}
-              className="text-green-600 min-w-[100px]"
+              variant={filter.status === 'completed' ? 'default' : 'outline'} 
+              size="sm" 
+              onClick={() => handleStatusFilter('completed')}
             >
               Completed
             </Button>
             <Button 
-              variant={filter === 'pending' ? 'default' : 'outline'}
-              onClick={() => setFilter('pending')}
-              className="text-yellow-600 min-w-[100px]"
+              variant={filter.status === 'pending' ? 'default' : 'outline'} 
+              size="sm" 
+              onClick={() => handleStatusFilter('pending')}
             >
               Pending
             </Button>
             <Button 
-              variant={filter === 'failed' ? 'default' : 'outline'}
-              onClick={() => setFilter('failed')}
-              className="text-red-600 min-w-[100px]"
+              variant={filter.status === 'failed' ? 'default' : 'outline'} 
+              size="sm" 
+              onClick={() => handleStatusFilter('failed')}
             >
               Failed
             </Button>
@@ -381,8 +471,10 @@ const Transactions: React.FC = () => {
                     onChange={(e) => handlePageSizeChange(Number(e.target.value))}
                     className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    {pageSizeOptions.map(size => (
-                      <option key={size} value={size}>{size}</option>
+                    {pageSizeOptions.map((size: number) => (
+                      <option key={size} value={size}>
+                        {size} per page
+                      </option>
                     ))}
                   </select>
                   <span className="text-sm text-gray-600">per page</span>
@@ -405,21 +497,26 @@ const Transactions: React.FC = () => {
 
                   {/* Page numbers */}
                   <div className="flex items-center gap-1">
-                    {/* First page */}
-                    {currentPage > 3 && (
-                      <>
-                        <Button
-                          variant={1 === currentPage ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => handlePageChange(1)}
-                          className="px-3 py-1 min-w-[40px]"
-                        >
-                          1
-                        </Button>
-                        {currentPage > 4 && <span className="px-2 text-gray-500">...</span>}
-                      </>
+                    {filter.status === 'all' && (
+                      <Badge variant="secondary" className="bg-gray-100 text-gray-800">
+                        All
+                      </Badge>
                     )}
-
+                    {filter.status === 'completed' && (
+                      <Badge variant="secondary" className="bg-green-100 text-green-800">
+                        Completed
+                      </Badge>
+                    )}
+                    {filter.status === 'pending' && (
+                      <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                        Pending
+                      </Badge>
+                    )}
+                    {filter.status === 'failed' && (
+                      <Badge variant="secondary" className="bg-red-100 text-red-800">
+                        Failed
+                      </Badge>
+                    )}
                     {/* Current page and surrounding pages */}
                     {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                       const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;

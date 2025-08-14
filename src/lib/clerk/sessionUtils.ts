@@ -20,6 +20,20 @@ const defaultMetadata: UserMetadata = {
   approved: false
 };
 
+// Helper function to extract user metadata from Clerk user object
+export const getUserMetadata = (user: any): UserMetadata | null => {
+  if (!user) return null;
+  
+  const publicMetadata = user.publicMetadata || {};
+  
+  return {
+    merchantId: publicMetadata.merchantId || '',
+    role: publicMetadata.role || 'staff',
+    approved: publicMetadata.approved || false,
+    businessName: publicMetadata.businessName
+  };
+};
+
 // Hook to get current user's metadata
 export const useUserMetadata = () => {
   const isDevelopment = process.env.NODE_ENV === 'development';
