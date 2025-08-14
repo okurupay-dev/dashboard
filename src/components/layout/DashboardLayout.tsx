@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useClerk } from '@clerk/clerk-react';
+import { useClerk, useUser } from '@clerk/clerk-react';
 import { useAutoUserSync } from '../../lib/clerk/sessionUtils';
+import { supabase } from '../../lib/supabase/client';
 import logo from '../../assets/images/logo.svg';
 
 // Check if we're in development mode
@@ -21,9 +22,46 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const location = useLocation();
   const currentPath = location.pathname;
   const { signOut } = useClerk();
+  const { user } = useUser();
+  const [userName, setUserName] = useState<string>('Loading...');
   
   // Automatically sync user to database on dashboard access
   useAutoUserSync();
+
+  // Fetch user name from database
+  useEffect(() => {
+    const fetchUserName = async () => {
+      if (!user?.id) return;
+
+      try {
+        const { data: userData, error } = await supabase
+          .from('users')
+          .select('name')
+          .eq('clerk_user_id', user.id)
+          .single();
+
+        if (error) {
+          console.error('Error fetching user name:', error);
+          // Fallback to Clerk user data if database fetch fails
+          setUserName(user.firstName || user.emailAddresses[0]?.emailAddress || 'User');
+          return;
+        }
+
+        if (userData?.name) {
+          setUserName(userData.name);
+        } else {
+          // Fallback to Clerk user data if no name in database
+          setUserName(user.firstName || user.emailAddresses[0]?.emailAddress || 'User');
+        }
+      } catch (error) {
+        console.error('Error fetching user name:', error);
+        // Fallback to Clerk user data
+        setUserName(user.firstName || user.emailAddresses[0]?.emailAddress || 'User');
+      }
+    };
+
+    fetchUserName();
+  }, [user?.id]);
   
   // This would typically come from an API call or context
   // For now using sample data that would be replaced with actual merchant data
@@ -139,7 +177,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
-              <span className="text-sm font-medium text-gray-700">John Merchant</span>
+              <span className="text-sm font-medium text-gray-700">{userName}</span>
             </div>
           </div>
           <button 
