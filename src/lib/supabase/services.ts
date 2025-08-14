@@ -1,5 +1,10 @@
 import { supabase, Database, handleSupabaseError, validateMerchantAccess, validateAdminAccess } from './client';
 
+// Check if Supabase is properly configured
+const isSupabaseConfigured = () => {
+  return process.env.REACT_APP_SUPABASE_URL && process.env.REACT_APP_SUPABASE_ANON_KEY;
+};
+
 // User context interface
 interface UserContext {
   userId: string;
