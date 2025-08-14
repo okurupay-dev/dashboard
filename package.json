@@ -57,6 +57,7 @@
     "@clerk/clerk-sdk-node": "^5.0.0",
     "autoprefixer": "^10.4.14",
     "postcss": "^8.4.31",
+    "svix": "^1.15.0",
     "tailwindcss": "^3.3.0"
   },
   "overrides": {

@@ -31,11 +31,11 @@ node scripts/set-user-metadata.js user@email.com merchant-uuid admin "Business N
    {
      "role": "admin",
      "approved": true,
-     "businessName": "Coffee Shop Inc"
+     "businessName": "Coffee Shop Inc",
+     "merchantId": "550e8400-e29b-41d4-a716-446655440000"
    }
 4. Set Private Metadata:
    {
-     "merchantId": "550e8400-e29b-41d4-a716-446655440000",
      "subscriptionTier": "starter",
      "kycStatus": "pending"
    }
@@ -136,17 +136,19 @@ SELECT * FROM users WHERE clerk_user_id = 'user_xyz123';
 {
   "role": "admin|merchant|staff",
   "approved": true,
-  "businessName": "Your Business Name"
+  "businessName": "Your Business Name",
+  "merchantId": "uuid-v4-string"
 }
 ```
 
 ### Private Metadata (Server-Only)
 ```json
 {
-  "merchantId": "uuid-v4-string",
   "subscriptionTier": "starter|pro|enterprise",
   "kycStatus": "pending|approved|rejected"
 }
 ```
+
+**Note:** `merchantId` is now in `publicMetadata` because `privateMetadata` is not accessible client-side in React apps without server middleware.
 
 This workflow ensures secure, multi-tenant data isolation while working within Clerk's invitation system limitations.

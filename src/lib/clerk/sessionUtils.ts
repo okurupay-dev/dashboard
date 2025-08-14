@@ -10,6 +10,7 @@ export interface UserMetadata {
   merchantId: string;
   role: UserRole;
   approved: boolean;
+  businessName?: string;
 }
 
 // Default metadata for new or unapproved users
@@ -44,7 +45,8 @@ export const useUserMetadata = () => {
   const metadata: UserMetadata = {
     merchantId: (publicMeta.merchantId as string) || defaultMetadata.merchantId,
     role: ((publicMeta.role as string) || defaultMetadata.role) as UserRole,
-    approved: (publicMeta.approved as boolean) || defaultMetadata.approved
+    approved: (publicMeta.approved as boolean) || defaultMetadata.approved,
+    businessName: (publicMeta.businessName as string) || undefined
   };
   
   // Development bypass: auto-approve if no metadata is set (for testing)
@@ -110,13 +112,24 @@ export const useAutoUserSync = () => {
   
   useEffect(() => {
     const syncUserToDatabase = async () => {
+      console.log('🔍 Auto-sync check:', {
+        isLoaded,
+        hasUser: !!user,
+        userId: user?.id,
+        merchantId: metadata.merchantId,
+        approved: metadata.approved,
+        role: metadata.role,
+        publicMetadata: user?.publicMetadata
+      });
+
       // Only sync if user is loaded and has metadata
       if (!isLoaded || !user || !metadata.merchantId || !metadata.approved) {
+        console.log('❌ Auto-sync skipped - missing required data');
         return;
       }
 
       try {
-        console.log('Auto-syncing user to database...');
+        console.log('🚀 Auto-syncing user to database...');
         
         // Check if user already exists in database
         const existingUser = await userSyncService.getUserByClerkId(user.id);
@@ -124,7 +137,11 @@ export const useAutoUserSync = () => {
         if (!existingUser) {
           // User doesn't exist in database, sync them
           const publicMetadata = user.publicMetadata || {};
-          const privateMetadata = (user as any).privateMetadata || {};
+          // Note: privateMetadata is not accessible client-side, using defaults
+          const privateMetadata = {
+            subscriptionTier: 'starter',
+            kycStatus: 'pending'
+          };
           
           await userSyncService.syncUserFromClerk(user, publicMetadata, privateMetadata);
           console.log('User successfully synced to database');

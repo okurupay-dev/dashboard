@@ -45,12 +45,12 @@ async function setUserMetadata() {
     const publicMetadata = {
       role: role,
       approved: true,
-      businessName: businessName
+      businessName: businessName,
+      merchantId: merchantId  // Moved to public for client-side access
     };
 
     // Set private metadata (server-only)
     const privateMetadata = {
-      merchantId: merchantId,
       subscriptionTier: 'starter',
       kycStatus: 'pending'
     };
