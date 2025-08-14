@@ -1,23 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
+import { supabase } from '../../lib/supabase/client';
+import { useUser } from '@clerk/clerk-react';
 
 interface UserProfile {
   name: string;
   email: string;
   role: string;
-  notificationsEnabled: boolean;
-  twoFactorEnabled: boolean;
   theme: 'light' | 'dark' | 'system';
   language: string;
   timezone: string;
-  companyName: string;
-  companyAddress: string;
-  companyWebsite: string;
-  companyIndustry: string;
 }
 
-
+interface CompanyProfile {
+  businessName: string;
+  businessAddress: string;
+  businessWebsite: string;
+  businessType: string;
+  businessPhone: string;
+  businessEmail: string;
+}
 
 interface NotificationSettings {
   email: boolean;
@@ -29,23 +32,29 @@ interface NotificationSettings {
 }
 
 const Settings: React.FC = () => {
-  // Sample initial data
+  const { user } = useUser();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  
+  // User preferences (editable)
   const [profile, setProfile] = useState<UserProfile>({
-    name: 'Alex Johnson',
-    email: 'alex@okuru.com',
-    role: 'Admin',
-    notificationsEnabled: true,
-    twoFactorEnabled: true,
+    name: '',
+    email: '',
+    role: '',
     theme: 'system',
     language: 'English',
-    timezone: 'America/New_York',
-    companyName: 'Okuru Payments Inc.',
-    companyAddress: '123 Blockchain Ave, San Francisco, CA 94105',
-    companyWebsite: 'https://okuru.com',
-    companyIndustry: 'Financial Technology'
+    timezone: 'America/New_York'
   });
 
-
+  // Company information (read-only, managed by Okuru admin)
+  const [companyProfile, setCompanyProfile] = useState<CompanyProfile>({
+    businessName: '',
+    businessAddress: '',
+    businessWebsite: '',
+    businessType: '',
+    businessPhone: '',
+    businessEmail: ''
+  });
 
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
     email: true,
@@ -56,450 +65,390 @@ const Settings: React.FC = () => {
     marketingUpdates: false
   });
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'notifications'>('profile');
-  const [isSaving, setIsSaving] = useState(false);
+  // Load user and company data from database
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (!user?.id) return;
 
-  const handleSaveProfile = () => {
-    setIsSaving(true);
-    // Simulate API call
-    setTimeout(() => {
-      setIsSaving(false);
-      alert('Profile settings saved successfully!');
-    }, 1000);
+      try {
+        setLoading(true);
+
+        // Get user profile from database
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select(`
+            name,
+            email,
+            role,
+            merchant_id
+          `)
+          .eq('clerk_user_id', user.id)
+          .single();
+
+        if (userError) {
+          console.error('Error loading user data:', userError);
+          return;
+        }
+
+        if (userData) {
+          // Set user profile data
+          setProfile({
+            name: userData.name || '',
+            email: userData.email || '',
+            role: userData.role || '',
+            theme: 'system', // Default theme, could be stored in user preferences
+            language: 'English', // Default language, could be stored in user preferences
+            timezone: 'America/New_York' // Default timezone, could be stored in user preferences
+          });
+
+          // Get merchant data separately
+          if (userData.merchant_id) {
+            const { data: merchantData, error: merchantError } = await supabase
+              .from('merchants')
+              .select(`
+                business_name,
+                business_address,
+                business_website,
+                business_type,
+                business_phone,
+                business_email
+              `)
+              .eq('merchant_id', userData.merchant_id)
+              .single();
+
+            if (!merchantError && merchantData) {
+              setCompanyProfile({
+                businessName: merchantData.business_name || '',
+                businessAddress: merchantData.business_address || '',
+                businessWebsite: merchantData.business_website || '',
+                businessType: merchantData.business_type || '',
+                businessPhone: merchantData.business_phone || '',
+                businessEmail: merchantData.business_email || ''
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading settings data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUserData();
+  }, [user?.id]);
+
+  // Save user preferences (only editable fields)
+  const handleSavePreferences = async () => {
+    if (!user?.id) return;
+
+    try {
+      setSaving(true);
+
+      // Only save user preferences, not company data
+      const { error } = await supabase
+        .from('users')
+        .update({
+          name: profile.name,
+          // Note: email and role are managed by Okuru admin
+          // theme, language, timezone could be added to user_preferences table
+        })
+        .eq('clerk_user_id', user.id);
+
+      if (error) {
+        console.error('Error saving preferences:', error);
+        alert('Error saving preferences. Please try again.');
+        return;
+      }
+
+      alert('Preferences saved successfully!');
+    } catch (error) {
+      console.error('Error saving preferences:', error);
+      alert('Error saving preferences. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleSaveNotificationSettings = () => {
-    setIsSaving(true);
-    // Simulate API call
-    setTimeout(() => {
-      setIsSaving(false);
-      alert('Notification settings saved successfully!');
-    }, 1000);
-  };
-
-
-
-  const renderProfileSettings = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle>Profile Settings</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-            <input
-              type="text"
-              className="w-full p-2 border rounded-md"
-              value={profile.name}
-              onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-            <input
-              type="email"
-              className="w-full p-2 border rounded-md"
-              value={profile.email}
-              onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-            <select
-              className="w-full p-2 border rounded-md"
-              value={profile.role}
-              onChange={(e) => setProfile({ ...profile, role: e.target.value })}
-            >
-              <option value="Admin">Admin</option>
-              <option value="Manager">Manager</option>
-              <option value="Viewer">Viewer</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Theme</label>
-            <select
-              className="w-full p-2 border rounded-md"
-              value={profile.theme}
-              onChange={(e) => setProfile({ ...profile, theme: e.target.value as 'light' | 'dark' | 'system' })}
-            >
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-              <option value="system">System Default</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Language</label>
-            <select
-              className="w-full p-2 border rounded-md"
-              value={profile.language}
-              onChange={(e) => setProfile({ ...profile, language: e.target.value })}
-            >
-              <option value="English">English</option>
-              <option value="Spanish">Spanish</option>
-              <option value="French">French</option>
-              <option value="German">German</option>
-              <option value="Japanese">Japanese</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
-            <select
-              className="w-full p-2 border rounded-md"
-              value={profile.timezone}
-              onChange={(e) => setProfile({ ...profile, timezone: e.target.value })}
-            >
-              <option value="America/New_York">Eastern Time (ET)</option>
-              <option value="America/Chicago">Central Time (CT)</option>
-              <option value="America/Denver">Mountain Time (MT)</option>
-              <option value="America/Los_Angeles">Pacific Time (PT)</option>
-              <option value="Europe/London">Greenwich Mean Time (GMT)</option>
-              <option value="Europe/Paris">Central European Time (CET)</option>
-              <option value="Asia/Tokyo">Japan Standard Time (JST)</option>
-            </select>
-          </div>
-          <div className="pt-6 pb-4 border-t mt-4">
-            <h3 className="text-lg font-medium mb-4">Company Information</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
-                <input
-                  type="text"
-                  className="w-full p-2 border rounded-md"
-                  value={profile.companyName}
-                  onChange={(e) => setProfile({ ...profile, companyName: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Company Address</label>
-                <input
-                  type="text"
-                  className="w-full p-2 border rounded-md"
-                  value={profile.companyAddress}
-                  onChange={(e) => setProfile({ ...profile, companyAddress: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Company Website</label>
-                <input
-                  type="url"
-                  className="w-full p-2 border rounded-md"
-                  value={profile.companyWebsite}
-                  onChange={(e) => setProfile({ ...profile, companyWebsite: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Industry</label>
-                <select
-                  className="w-full p-2 border rounded-md"
-                  value={profile.companyIndustry}
-                  onChange={(e) => setProfile({ ...profile, companyIndustry: e.target.value })}
-                >
-                  <option value="Financial Technology">Financial Technology</option>
-                  <option value="Banking">Banking</option>
-                  <option value="Cryptocurrency">Cryptocurrency</option>
-                  <option value="Retail">Retail</option>
-                  <option value="E-commerce">E-commerce</option>
-                  <option value="Technology">Technology</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-            </div>
-          </div>
-          <div className="pt-4">
-            <Button 
-              onClick={handleSaveProfile}
-              disabled={isSaving}
-              className="w-full"
-            >
-              {isSaving ? 'Saving...' : 'Save Profile Settings'}
-            </Button>
+  if (loading) {
+    return (
+      <div className="p-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
+          <div className="space-y-4">
+            <div className="h-32 bg-gray-200 rounded"></div>
+            <div className="h-32 bg-gray-200 rounded"></div>
+            <div className="h-32 bg-gray-200 rounded"></div>
           </div>
         </div>
-      </CardContent>
-    </Card>
-  );
-
-  const renderSecuritySettings = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle>Security Settings</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-medium">Two-Factor Authentication</h3>
-              <p className="text-sm text-gray-500">Add an extra layer of security to your account</p>
-            </div>
-            <div className="flex items-center">
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input 
-                  type="checkbox" 
-                  className="sr-only peer"
-                  checked={profile.twoFactorEnabled}
-                  onChange={() => setProfile({ ...profile, twoFactorEnabled: !profile.twoFactorEnabled })}
-                />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-              </label>
-            </div>
-          </div>
-          <div className="pt-2 pb-2 border-t border-b">
-            <h3 className="text-lg font-medium pt-2 pb-2">Password</h3>
-            <div className="space-y-4 pt-2">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
-                <input
-                  type="password"
-                  className="w-full p-2 border rounded-md"
-                  placeholder="••••••••"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
-                <input
-                  type="password"
-                  className="w-full p-2 border rounded-md"
-                  placeholder="••••••••"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
-                <input
-                  type="password"
-                  className="w-full p-2 border rounded-md"
-                  placeholder="••••••••"
-                />
-              </div>
-            </div>
-          </div>
-          <div className="pt-4">
-            <h3 className="text-lg font-medium mb-2">Session Management</h3>
-            <div className="bg-gray-50 p-4 rounded-md mb-4">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="font-medium">Current Session</p>
-                  <p className="text-sm text-gray-500">Chrome on macOS • New York, USA</p>
-                </div>
-                <div className="text-sm text-green-600 font-medium">Active</div>
-              </div>
-            </div>
-            <Button variant="outline" className="w-full">Sign Out All Other Sessions</Button>
-          </div>
-          <div className="pt-4">
-            <Button 
-              onClick={handleSaveProfile}
-              disabled={isSaving}
-              className="w-full"
-            >
-              {isSaving ? 'Saving...' : 'Save Security Settings'}
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-
-  const renderNotificationSettings = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle>Notification Settings</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <div>
-            <h3 className="text-lg font-medium mb-2">Notification Channels</h3>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Email Notifications</p>
-                  <p className="text-sm text-gray-500">Receive notifications via email</p>
-                </div>
-                <div className="flex items-center">
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      className="sr-only peer"
-                      checked={notificationSettings.email}
-                      onChange={() => setNotificationSettings({ 
-                        ...notificationSettings, 
-                        email: !notificationSettings.email 
-                      })}
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Push Notifications</p>
-                  <p className="text-sm text-gray-500">Receive notifications in browser</p>
-                </div>
-                <div className="flex items-center">
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      className="sr-only peer"
-                      checked={notificationSettings.push}
-                      onChange={() => setNotificationSettings({ 
-                        ...notificationSettings, 
-                        push: !notificationSettings.push 
-                      })}
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">SMS Notifications</p>
-                  <p className="text-sm text-gray-500">Receive notifications via SMS</p>
-                </div>
-                <div className="flex items-center">
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      className="sr-only peer"
-                      checked={notificationSettings.sms}
-                      onChange={() => setNotificationSettings({ 
-                        ...notificationSettings, 
-                        sms: !notificationSettings.sms 
-                      })}
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="pt-4">
-            <h3 className="text-lg font-medium mb-2">Notification Types</h3>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Transaction Alerts</p>
-                  <p className="text-sm text-gray-500">Get notified about new transactions</p>
-                </div>
-                <div className="flex items-center">
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      className="sr-only peer"
-                      checked={notificationSettings.transactionAlerts}
-                      onChange={() => setNotificationSettings({ 
-                        ...notificationSettings, 
-                        transactionAlerts: !notificationSettings.transactionAlerts 
-                      })}
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Security Alerts</p>
-                  <p className="text-sm text-gray-500">Get notified about security events</p>
-                </div>
-                <div className="flex items-center">
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      className="sr-only peer"
-                      checked={notificationSettings.securityAlerts}
-                      onChange={() => setNotificationSettings({ 
-                        ...notificationSettings, 
-                        securityAlerts: !notificationSettings.securityAlerts 
-                      })}
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Marketing Updates</p>
-                  <p className="text-sm text-gray-500">Receive product updates and news</p>
-                </div>
-                <div className="flex items-center">
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      className="sr-only peer"
-                      checked={notificationSettings.marketingUpdates}
-                      onChange={() => setNotificationSettings({ 
-                        ...notificationSettings, 
-                        marketingUpdates: !notificationSettings.marketingUpdates 
-                      })}
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="pt-4">
-            <Button 
-              onClick={handleSaveNotificationSettings}
-              disabled={isSaving}
-              className="w-full"
-            >
-              {isSaving ? 'Saving...' : 'Save Notification Settings'}
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
+      </div>
+    );
+  }
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Settings</h1>
-      </div>
+    <div className="p-6 max-w-4xl mx-auto">
+      <h1 className="text-3xl font-bold text-gray-900 mb-8">Settings</h1>
 
-      <div className="mb-6">
-        <div className="border-b">
-          <nav className="flex -mb-px space-x-8">
-            <button
-              onClick={() => setActiveTab('profile')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'profile'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* User Profile Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>User Profile</CardTitle>
+            <p className="text-sm text-gray-600">Manage your personal account settings</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+              <input
+                type="text"
+                className="w-full p-2 border rounded-md"
+                value={profile.name}
+                onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <input
+                type="email"
+                className="w-full p-2 border rounded-md bg-gray-50"
+                value={profile.email}
+                disabled
+                title="Email is managed by Okuru admin"
+              />
+              <p className="text-xs text-gray-500 mt-1">Email is managed by your administrator</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+              <input
+                type="text"
+                className="w-full p-2 border rounded-md bg-gray-50"
+                value={profile.role}
+                disabled
+                title="Role is managed by Okuru admin"
+              />
+              <p className="text-xs text-gray-500 mt-1">Role is managed by your administrator</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Theme</label>
+              <select
+                className="w-full p-2 border rounded-md"
+                value={profile.theme}
+                onChange={(e) => setProfile({ ...profile, theme: e.target.value as 'light' | 'dark' | 'system' })}
+              >
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+                <option value="system">System Default</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Language</label>
+              <select
+                className="w-full p-2 border rounded-md"
+                value={profile.language}
+                onChange={(e) => setProfile({ ...profile, language: e.target.value })}
+              >
+                <option value="English">English</option>
+                <option value="Spanish">Spanish</option>
+                <option value="French">French</option>
+                <option value="German">German</option>
+                <option value="Japanese">Japanese</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
+              <select
+                className="w-full p-2 border rounded-md"
+                value={profile.timezone}
+                onChange={(e) => setProfile({ ...profile, timezone: e.target.value })}
+              >
+                <option value="America/New_York">Eastern Time (ET)</option>
+                <option value="America/Chicago">Central Time (CT)</option>
+                <option value="America/Denver">Mountain Time (MT)</option>
+                <option value="America/Los_Angeles">Pacific Time (PT)</option>
+                <option value="Europe/London">Greenwich Mean Time (GMT)</option>
+                <option value="Europe/Paris">Central European Time (CET)</option>
+                <option value="Asia/Tokyo">Japan Standard Time (JST)</option>
+              </select>
+            </div>
+            <Button 
+              onClick={handleSavePreferences} 
+              disabled={saving}
+              className="w-full"
             >
-              Profile
-            </button>
-            <button
-              onClick={() => setActiveTab('security')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'security'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Security
-            </button>
+              {saving ? 'Saving...' : 'Save Preferences'}
+            </Button>
+          </CardContent>
+        </Card>
 
-            <button
-              onClick={() => setActiveTab('notifications')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'notifications'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Notifications
-            </button>
-          </nav>
-        </div>
-      </div>
+        {/* Company Information Section (Read-Only) */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Company Information</CardTitle>
+            <p className="text-sm text-gray-600">Business details managed by Okuru admin</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Business Name</label>
+              <input
+                type="text"
+                className="w-full p-2 border rounded-md bg-gray-50"
+                value={companyProfile.businessName}
+                disabled
+                title="Managed by Okuru admin"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Business Address</label>
+              <input
+                type="text"
+                className="w-full p-2 border rounded-md bg-gray-50"
+                value={companyProfile.businessAddress}
+                disabled
+                title="Managed by Okuru admin"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
+              <input
+                type="url"
+                className="w-full p-2 border rounded-md bg-gray-50"
+                value={companyProfile.businessWebsite}
+                disabled
+                title="Managed by Okuru admin"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Business Type</label>
+              <input
+                type="text"
+                className="w-full p-2 border rounded-md bg-gray-50"
+                value={companyProfile.businessType}
+                disabled
+                title="Managed by Okuru admin"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Business Phone</label>
+              <input
+                type="tel"
+                className="w-full p-2 border rounded-md bg-gray-50"
+                value={companyProfile.businessPhone}
+                disabled
+                title="Managed by Okuru admin"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Business Email</label>
+              <input
+                type="email"
+                className="w-full p-2 border rounded-md bg-gray-50"
+                value={companyProfile.businessEmail}
+                disabled
+                title="Managed by Okuru admin"
+              />
+            </div>
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+              <p className="text-sm text-blue-800">
+                <strong>Note:</strong> Company information is managed by your Okuru administrator. 
+                Contact support if you need to update these details.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
 
-      <div>
-        {activeTab === 'profile' && renderProfileSettings()}
-        {activeTab === 'security' && renderSecuritySettings()}
-  
-        {activeTab === 'notifications' && renderNotificationSettings()}
+        {/* Notification Settings */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Notification Preferences</CardTitle>
+            <p className="text-sm text-gray-600">Choose how you want to receive notifications</p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <h4 className="font-medium text-gray-900">Notification Types</h4>
+                <div className="space-y-3">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                      checked={notificationSettings.transactionAlerts}
+                      onChange={(e) => setNotificationSettings({
+                        ...notificationSettings,
+                        transactionAlerts: e.target.checked
+                      })}
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Transaction Alerts</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                      checked={notificationSettings.securityAlerts}
+                      onChange={(e) => setNotificationSettings({
+                        ...notificationSettings,
+                        securityAlerts: e.target.checked
+                      })}
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Security Alerts</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                      checked={notificationSettings.marketingUpdates}
+                      onChange={(e) => setNotificationSettings({
+                        ...notificationSettings,
+                        marketingUpdates: e.target.checked
+                      })}
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Marketing Updates</span>
+                  </label>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <h4 className="font-medium text-gray-900">Delivery Methods</h4>
+                <div className="space-y-3">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                      checked={notificationSettings.email}
+                      onChange={(e) => setNotificationSettings({
+                        ...notificationSettings,
+                        email: e.target.checked
+                      })}
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Email</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                      checked={notificationSettings.push}
+                      onChange={(e) => setNotificationSettings({
+                        ...notificationSettings,
+                        push: e.target.checked
+                      })}
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Push Notifications</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                      checked={notificationSettings.sms}
+                      onChange={(e) => setNotificationSettings({
+                        ...notificationSettings,
+                        sms: e.target.checked
+                      })}
+                    />
+                    <span className="ml-2 text-sm text-gray-700">SMS</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
