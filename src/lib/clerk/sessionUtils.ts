@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useUser } from '@clerk/clerk-react';
+import { userSyncService } from '../supabase/services';
 
 // Define user roles
 export type UserRole = 'admin' | 'merchant' | 'staff';
@@ -100,4 +101,41 @@ export const withRoleProtection = (
     
     return React.createElement(Component, props);
   };
+};
+
+// Hook to automatically sync user with database on first login
+export const useAutoUserSync = () => {
+  const { user, isLoaded } = useUser();
+  const { metadata } = useUserMetadata();
+  
+  useEffect(() => {
+    const syncUserToDatabase = async () => {
+      // Only sync if user is loaded and has metadata
+      if (!isLoaded || !user || !metadata.merchantId || !metadata.approved) {
+        return;
+      }
+
+      try {
+        console.log('Auto-syncing user to database...');
+        
+        // Check if user already exists in database
+        const existingUser = await userSyncService.getUserByClerkId(user.id);
+        
+        if (!existingUser) {
+          // User doesn't exist in database, sync them
+          const publicMetadata = user.publicMetadata || {};
+          const privateMetadata = (user as any).privateMetadata || {};
+          
+          await userSyncService.syncUserFromClerk(user, publicMetadata, privateMetadata);
+          console.log('User successfully synced to database');
+        } else {
+          console.log('User already exists in database');
+        }
+      } catch (error) {
+        console.error('Failed to auto-sync user to database:', error);
+      }
+    };
+
+    syncUserToDatabase();
+  }, [isLoaded, user?.id, metadata.merchantId, metadata.approved]);
 };

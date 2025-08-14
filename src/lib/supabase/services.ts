@@ -8,13 +8,17 @@ const isSupabaseConfigured = () => {
 // User Synchronization Service - Syncs Clerk users with Supabase
 export const userSyncService = {
   // Sync user from Clerk to Supabase database
-  syncUserFromClerk: async (clerkUser: any, metadata: any) => {
+  syncUserFromClerk: async (clerkUser: any, publicMetadata: any, privateMetadata: any) => {
     try {
-      if (!clerkUser || !metadata) {
+      if (!clerkUser || !publicMetadata || !privateMetadata) {
         throw new Error('Missing Clerk user or metadata');
       }
 
-      const { merchantId, role, approved, businessName } = metadata;
+      // Extract from public metadata (client-accessible)
+      const { role, approved, businessName } = publicMetadata;
+      
+      // Extract from private metadata (server-only)
+      const { merchantId, subscriptionTier, kycStatus } = privateMetadata;
       
       if (!merchantId) {
         throw new Error('merchantId is required in Clerk metadata');

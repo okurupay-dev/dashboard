@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useClerk } from '@clerk/clerk-react';
+import { useAutoUserSync } from '../../lib/clerk/sessionUtils';
 import logo from '../../assets/images/logo.svg';
 
 // Check if we're in development mode
@@ -20,6 +21,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const location = useLocation();
   const currentPath = location.pathname;
   const { signOut } = useClerk();
+  
+  // Automatically sync user to database on dashboard access
+  useAutoUserSync();
   
   // This would typically come from an API call or context
   // For now using sample data that would be replaced with actual merchant data
