@@ -201,10 +201,12 @@ const Settings: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
               <input
                 type="text"
-                className="w-full p-2 border rounded-md"
+                className="w-full p-2 border rounded-md bg-gray-50"
                 value={profile.name}
-                onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                disabled
+                title="Name is managed by Okuru"
               />
+              <p className="text-xs text-gray-500 mt-1">Name is managed by Okuru</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
@@ -213,9 +215,9 @@ const Settings: React.FC = () => {
                 className="w-full p-2 border rounded-md bg-gray-50"
                 value={profile.email}
                 disabled
-                title="Email is managed by Okuru admin"
+                title="Email is managed by Okuru"
               />
-              <p className="text-xs text-gray-500 mt-1">Email is managed by your administrator</p>
+              <p className="text-xs text-gray-500 mt-1">Email is managed by Okuru</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
@@ -224,9 +226,9 @@ const Settings: React.FC = () => {
                 className="w-full p-2 border rounded-md bg-gray-50"
                 value={profile.role}
                 disabled
-                title="Role is managed by Okuru admin"
+                title="Role is managed by Okuru"
               />
-              <p className="text-xs text-gray-500 mt-1">Role is managed by your administrator</p>
+              <p className="text-xs text-gray-500 mt-1">Role is managed by Okuru</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Theme</label>
@@ -284,7 +286,7 @@ const Settings: React.FC = () => {
         <Card>
           <CardHeader>
             <CardTitle>Company Information</CardTitle>
-            <p className="text-sm text-gray-600">Business details managed by Okuru admin</p>
+            <p className="text-sm text-gray-600">Business details managed by Okuru</p>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
@@ -294,7 +296,7 @@ const Settings: React.FC = () => {
                 className="w-full p-2 border rounded-md bg-gray-50"
                 value={companyProfile.businessName}
                 disabled
-                title="Managed by Okuru admin"
+                title="Managed by Okuru"
               />
             </div>
             <div>
@@ -304,7 +306,7 @@ const Settings: React.FC = () => {
                 className="w-full p-2 border rounded-md bg-gray-50"
                 value={companyProfile.businessAddress}
                 disabled
-                title="Managed by Okuru admin"
+                title="Managed by Okuru"
               />
             </div>
             <div>
@@ -314,7 +316,7 @@ const Settings: React.FC = () => {
                 className="w-full p-2 border rounded-md bg-gray-50"
                 value={companyProfile.businessWebsite}
                 disabled
-                title="Managed by Okuru admin"
+                title="Managed by Okuru"
               />
             </div>
             <div>
@@ -324,7 +326,7 @@ const Settings: React.FC = () => {
                 className="w-full p-2 border rounded-md bg-gray-50"
                 value={companyProfile.businessType}
                 disabled
-                title="Managed by Okuru admin"
+                title="Managed by Okuru"
               />
             </div>
             <div>
@@ -334,7 +336,7 @@ const Settings: React.FC = () => {
                 className="w-full p-2 border rounded-md bg-gray-50"
                 value={companyProfile.businessPhone}
                 disabled
-                title="Managed by Okuru admin"
+                title="Managed by Okuru"
               />
             </div>
             <div>
@@ -344,12 +346,12 @@ const Settings: React.FC = () => {
                 className="w-full p-2 border rounded-md bg-gray-50"
                 value={companyProfile.businessEmail}
                 disabled
-                title="Managed by Okuru admin"
+                title="Managed by Okuru"
               />
             </div>
             <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
               <p className="text-sm text-blue-800">
-                <strong>Note:</strong> Company information is managed by your Okuru administrator. 
+                <strong>Note:</strong> Company information is managed by Okuru. 
                 Contact support if you need to update these details.
               </p>
             </div>
