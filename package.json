@@ -56,5 +56,11 @@
     "autoprefixer": "^10.4.14",
     "postcss": "^8.4.31",
     "tailwindcss": "^3.3.0"
+  },
+  "overrides": {
+    "viem": "^2.18.2"
+  },
+  "resolutions": {
+    "viem": "^2.18.2"
   }
 }
