@@ -5,6 +5,116 @@ const isSupabaseConfigured = () => {
   return process.env.REACT_APP_SUPABASE_URL && process.env.REACT_APP_SUPABASE_ANON_KEY;
 };
 
+// User Synchronization Service - Syncs Clerk users with Supabase
+export const userSyncService = {
+  // Sync user from Clerk to Supabase database
+  syncUserFromClerk: async (clerkUser: any, metadata: any) => {
+    try {
+      if (!clerkUser || !metadata) {
+        throw new Error('Missing Clerk user or metadata');
+      }
+
+      const { merchantId, role, approved, businessName } = metadata;
+      
+      if (!merchantId) {
+        throw new Error('merchantId is required in Clerk metadata');
+      }
+
+      // 1. Create or verify merchant record
+      const { error: merchantError } = await supabase
+        .from('merchants')
+        .upsert({
+          merchant_id: merchantId,
+          name: businessName || clerkUser.fullName || 'New Business',
+          status: 'active'
+        }, {
+          onConflict: 'merchant_id',
+          ignoreDuplicates: true
+        });
+
+      if (merchantError) {
+        console.error('Error creating merchant:', merchantError);
+      }
+
+      // 2. Create or update user record
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('user_id')
+        .eq('clerk_user_id', clerkUser.id)
+        .single();
+
+      if (!existingUser) {
+        // Create new user
+        const { data: newUser, error: userError } = await supabase
+          .from('users')
+          .insert({
+            clerk_user_id: clerkUser.id,
+            merchant_id: merchantId,
+            name: clerkUser.fullName || clerkUser.firstName || 'User',
+            email: clerkUser.primaryEmailAddress?.emailAddress || '',
+            role: role || 'merchant',
+            approved: approved || false
+          })
+          .select()
+          .single();
+
+        if (userError) {
+          throw userError;
+        }
+
+        console.log('Created new user in database:', newUser);
+        return newUser;
+      } else {
+        // Update existing user
+        const { data: updatedUser, error: updateError } = await supabase
+          .from('users')
+          .update({
+            name: clerkUser.fullName || clerkUser.firstName || 'User',
+            email: clerkUser.primaryEmailAddress?.emailAddress || '',
+            role: role || 'merchant',
+            approved: approved || false
+          })
+          .eq('clerk_user_id', clerkUser.id)
+          .select()
+          .single();
+
+        if (updateError) {
+          throw updateError;
+        }
+
+        console.log('Updated existing user in database:', updatedUser);
+        return updatedUser;
+      }
+    } catch (error) {
+      console.error('Error syncing user from Clerk:', error);
+      throw error;
+    }
+  },
+
+  // Get user from database by Clerk ID
+  getUserByClerkId: async (clerkUserId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select(`
+          *,
+          merchants(*)
+        `)
+        .eq('clerk_user_id', clerkUserId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error getting user by Clerk ID:', error);
+      return null;
+    }
+  }
+};
+
 // User context interface
 interface UserContext {
   userId: string;
