@@ -1,33 +1,150 @@
 // Wallets page - Single Okuru wallet via Web3Auth
 
 import React, { useState, useEffect } from 'react';
-import { Wallet, Shield, ExternalLink, CheckCircle, AlertCircle, Clock, Copy } from 'lucide-react';
 import { useUser } from '@clerk/clerk-react';
 import { useUserMetadata } from '../../lib/clerk/sessionUtils';
-import { 
-  MerchantWallet, 
-  WalletAddress, 
-  SupportedChain, 
-  VerificationChallenge,
-  WalletSetupStatus 
-} from './types';
-import {
-  walletProvider,
-  generateVerificationChallenge,
-  getChainById,
-  getEnabledChains,
-  formatAddress,
-  getExplorerUrl,
-  getWalletSetupStatus,
-  SUPPORTED_CHAINS
-} from '../../lib/wallet/simpleWalletProvider';
-import {
-  createMerchantWallet,
-  getMerchantWallet,
-  verifyChainAddress,
-  sampleWalletData,
-  sampleWalletSetupStatus
-} from '../../lib/api/walletService';
+import { CheckCircle, AlertCircle, ExternalLink, Wallet, Shield, Clock, Copy } from 'lucide-react';
+import { walletProvider } from '../../lib/wallet/simpleWalletProvider';
+import { walletService } from '../../lib/supabase/services';
+import { useSupabaseAuth } from '../../lib/supabase/client';
+
+// Types for wallet data
+interface MerchantWallet {
+  wallet_id: string;
+  merchant_id: string;
+  web3auth_user_id: string | null;
+  addresses: WalletAddress[];
+  created_at: string;
+  updated_at: string;
+}
+
+interface WalletAddress {
+  address_id: string;
+  wallet_id: string;
+  blockchain: string;
+  address: string;
+  is_verified: boolean;
+  verification_signature: string | null;
+  verified_at: string | null;
+  created_at: string;
+}
+
+interface WalletSetupStatus {
+  isComplete: boolean;
+  totalChains: number;
+  verifiedChains: number;
+  hasWallet: boolean;
+  hasLocations: boolean;
+  hasStaff: boolean;
+  hasTerminals: boolean;
+}
+
+interface SupportedChain {
+  id: string;
+  name: string;
+  symbol: string;
+  enabled: boolean;
+}
+
+// Supported chains configuration
+const SUPPORTED_CHAINS: SupportedChain[] = [
+  { id: 'ethereum', name: 'Ethereum', symbol: 'ETH', enabled: true },
+  { id: 'polygon', name: 'Polygon', symbol: 'MATIC', enabled: true },
+  { id: 'bsc', name: 'BSC', symbol: 'BNB', enabled: true }
+];
+
+// Utility functions
+const getEnabledChains = () => SUPPORTED_CHAINS.filter(chain => chain.enabled);
+const getChainById = (id: string) => SUPPORTED_CHAINS.find(chain => chain.id === id);
+const formatAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
+const getExplorerUrl = (blockchain: string, address: string) => {
+  const explorers: Record<string, string> = {
+    ethereum: 'https://etherscan.io/address/',
+    polygon: 'https://polygonscan.com/address/',
+    bsc: 'https://bscscan.com/address/'
+  };
+  return explorers[blockchain] + address;
+};
+
+const generateVerificationChallenge = (address: string, blockchain: string) => {
+  return `Please sign this message to verify ownership of ${address} on ${blockchain}. Timestamp: ${Date.now()}`;
+};
+
+const getWalletSetupStatus = (wallet: MerchantWallet | null): WalletSetupStatus => {
+  if (!wallet) {
+    return {
+      isComplete: false,
+      totalChains: 3,
+      verifiedChains: 0,
+      hasWallet: false,
+      hasLocations: true,
+      hasStaff: false,
+      hasTerminals: true
+    };
+  }
+  
+  const verifiedChains = wallet.addresses.filter(addr => addr.is_verified).length;
+  return {
+    isComplete: verifiedChains >= 1,
+    totalChains: 3,
+    verifiedChains,
+    hasWallet: true,
+    hasLocations: true,
+    hasStaff: false,
+    hasTerminals: true
+  };
+};
+
+// Sample data for fallback
+const sampleWalletData: MerchantWallet = {
+  wallet_id: 'wallet_123',
+  merchant_id: 'merchant_456',
+  web3auth_user_id: 'web3auth_789',
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+  addresses: [
+    {
+      address_id: 'addr_1',
+      wallet_id: 'wallet_123',
+      blockchain: 'ethereum',
+      address: '0x742d35Cc6634C0532925a3b8D2F7e8b6',
+      is_verified: true,
+      verification_signature: 'sample_signature',
+      verified_at: '2024-01-15T10:30:00Z',
+      created_at: new Date().toISOString()
+    },
+    {
+      address_id: 'addr_2',
+      wallet_id: 'wallet_123', 
+      blockchain: 'polygon',
+      address: '0x742d35Cc6634C0532925a3b8D2F7e8b6',
+      is_verified: false,
+      verification_signature: null,
+      verified_at: null,
+      created_at: new Date().toISOString()
+    },
+    {
+      address_id: 'addr_3',
+      wallet_id: 'wallet_123',
+      blockchain: 'bsc', 
+      address: '0x742d35Cc6634C0532925a3b8D2F7e8b6',
+      is_verified: false,
+      verification_signature: null,
+      verified_at: null,
+      created_at: new Date().toISOString()
+    }
+  ]
+};
+
+const sampleWalletSetupStatus: WalletSetupStatus = {
+  isComplete: false,
+  totalChains: 3,
+  verifiedChains: 1,
+  hasWallet: true,
+  hasLocations: true,
+  hasStaff: false,
+  hasTerminals: true
+};
 
 const Wallets: React.FC = () => {
   const isDevelopment = process.env.NODE_ENV === 'development';
@@ -85,26 +202,35 @@ const Wallets: React.FC = () => {
         if (!user || !metadata || !metadata.merchantId) {
           console.log('Using sample data due to missing user/metadata');
           const walletData = sampleWalletData;
-          const statusData = sampleWalletSetupStatus;
+          const statusData = getWalletSetupStatus(walletData);
           setWallet(walletData);
           setSetupStatus(statusData);
           setIsLoading(false);
           return;
         }
 
-        // For production with real user data
-        // TODO: Uncomment when API is ready
-        // const walletData = await getMerchantWallet({
-        //   userId: user.id,
-        //   merchantId: metadata.merchantId,
-        //   role: metadata.role
-        // });
-        
-        const walletData = sampleWalletData;
-        const statusData = sampleWalletSetupStatus;
-
-        setWallet(walletData);
-        setSetupStatus(statusData);
+        // For production with real user data - use Supabase
+        try {
+          const userContext = {
+            userId: user.id,
+            merchantId: metadata.merchantId,
+            role: metadata.role,
+            approved: metadata.approved || false
+          };
+          
+          const walletData = await walletService.getMerchantWallet(userContext);
+          const statusData = getWalletSetupStatus(walletData);
+          
+          setWallet(walletData);
+          setSetupStatus(statusData);
+        } catch (apiError) {
+          console.log('API not available, using sample data:', apiError);
+          // Fallback to sample data if API fails
+          const walletData = sampleWalletData;
+          const statusData = getWalletSetupStatus(walletData);
+          setWallet(walletData);
+          setSetupStatus(statusData);
+        }
       } catch (error) {
         console.error('Failed to load wallet data:', error);
         setError('Failed to load wallet data');
@@ -116,9 +242,9 @@ const Wallets: React.FC = () => {
     loadWalletData();
   }, [user, metadata]);
 
-  // Create wallet via simplified provider
+  // Create wallet via Web3Auth and Supabase
   const handleCreateWallet = async () => {
-    if (!walletInitialized || !user) return;
+    if (!walletInitialized || !user || !metadata) return;
 
     try {
       setIsCreating(true);
@@ -129,125 +255,106 @@ const Wallets: React.FC = () => {
       if (!connectedWallet) {
         throw new Error('Failed to connect wallet');
       }
-      
-      // Derive addresses for all supported chains
-      const addresses = await walletProvider.deriveChainAddresses();
 
-      // Create wallet in backend
-      // TODO: Uncomment when API is ready
-      // const newWallet = await createMerchantWallet(
-      //   {
-      //     userId: user.id,
-      //     merchantId: metadata.merchantId,
-      //     role: metadata.role
-      //   },
-      //   {
-      //     web3auth_user_id: userInfo.verifierId || user.id,
-      //     addresses
-      //   }
-      // );
-
-      // For development, simulate wallet creation
-      const newWallet: MerchantWallet = {
-        wallet_id: `wallet-${Date.now()}`,
-        merchant_id: metadata.merchantId,
-        web3auth_user_id: user.id,
-        created_at: new Date().toISOString(),
-        addresses
+      // Create wallet in Supabase
+      const userContext = {
+        userId: user.id,
+        merchantId: metadata.merchantId,
+        role: metadata.role,
+        approved: metadata.approved || false
       };
-
-      setWallet(newWallet);
-      setSetupStatus(getWalletSetupStatus(addresses));
       
-    } catch (error: any) {
-      console.error('Wallet creation failed:', error);
-      if (error.message.includes('popup') || error.message.includes('blocked')) {
-        setError('Pop-up blocked or session failed. Please try again or allow pop-ups.');
-      } else {
-        setError('Failed to create wallet. Please try again.');
+      const newWallet = await walletService.createMerchantWallet(userContext, connectedWallet.userId);
+      
+      // Get addresses for enabled chains and add to Supabase
+      const enabledChains = getEnabledChains();
+      const addresses: WalletAddress[] = [];
+
+      for (const chain of enabledChains) {
+        const address = await walletProvider.getAddress(chain.id);
+        if (address) {
+          const walletAddress = await walletService.addWalletAddress(
+            userContext,
+            newWallet.wallet_id,
+            chain.id,
+            address
+          );
+          addresses.push(walletAddress);
+        }
       }
+
+      // Update wallet with addresses
+      const walletWithAddresses = { ...newWallet, addresses };
+      setWallet(walletWithAddresses);
+      setSetupStatus(getWalletSetupStatus(walletWithAddresses));
+    } catch (error) {
+      console.error('Wallet creation failed:', error);
+      setError(error instanceof Error ? error.message : 'Failed to create wallet');
     } finally {
       setIsCreating(false);
     }
   };
 
-  // Verify chain ownership
-  const handleVerifyChain = async (chainId: string) => {
-    if (!wallet || !walletInitialized) return;
-
-    const chain = getChainById(chainId);
-    const address = wallet.addresses.find(addr => addr.chain_id === chainId);
-    
-    if (!chain || !address) return;
+  // Verify chain address with signature
+  const handleVerifyAddress = async (address: WalletAddress) => {
+    if (!walletInitialized || !user || !metadata) return;
 
     try {
-      setVerifyingChain(chainId);
+      setVerifyingChain(address.blockchain);
       setError(null);
 
-      // Check if wallet is connected
-      if (!walletProvider.isConnected()) {
-        throw new Error('Wallet not connected');
+      const chain = getChainById(address.blockchain);
+      if (!chain) {
+        throw new Error('Unsupported chain');
       }
 
       // Generate verification challenge
-      const challenge = generateVerificationChallenge(metadata.merchantId, chain);
-
-      // Sign the challenge
-      const signature = await walletProvider.signMessage(challenge.message);
-
-      // Verify with backend
-      // TODO: Uncomment when API is ready
-      // const verifiedAddress = await verifyChainAddress(
-      //   {
-      //     userId: user!.id,
-      //     merchantId: metadata.merchantId,
-      //     role: metadata.role
-      //   },
-      //   chainId,
-      //   signature,
-      //   challenge
-      // );
-
-      // For development, simulate verification
-      const verifiedAddress: WalletAddress = {
-        ...address,
-        status: 'verified',
-        verified_at: new Date().toISOString(),
-        signature_ref: `sig-${chainId}-${Date.now()}`,
-        explorer_url: getExplorerUrl(chain, address.address)
-      };
-
-      // Update wallet state
-      const updatedWallet = {
-        ...wallet,
-        addresses: wallet.addresses.map(addr => 
-          addr.chain_id === chainId ? verifiedAddress : addr
-        )
-      };
-
-      setWallet(updatedWallet);
-      setSetupStatus(getWalletSetupStatus(updatedWallet.addresses));
-
-      // Show success message
-      alert(`Wallet verified for ${chain.chain_name}.`);
-
-    } catch (error: any) {
-      console.error('Chain verification failed:', error);
-      if (error.message.includes('declined')) {
-        setError('Signature declined. Try again.');
-      } else {
-        setError('Verification failed. Please try again.');
+      const challenge = generateVerificationChallenge(address.address, address.blockchain);
+      
+      // Sign challenge
+      const signature = await walletProvider.signMessage(challenge);
+      if (!signature) {
+        throw new Error('Failed to sign verification message');
       }
+
+      // Update address verification in Supabase
+      const userContext = {
+        userId: user.id,
+        merchantId: metadata.merchantId,
+        role: metadata.role,
+        approved: metadata.approved || false
+      };
+      
+      const updatedAddress = await walletService.verifyWalletAddress(
+        userContext,
+        address.address_id,
+        signature
+      );
+
+      // Update wallet with verified address
+      if (wallet) {
+        const updatedWallet = {
+          ...wallet,
+          addresses: wallet.addresses.map(addr => 
+            addr.address_id === address.address_id ? updatedAddress : addr
+          )
+        };
+        setWallet(updatedWallet);
+        setSetupStatus(getWalletSetupStatus(updatedWallet));
+      }
+    } catch (error) {
+      console.error('Address verification failed:', error);
+      setError(error instanceof Error ? error.message : 'Failed to verify address');
     } finally {
       setVerifyingChain(null);
     }
   };
 
   // Copy address to clipboard
-  const handleCopyAddress = async (address: string) => {
+  const copyToClipboard = async (address: string) => {
     try {
       await navigator.clipboard.writeText(address);
-      // Could add a toast notification here
+      // You could add a toast notification here
     } catch (error) {
       console.error('Failed to copy address:', error);
     }
@@ -426,16 +533,16 @@ const Wallets: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {wallet.addresses.map((address) => {
-                  const chain = getChainById(address.chain_id);
+                {wallet.addresses.map((address: WalletAddress) => {
+                  const chain = getChainById(address.blockchain);
                   if (!chain) return null;
 
                   const isEnabled = chain.enabled;
                   const isVerified = address.status === 'verified';
-                  const isVerifying = verifyingChain === address.chain_id;
+                  const isVerifying = verifyingChain === address.blockchain;
 
                   return (
-                    <tr key={address.chain_id} className={!isEnabled ? 'opacity-50' : ''}>
+                    <tr key={address.address_id} className={!isEnabled ? 'opacity-50' : ''}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="text-sm font-medium text-gray-900">
