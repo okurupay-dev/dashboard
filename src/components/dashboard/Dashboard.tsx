@@ -113,7 +113,7 @@ const sampleData = {
       change: 2.4,
       balance: 0.0842,
       balanceUsd: 3354.74,
-      icon: 'https://cryptologos.cc/logos/bitcoin-btc-logo.png?v=025',
+      icon: '₿', // Bitcoin symbol
       hasAutomation: true,
       automationRule: 'Auto Convert to USDC > 1 BTC'
     },
@@ -125,7 +125,7 @@ const sampleData = {
       change: 3.2,
       balance: 1.245,
       balanceUsd: 3058.69,
-      icon: 'https://cryptologos.cc/logos/ethereum-eth-logo.png?v=025',
+      icon: 'Ξ', // Ethereum symbol
       hasAutomation: true,
       automationRule: 'Auto Convert to USDC > 5 ETH'
     },
@@ -137,7 +137,7 @@ const sampleData = {
       change: -1.8,
       balance: 12.5,
       balanceUsd: 1557.00,
-      icon: 'https://cryptologos.cc/logos/solana-sol-logo.png?v=025',
+      icon: '◎', // Solana symbol
       hasAutomation: false
     },
     {
@@ -148,7 +148,7 @@ const sampleData = {
       change: 0.7,
       balance: 1250,
       balanceUsd: 562.50,
-      icon: 'https://cryptologos.cc/logos/cardano-ada-logo.png?v=025',
+      icon: '₳', // Cardano symbol
       hasAutomation: false
     }
   ]
