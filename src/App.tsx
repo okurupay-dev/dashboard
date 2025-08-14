@@ -12,9 +12,17 @@ import Automations from './components/automations/Automations';
 import Wallets from './components/wallets/Wallets';
 import CustomSignIn from './components/auth/ClerkSignIn';
 
+// Check if we're in development mode
+const isDevelopment = process.env.NODE_ENV === 'development';
+
 // Component to check if user is authenticated
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoaded } = useUser();
+  
+  // In development mode, bypass all authentication
+  if (isDevelopment) {
+    return <>{children}</>;
+  }
   
   // Show loading while Clerk is initializing
   if (!isLoaded) {
@@ -32,6 +40,42 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 function App() {
+  // In development mode, still use ClerkProvider but bypass authentication logic
+  if (isDevelopment) {
+    return (
+      <Router>
+        <ClerkProvider 
+          publishableKey={process.env.REACT_APP_CLERK_PUBLISHABLE_KEY || "pk_test_Z3VpZGluZy13ZXJld29sZi03Mi5jbGVyay5hY2NvdW50cy5kZXYk"}
+          appearance={{
+            variables: { colorPrimary: '#6366f1' },
+            elements: {
+              formButtonPrimary: 'bg-indigo-600 hover:bg-indigo-700',
+              card: 'bg-white',
+            },
+          }}
+        >
+          <Routes>
+            {/* Development mode - direct access to all routes */}
+            <Route path="/" element={<DashboardLayout children={<Outlet />} />}>
+              <Route index element={<Dashboard />} />
+              <Route path="transactions" element={<Transactions />} />
+              <Route path="terminals" element={<Terminals />} />
+              <Route path="analytics" element={<Analytics />} />
+              <Route path="settings" element={<Settings />} />
+              <Route path="staff" element={<Staff />} />
+              <Route path="automations" element={<Automations />} />
+              <Route path="wallets" element={<Wallets />} />
+            </Route>
+            
+            {/* Redirect any other paths to dashboard */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </ClerkProvider>
+      </Router>
+    );
+  }
+
+  // Production mode - use Clerk authentication
   return (
     <Router>
       <ClerkProvider 

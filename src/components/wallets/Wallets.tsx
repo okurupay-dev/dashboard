@@ -30,8 +30,12 @@ import {
 } from '../../lib/api/walletService';
 
 const Wallets: React.FC = () => {
-  const { user } = useUser();
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  const { user: clerkUser } = useUser();
   const { metadata } = useUserMetadata();
+  
+  // Use mock user in development, real user in production
+  const user = isDevelopment ? { id: 'dev-user-123' } : clerkUser;
   const [wallet, setWallet] = useState<MerchantWallet | null>(null);
   const [setupStatus, setSetupStatus] = useState<WalletSetupStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);

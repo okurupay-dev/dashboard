@@ -20,7 +20,18 @@ const defaultMetadata: UserMetadata = {
 
 // Hook to get current user's metadata
 export const useUserMetadata = () => {
+  const isDevelopment = process.env.NODE_ENV === 'development';
   const { user, isLoaded } = useUser();
+  
+  // In development mode, return mock user metadata
+  if (isDevelopment) {
+    const mockMetadata: UserMetadata = {
+      merchantId: 'merchant-dev-123',
+      role: 'admin',
+      approved: true
+    };
+    return { isLoaded: true, metadata: mockMetadata };
+  }
   
   if (!isLoaded || !user) {
     return { isLoaded: false, metadata: defaultMetadata };
@@ -35,8 +46,9 @@ export const useUserMetadata = () => {
     approved: (publicMeta.approved as boolean) || defaultMetadata.approved
   };
   
-  // Only approve users who have been explicitly approved
-  const isApproved = metadata.approved === true;
+  // Development bypass: auto-approve if no metadata is set (for testing)
+  const hasNoMetadata = !publicMeta.approved && !publicMeta.role && !publicMeta.merchantId;
+  const isApproved = metadata.approved === true || (isDevelopment && hasNoMetadata);
 
   return {
     isLoaded: true,
