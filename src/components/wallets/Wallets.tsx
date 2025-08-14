@@ -78,12 +78,21 @@ const Wallets: React.FC = () => {
   // Load wallet data
   useEffect(() => {
     const loadWalletData = async () => {
-      if (!user || !metadata.merchantId) return;
-
       try {
         setIsLoading(true);
         
-        // For development, use sample data
+        // In development mode or if user/metadata is missing, use sample data
+        if (!user || !metadata || !metadata.merchantId) {
+          console.log('Using sample data due to missing user/metadata');
+          const walletData = sampleWalletData;
+          const statusData = sampleWalletSetupStatus;
+          setWallet(walletData);
+          setSetupStatus(statusData);
+          setIsLoading(false);
+          return;
+        }
+
+        // For production with real user data
         // TODO: Uncomment when API is ready
         // const walletData = await getMerchantWallet({
         //   userId: user.id,
