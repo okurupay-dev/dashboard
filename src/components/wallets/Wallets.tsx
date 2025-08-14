@@ -36,6 +36,9 @@ const Wallets: React.FC = () => {
   
   // Use mock user in development, real user in production
   const user = isDevelopment ? { id: 'dev-user-123' } : clerkUser;
+  
+  // Debug logging
+  console.log('Wallets component rendering:', { isDevelopment, user, metadata });
   const [wallet, setWallet] = useState<MerchantWallet | null>(null);
   const [setupStatus, setSetupStatus] = useState<WalletSetupStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -232,9 +235,20 @@ const Wallets: React.FC = () => {
     }
   };
 
+  // Early return for debugging - ensure something renders
+  if (!user) {
+    return (
+      <div className="p-6">
+        <h1 className="text-2xl font-bold mb-4">Wallets</h1>
+        <p>Loading user data...</p>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="p-6">
+        <h1 className="text-2xl font-bold mb-4">Wallets</h1>
         <div className="animate-pulse">
           <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
           <div className="h-4 bg-gray-200 rounded w-1/2 mb-8"></div>
