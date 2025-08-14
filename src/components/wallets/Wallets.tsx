@@ -264,23 +264,20 @@ const Wallets: React.FC = () => {
         approved: metadata.approved || false
       };
       
-      const newWallet = await walletService.createMerchantWallet(userContext, connectedWallet.userId);
+      const newWallet = await walletService.createMerchantWallet(userContext, user.id);
       
       // Get addresses for enabled chains and add to Supabase
-      const enabledChains = getEnabledChains();
+      const derivedAddresses = await walletProvider.deriveChainAddresses();
       const addresses: WalletAddress[] = [];
 
-      for (const chain of enabledChains) {
-        const address = await walletProvider.getAddress(chain.id);
-        if (address) {
-          const walletAddress = await walletService.addWalletAddress(
-            userContext,
-            newWallet.wallet_id,
-            chain.id,
-            address
-          );
-          addresses.push(walletAddress);
-        }
+      for (const derivedAddr of derivedAddresses) {
+        const walletAddress = await walletService.addWalletAddress(
+          userContext,
+          newWallet.wallet_id,
+          derivedAddr.chain_id,
+          derivedAddr.address
+        );
+        addresses.push(walletAddress);
       }
 
       // Update wallet with addresses
@@ -292,6 +289,26 @@ const Wallets: React.FC = () => {
       setError(error instanceof Error ? error.message : 'Failed to create wallet');
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  // Copy address to clipboard
+  const handleCopyAddress = async (address: string) => {
+    try {
+      await navigator.clipboard.writeText(address);
+      // You could add a toast notification here
+    } catch (err) {
+      console.error('Failed to copy address:', err);
+    }
+  };
+
+  // Handle verify chain by chain ID
+  const handleVerifyChain = async (chainId: string) => {
+    if (!wallet) return;
+    
+    const address = wallet.addresses.find(addr => addr.blockchain === chainId);
+    if (address) {
+      await handleVerifyAddress(address);
     }
   };
 
@@ -419,12 +436,12 @@ const Wallets: React.FC = () => {
               <h3 className="font-semibold text-blue-900 mb-2">Finish setup to go live:</h3>
               <div className="flex items-center space-x-6 text-sm">
                 <div className="flex items-center space-x-2">
-                  {setupStatus.is_complete ? (
+                  {setupStatus.isComplete ? (
                     <CheckCircle className="h-4 w-4 text-green-500" />
                   ) : (
                     <Clock className="h-4 w-4 text-gray-400" />
                   )}
-                  <span className={setupStatus.is_complete ? 'text-green-700' : 'text-gray-600'}>
+                  <span className={setupStatus.isComplete ? 'text-green-700' : 'text-gray-600'}>
                     Wallets
                   </span>
                 </div>
@@ -444,7 +461,7 @@ const Wallets: React.FC = () => {
             </div>
             <div className="text-right">
               <div className="text-sm text-blue-700">
-                {setupStatus.chains_verified} of {setupStatus.total_enabled_chains} chains verified
+                {setupStatus.verifiedChains} of {setupStatus.totalChains} chains verified
               </div>
             </div>
           </div>
@@ -538,7 +555,7 @@ const Wallets: React.FC = () => {
                   if (!chain) return null;
 
                   const isEnabled = chain.enabled;
-                  const isVerified = address.status === 'verified';
+                  const isVerified = address.is_verified;
                   const isVerifying = verifyingChain === address.blockchain;
 
                   return (
@@ -546,7 +563,7 @@ const Wallets: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="text-sm font-medium text-gray-900">
-                            {chain.chain_name}
+                            {chain.name}
                           </div>
                           <div className="text-xs text-gray-500 ml-2">
                             ({chain.symbol})
@@ -586,9 +603,9 @@ const Wallets: React.FC = () => {
                         {address.verified_at ? new Date(address.verified_at).toLocaleDateString() : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {isVerified && address.explorer_url ? (
+                        {isVerified ? (
                           <a
-                            href={address.explorer_url}
+                            href={getExplorerUrl(address.blockchain, address.address)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center text-blue-600 hover:text-blue-800"
@@ -612,7 +629,7 @@ const Wallets: React.FC = () => {
                           <span className="text-xs text-gray-500">Complete</span>
                         ) : canManageWallets ? (
                           <button
-                            onClick={() => handleVerifyChain(address.chain_id)}
+                            onClick={() => handleVerifyChain(address.blockchain)}
                             disabled={isVerifying}
                             className="inline-flex items-center px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-full hover:bg-blue-100 disabled:opacity-50"
                             title="Signing proves you control this wallet. No funds are moved."
