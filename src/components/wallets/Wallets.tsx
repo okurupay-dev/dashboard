@@ -192,14 +192,18 @@ const Wallets: React.FC = () => {
     initializeWallet();
   }, []);
 
-  // Load wallet data
+  // Load wallet data - use stable dependencies to prevent infinite loops
   useEffect(() => {
     const loadWalletData = async () => {
       try {
         setIsLoading(true);
         
+        // Check if we have the required user data
+        const userId = user?.id;
+        const merchantId = metadata?.merchantId;
+        
         // In development mode or if user/metadata is missing, use sample data
-        if (!user || !metadata || !metadata.merchantId) {
+        if (!userId || !merchantId) {
           console.log('Using sample data due to missing user/metadata');
           const walletData = sampleWalletData;
           const statusData = getWalletSetupStatus(walletData);
@@ -212,9 +216,9 @@ const Wallets: React.FC = () => {
         // For production with real user data - use Supabase
         try {
           const userContext = {
-            userId: user.id,
-            merchantId: metadata.merchantId,
-            role: metadata.role,
+            userId,
+            merchantId,
+            role: metadata.role || 'merchant',
             approved: metadata.approved || false
           };
           
@@ -223,16 +227,16 @@ const Wallets: React.FC = () => {
           
           setWallet(walletData);
           setSetupStatus(statusData);
-        } catch (apiError) {
-          console.log('API not available, using sample data:', apiError);
-          // Fallback to sample data if API fails
+        } catch (supabaseError) {
+          console.error('Failed to load wallet from Supabase:', supabaseError);
+          // Fall back to sample data on error
           const walletData = sampleWalletData;
           const statusData = getWalletSetupStatus(walletData);
           setWallet(walletData);
           setSetupStatus(statusData);
         }
       } catch (error) {
-        console.error('Failed to load wallet data:', error);
+        console.error('Error loading wallet data:', error);
         setError('Failed to load wallet data');
       } finally {
         setIsLoading(false);
@@ -240,7 +244,7 @@ const Wallets: React.FC = () => {
     };
 
     loadWalletData();
-  }, [user, metadata]);
+  }, [user?.id, metadata?.merchantId, metadata?.role, metadata?.approved]);
 
   // Create wallet via Web3Auth and Supabase
   const handleCreateWallet = async () => {
