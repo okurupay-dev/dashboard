@@ -37,18 +37,27 @@ const Wallets: React.FC = () => {
   // Use mock user in development, real user in production
   const user = isDevelopment ? { id: 'dev-user-123' } : clerkUser;
   
-  // Debug logging
-  console.log('Wallets component rendering:', { isDevelopment, user, metadata });
   const [wallet, setWallet] = useState<MerchantWallet | null>(null);
   const [setupStatus, setSetupStatus] = useState<WalletSetupStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [verifyingChain, setVerifyingChain] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [walletInitialized, setWalletInitialized] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Check if user can manage wallets (admin only)
-  const canManageWallets = metadata.role === 'admin';
+  const canManageWallets = metadata?.role === 'admin';
+
+  // Debug logging
+  console.log('Wallets component rendering:', { 
+    isDevelopment, 
+    user, 
+    metadata, 
+    isLoading, 
+    wallet, 
+    setupStatus,
+    canManageWallets
+  });
   const enabledChains = getEnabledChains();
 
   // Initialize wallet provider on component mount
@@ -237,10 +246,28 @@ const Wallets: React.FC = () => {
 
   // Early return for debugging - ensure something renders
   if (!user) {
+    console.log('No user found, showing fallback');
     return (
       <div className="p-6">
         <h1 className="text-2xl font-bold mb-4">Wallets</h1>
         <p>Loading user data...</p>
+        <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded">
+          <p className="text-sm text-yellow-800">Debug: No user object available</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Add fallback if metadata is missing
+  if (!metadata) {
+    console.log('No metadata found, showing fallback');
+    return (
+      <div className="p-6">
+        <h1 className="text-2xl font-bold mb-4">Wallets</h1>
+        <p>Loading user permissions...</p>
+        <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded">
+          <p className="text-sm text-yellow-800">Debug: No metadata available</p>
+        </div>
       </div>
     );
   }
