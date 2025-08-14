@@ -9,6 +9,7 @@ import Settings from './components/settings/Settings';
 import Terminals from './components/terminals/Terminals';
 import Staff from './components/staff/Staff';
 import Automations from './components/automations/Automations';
+import Wallets from './components/wallets/Wallets';
 import CustomSignIn from './components/auth/ClerkSignIn';
 
 // Component to check if user is authenticated
@@ -66,6 +67,7 @@ function App() {
             <Route path="settings" element={<Settings />} />
             <Route path="staff" element={<Staff />} />
             <Route path="automations" element={<Automations />} />
+            <Route path="wallets" element={<Wallets />} />
           </Route>
           
           {/* Redirect unauthenticated users */}

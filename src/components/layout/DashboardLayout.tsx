@@ -3,6 +3,9 @@ import { Link, useLocation } from 'react-router-dom';
 import { useClerk } from '@clerk/clerk-react';
 import logo from '../../assets/images/logo.svg';
 
+// Check if we're in development mode
+const isDevelopment = process.env.NODE_ENV === 'development';
+
 // This would typically come from a context or API call
 interface MerchantInfo {
   name: string;
@@ -26,8 +29,16 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   };
 
   const handleLogout = async () => {
+    if (isDevelopment) {
+      // In development mode, just reload the page
+      window.location.reload();
+      return;
+    }
+    
     try {
-      await signOut();
+      if (signOut) {
+        await signOut();
+      }
       // User will be automatically redirected to sign-in page by the ProtectedRoute
     } catch (error) {
       console.error('Error signing out:', error);
@@ -98,6 +109,14 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
               <span className="ml-1">Automations</span>
+            </div>
+          </Link>
+          <Link to="/wallets">
+            <div className={`sidebar-item flex items-center p-4 rounded-lg transition-all duration-200 ${currentPath === '/wallets' ? 'bg-blue-50 text-blue-700 font-medium shadow-sm' : 'hover:bg-gray-50 text-gray-700'}`}>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+              </svg>
+              <span className="ml-1">Wallets</span>
             </div>
           </Link>
         </nav>
