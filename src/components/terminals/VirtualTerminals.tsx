@@ -124,12 +124,14 @@ const VirtualTerminals = (): React.ReactElement => {
     { id: '4', symbol: 'DAI', name: 'MakerDAO DAI', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'dai', network: 'Ethereum' },
     { id: '5', symbol: 'WBTC', name: 'Wrapped BTC', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'wrapped-bitcoin', network: 'Ethereum' },
     
-    // Base Network - Top 5
+    // Base Network - Top Tokens
     { id: '6', symbol: 'ETH', name: 'Base ETH', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'ethereum', network: 'Base' },
     { id: '7', symbol: 'USDC', name: 'Circle USDC (Base)', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'usd-coin', network: 'Base' },
     { id: '8', symbol: 'cbETH', name: 'Coinbase cbETH', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'coinbase-wrapped-staked-eth', network: 'Base' },
     { id: '9', symbol: 'DEGEN', name: 'DEGEN', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'degen-base', network: 'Base' },
     { id: '10', symbol: 'USDT', name: 'Tether USDT (Base)', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'tether', network: 'Base' },
+    { id: '11', symbol: 'DAI', name: 'DAI (Base)', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'dai', network: 'Base' },
+    { id: '12', symbol: 'USDbC', name: 'USDbC', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'usd-base-coin', network: 'Base' },
   ]);
 
   // Get user context for database operations (following Wallets.tsx pattern)
@@ -177,15 +179,20 @@ const VirtualTerminals = (): React.ReactElement => {
   };
 
   // Helper function to map token symbol to blockchain network
-const getBlockchainForToken = (symbol: string): string => {
+const getBlockchainForToken = (symbol: string, network?: string): string => {
+  // If network is explicitly provided, use that
+  if (network) return network;
+  
+  // Otherwise use the mapping
   const blockchainMap: Record<string, string> = {
     'ETH': 'Ethereum',
-    'USDC': 'Ethereum',
-    'USDT': 'Ethereum',
-    'DAI': 'Ethereum',
+    'USDC': 'Ethereum', // Default USDC to Ethereum
+    'USDT': 'Ethereum', // Default USDT to Ethereum
+    'DAI': 'Ethereum',  // Default DAI to Ethereum
     'WBTC': 'Ethereum',
     'cbETH': 'Base',
-    'DEGEN': 'Base'
+    'DEGEN': 'Base',
+    'USDbC': 'Base'
   };
   
   return blockchainMap[symbol] || 'Ethereum'; // Default to Ethereum if not found
