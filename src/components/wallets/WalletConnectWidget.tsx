@@ -57,7 +57,7 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
   const { user } = useUser();
   const { metadata } = useUserMetadata();
 
-  // Initialize Web3 wallet detection
+  // Initialize Web3 wallet detection and check for existing connections
   useEffect(() => {
     const initializeWeb3 = async () => {
       try {
@@ -67,6 +67,96 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
         const walletDetected = await web3WalletProvider.detectWallet();
         if (!walletDetected) {
           setError('No Web3 wallet detected. Please install MetaMask or another Web3 wallet.');
+          setIsInitializing(false);
+          return;
+        }
+        
+        // Check if user already has a verified wallet in the database
+        if (user && metadata?.merchantId) {
+          console.log('🔍 Checking for existing wallet connections...');
+          try {
+            const { data: existingWallets, error } = await supabase
+              .from('merchant_wallets')
+              .select(`
+                wallet_id,
+                is_primary,
+                wallet_addresses!merchant_wallets_wallet_id_fkey (
+                  address_id,
+                  address,
+                  blockchain,
+                  is_verified,
+                  verified_at
+                )
+              `)
+              .eq('merchant_id', metadata.merchantId)
+              .eq('wallet_addresses.is_verified', true);
+
+            if (existingWallets && existingWallets.length > 0) {
+              console.log('✅ Found existing verified wallet connections:', existingWallets);
+              
+              // Get the primary wallet or first verified wallet
+              const primaryWallet = existingWallets.find(w => w.is_primary) || existingWallets[0];
+              const walletAddress = (primaryWallet.wallet_addresses as any);
+              
+              if (walletAddress && walletAddress.address) {
+                // Try to reconnect to the existing wallet
+                console.log('🔄 Attempting to reconnect to existing wallet...');
+                try {
+                  const connection = await web3WalletProvider.connectWallet();
+                  
+                  // Check if the connected wallet matches the stored one
+                  if (connection.address.toLowerCase() === walletAddress.address.toLowerCase()) {
+                    console.log('✅ Successfully reconnected to existing wallet');
+                    
+                    // Get token balances
+                    const ethBalance = await web3WalletProvider.getBalance(connection.address);
+                    
+                    // Create wallet info
+                    const reconnectedWalletInfo: ConnectedWalletInfo = {
+                      address: connection.address,
+                      chainId: connection.chainId,
+                      provider: connection.provider,
+                      isConnected: true,
+                      addresses: [
+                        {
+                          address: connection.address,
+                          chainId: connection.chainId,
+                          chainName: walletConnectConfig.chains.find(c => c.id === connection.chainId)?.name || 'Unknown',
+                          isVerified: true,
+                          addedAt: walletAddress.verified_at || new Date().toISOString()
+                        }
+                      ],
+                      tokens: [
+                        {
+                          symbol: 'ETH',
+                          name: 'Ethereum',
+                          balance: ethBalance,
+                          decimals: 18,
+                          address: 'native',
+                          chainId: connection.chainId,
+                          usdValue: (parseFloat(ethBalance) * 2500).toFixed(2)
+                        }
+                      ]
+                    };
+
+                    setWalletInfo(reconnectedWalletInfo);
+                    setIsConnected(true);
+                    onWalletConnected(reconnectedWalletInfo);
+                    
+                    console.log('✅ Wallet reconnection complete');
+                  } else {
+                    console.log('⚠️ Connected wallet does not match stored wallet');
+                  }
+                } catch (reconnectError) {
+                  console.log('⚠️ Could not automatically reconnect wallet:', reconnectError);
+                  // This is fine - user can manually connect
+                }
+              }
+            }
+          } catch (dbError) {
+            console.log('⚠️ Could not check existing wallets:', dbError);
+            // This is fine - user can manually connect
+          }
         }
         
         console.log('✅ Web3 wallet detection complete');
@@ -80,7 +170,7 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
     };
 
     initializeWeb3();
-  }, []);
+  }, [user, metadata]);
 
   // Connect wallet using real Web3 provider
   const handleConnectWallet = async () => {
@@ -134,7 +224,96 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
       const { signature, message } = await web3WalletProvider.signMerchantOwnership(merchantId, userEmail);
       console.log('✅ Signature obtained successfully');
       
-      // Step 4: Get token balances
+      // Step 4: Save wallet connection to database
+      console.log('💾 Saving wallet connection to database...');
+      try {
+        // First, check if wallet address already exists
+        const { data: existingWallet, error: checkError } = await supabase
+          .from('wallet_addresses')
+          .select('address_id, address, blockchain, is_verified')
+          .eq('address', connection.address.toLowerCase())
+          .eq('blockchain', walletConnectConfig.chains.find(c => c.id === connection.chainId)?.name || 'Ethereum')
+          .single();
+
+        let addressId: string;
+
+        if (existingWallet) {
+          // Update existing wallet with verification
+          const { error: updateError } = await supabase
+            .from('wallet_addresses')
+            .update({
+              is_verified: true,
+              verification_signature: signature,
+              verified_at: new Date().toISOString(),
+              verified_by_user_id: user.id
+            })
+            .eq('address_id', existingWallet.address_id);
+
+          if (updateError) {
+            console.error('❌ Failed to update wallet verification:', updateError);
+            throw new Error('Failed to verify wallet address');
+          }
+
+          addressId = existingWallet.address_id;
+          console.log('✅ Updated existing wallet verification');
+        } else {
+          // Create new wallet address record
+          const { data: newWallet, error: insertError } = await supabase
+            .from('wallet_addresses')
+            .insert({
+              address: connection.address.toLowerCase(),
+              blockchain: walletConnectConfig.chains.find(c => c.id === connection.chainId)?.name || 'Ethereum',
+              is_verified: true,
+              verification_signature: signature,
+              verified_at: new Date().toISOString(),
+              verified_by_user_id: user.id
+            })
+            .select('address_id')
+            .single();
+
+          if (insertError || !newWallet) {
+            console.error('❌ Failed to create wallet address:', insertError);
+            throw new Error('Failed to save wallet address');
+          }
+
+          addressId = newWallet.address_id;
+          console.log('✅ Created new wallet address record');
+        }
+
+        // Link wallet to merchant if not already linked
+        const { data: existingLink, error: linkCheckError } = await supabase
+          .from('merchant_wallets')
+          .select('wallet_id')
+          .eq('merchant_id', merchantId)
+          .eq('wallet_id', addressId)
+          .single();
+
+        if (!existingLink) {
+          const { error: linkError } = await supabase
+            .from('merchant_wallets')
+            .insert({
+              merchant_id: merchantId,
+              wallet_id: addressId,
+              is_primary: true,
+              added_by_user_id: user.id
+            });
+
+          if (linkError) {
+            console.error('❌ Failed to link wallet to merchant:', linkError);
+            throw new Error('Failed to link wallet to merchant account');
+          }
+
+          console.log('✅ Linked wallet to merchant account');
+        }
+
+        console.log('✅ Wallet connection saved to database successfully');
+      } catch (dbError) {
+        console.error('❌ Database operation failed:', dbError);
+        // Don't throw here - allow the UI connection to proceed even if DB save fails
+        // The user can retry the connection later
+      }
+      
+      // Step 5: Get token balances
       const ethBalance = await web3WalletProvider.getBalance(connection.address);
       
       // Create wallet info with real data
