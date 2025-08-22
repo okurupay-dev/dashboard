@@ -42,7 +42,14 @@ interface WalletStatus {
 interface PairingInfo {
   pairingKey: string;
   isActive: boolean;
-  lastUsed?: string;
+  lastUsed: null | string | undefined;
+}
+
+interface UserContext {
+  userId: string;
+  merchantId: string;
+  role: string;
+  approved: boolean;
 }
 
 interface PasswordFormData {
@@ -70,7 +77,7 @@ const getCoingeckoImageId = (coingeckoId: string): string => {
   return imageIdMap[coingeckoId] || '1';
 };
 
-const VirtualTerminals: React.FC = () => {
+const VirtualTerminals = (): React.ReactElement => {
   const [activeTab, setActiveTab] = useState('password');
   const [passwordInfo, setPasswordInfo] = useState<VirtualTerminalPassword>({
     lastChanged: '',
@@ -81,6 +88,32 @@ const VirtualTerminals: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [isTokenSectionCollapsed, setIsTokenSectionCollapsed] = useState(false);
+  
+  // User and merchant context
+  const { user } = useUser();
+  const [merchantId, setMerchantId] = useState<string | null>(null);
+  
+  // Terminal settings
+  const [terminalSettings, setTerminalSettings] = useState<TerminalSettings>({
+    terminalName: 'Main Terminal',
+    sessionTimeout: '30',
+    autoLogout: true,
+    defaultCurrency: 'USD',
+    virtualTerminalEnabled: true
+  });
+  
+  // Virtual terminal state
+  const [virtualTerminal, setVirtualTerminal] = useState<any>(null);
+  
+  // Token state
+  const [selectedTokens, setSelectedTokens] = useState<AcceptedToken[]>([]);
+  
+  // Pairing info
+  const [pairingInfo, setPairingInfo] = useState<PairingInfo>({
+    pairingKey: '',
+    isActive: false,
+    lastUsed: null
+  });
   const isFirstTimeSetup = !passwordInfo.lastChanged;
   
   const [availableTokens] = useState<AcceptedToken[]>([
@@ -99,21 +132,7 @@ const VirtualTerminals: React.FC = () => {
     { id: '10', symbol: 'USDT', name: 'Tether USDT (Base)', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'tether', network: 'Base' },
   ]);
 
-  const [selectedTokens, setSelectedTokens] = useState<AcceptedToken[]>(
-    availableTokens.filter(token => token.isSelected).sort((a, b) => a.priority - b.priority)
-  );
-
-  const [terminalSettings, setTerminalSettings] = useState<TerminalSettings>({
-    terminalName: 'Main Terminal',
-    sessionTimeout: '30',
-    autoLogout: true,
-    defaultCurrency: 'USD',
-    virtualTerminalEnabled: true
-  });
-
   // Get user context for database operations (following Wallets.tsx pattern)
-  const { user } = useUser();
-  const [merchantId, setMerchantId] = useState<string | null>(null);
   const [userContextLoaded, setUserContextLoaded] = useState(false);
 
   // Get merchant ID from user metadata or database (same pattern as Wallets.tsx)
@@ -149,14 +168,30 @@ const VirtualTerminals: React.FC = () => {
     }
   };
 
-  const userContext = {
-    userId: merchantId || '',
+  // Create user context object for database operations
+  const userContext: UserContext = {
+    userId: user?.id || '',
     merchantId: merchantId || '',
     role: 'merchant',
     approved: true
   };
 
-  // Direct database integration functions
+  // Helper function to map token symbol to blockchain network
+const getBlockchainForToken = (symbol: string): string => {
+  const blockchainMap: Record<string, string> = {
+    'ETH': 'Ethereum',
+    'USDC': 'Ethereum',
+    'USDT': 'Ethereum',
+    'DAI': 'Ethereum',
+    'WBTC': 'Ethereum',
+    'cbETH': 'Base',
+    'DEGEN': 'Base'
+  };
+  
+  return blockchainMap[symbol] || 'Ethereum'; // Default to Ethereum if not found
+};
+
+// Direct database integration functions
   const loadVirtualTerminalSettings = async () => {
     try {
       setIsLoading(true);
@@ -244,7 +279,7 @@ const VirtualTerminals: React.FC = () => {
           setPairingInfo(prev => ({
             ...prev,
             pairingKey: newKey,
-            lastUsed: undefined
+            lastUsed: null
           }));
           
           alert('New pairing key generated successfully!');
@@ -321,12 +356,132 @@ const VirtualTerminals: React.FC = () => {
     walletCount: 0
   });
 
-  // Pairing key info - Loaded from API
-  const [pairingInfo, setPairingInfo] = useState<PairingInfo>({
-    pairingKey: '',
-    isActive: false,
-    lastUsed: undefined
-  });
+  // Pairing key info already declared above
+
+  // Load token configuration from database
+  const loadTokenConfiguration = async () => {
+    try {
+      if (!merchantId) {
+        console.log('⚠️ Cannot load token configuration: No merchant ID available');
+        return;
+      }
+      
+      // Get virtual terminal ID
+      const { data: virtualTerminal, error: terminalError } = await supabase
+        .from('terminals')
+        .select('terminal_id')
+        .eq('merchant_id', merchantId)
+        .eq('device_type', 'virtual')
+        .single();
+
+      if (terminalError && terminalError.code !== 'PGRST116') {
+        console.error('Error finding virtual terminal:', terminalError);
+        return;
+      }
+
+      if (!virtualTerminal) {
+        console.log('ℹ️ No virtual terminal found - will be created when needed');
+        return;
+      }
+
+      // Load token configuration using terminal_id
+      const { data, error } = await supabase
+        .from('terminal_crypto_config')
+        .select('*')
+        .eq('terminal_id', virtualTerminal.terminal_id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error loading token configuration:', error);
+        return;
+      }
+
+      if (data) {
+        console.log('🔍 Found existing token configuration:', data);
+        // Convert database format to UI format
+        const loadedTokens: AcceptedToken[] = [];
+        
+        // Map crypto_1, crypto_2, crypto_3 to selected tokens
+        if (data.crypto_1) {
+          // First try to find by both symbol and network
+          let token = availableTokens.find(t => 
+            t.symbol === data.crypto_1 && 
+            t.network === data.crypto_1_blockchain
+          );
+          
+          // If not found, try just by symbol
+          if (!token) {
+            token = availableTokens.find(t => t.symbol === data.crypto_1);
+          }
+          
+          if (token) {
+            loadedTokens.push({
+              ...token,
+              priority: 1,
+              isSelected: true
+            });
+          } else {
+            console.warn(`⚠️ Could not find token for ${data.crypto_1} on ${data.crypto_1_blockchain}`);
+          }
+        }
+        
+        // Load second token if available
+        if (data.crypto_2) {
+          // First try to find by both symbol and network
+          let token = availableTokens.find(t => 
+            t.symbol === data.crypto_2 && 
+            t.network === data.crypto_2_blockchain
+          );
+          
+          // If not found, try just by symbol
+          if (!token) {
+            token = availableTokens.find(t => t.symbol === data.crypto_2);
+          }
+          
+          if (token) {
+            loadedTokens.push({
+              ...token,
+              priority: 2,
+              isSelected: true
+            });
+          } else {
+            console.warn(`⚠️ Could not find token for ${data.crypto_2} on ${data.crypto_2_blockchain}`);
+          }
+        }
+        
+        // Load third token if available
+        if (data.crypto_3) {
+          // First try to find by both symbol and network
+          let token = availableTokens.find(t => 
+            t.symbol === data.crypto_3 && 
+            t.network === data.crypto_3_blockchain
+          );
+          
+          // If not found, try just by symbol
+          if (!token) {
+            token = availableTokens.find(t => t.symbol === data.crypto_3);
+          }
+          
+          if (token) {
+            loadedTokens.push({
+              ...token,
+              priority: 3,
+              isSelected: true
+            });
+          } else {
+            console.warn(`⚠️ Could not find token for ${data.crypto_3} on ${data.crypto_3_blockchain}`);
+          }
+        }
+        
+        setSelectedTokens(loadedTokens);
+        console.log('✅ Token configuration loaded:', loadedTokens);
+      } else {
+        console.log('ℹ️ No existing token configuration found');
+      }
+    } catch (error) {
+      console.error('Error loading token configuration:', error);
+    }
+  };
 
   // Load merchant ID and data on component mount
   useEffect(() => {
@@ -453,108 +608,6 @@ const VirtualTerminals: React.FC = () => {
     setSelectedTokens(updatedTokens);
   };
 
-  // Helper function to map token symbols to their blockchains
-  const getBlockchainForToken = (tokenSymbol: string): string => {
-    const blockchainMap: { [key: string]: string } = {
-      'ETH': 'Ethereum',
-      'USDC': 'Ethereum', 
-      'USDT': 'Ethereum',
-      'DAI': 'Ethereum',
-      'WBTC': 'Ethereum',
-      'MATIC': 'Polygon',
-      'cbETH': 'Base',
-      'DEGEN': 'Base',
-      'USDT_BASE': 'Base'
-    };
-    
-    return blockchainMap[tokenSymbol] || 'Ethereum'; // Default to Ethereum
-  };
-
-  // Load existing token configuration from database
-  const loadTokenConfiguration = async () => {
-    if (!merchantId) return;
-
-    try {
-      console.log('🔍 Loading token configuration for merchant:', merchantId);
-
-      // First, find the virtual terminal for this merchant
-      const { data: virtualTerminal, error: terminalError } = await supabase
-        .from('terminals')
-        .select('terminal_id')
-        .eq('merchant_id', userContext.merchantId)
-        .eq('device_type', 'virtual')
-        .single();
-
-      if (terminalError && terminalError.code !== 'PGRST116') {
-        console.error('Error finding virtual terminal:', terminalError);
-        return;
-      }
-
-      if (!virtualTerminal) {
-        console.log('ℹ️ No virtual terminal found - will be created when needed');
-        return;
-      }
-
-      // Load token configuration using terminal_id
-      const { data, error } = await supabase
-        .from('terminal_crypto_config')
-        .select('*')
-        .eq('terminal_id', virtualTerminal.terminal_id)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error loading token configuration:', error);
-        return;
-      }
-
-      if (data) {
-        // Convert database format to UI format
-        const loadedTokens: AcceptedToken[] = [];
-        
-        // Map crypto_1, crypto_2, crypto_3 to selected tokens
-        if (data.crypto_1) {
-          const token = availableTokens.find(t => t.symbol === data.crypto_1);
-          if (token) {
-            loadedTokens.push({
-              ...token,
-              priority: 1,
-              isSelected: true
-            });
-          }
-        }
-        
-        if (data.crypto_2) {
-          const token = availableTokens.find(t => t.symbol === data.crypto_2);
-          if (token) {
-            loadedTokens.push({
-              ...token,
-              priority: 2,
-              isSelected: true
-            });
-          }
-        }
-        
-        if (data.crypto_3) {
-          const token = availableTokens.find(t => t.symbol === data.crypto_3);
-          if (token) {
-            loadedTokens.push({
-              ...token,
-              priority: 3,
-              isSelected: true
-            });
-          }
-        }
-
-        setSelectedTokens(loadedTokens);
-        console.log('✅ Token configuration loaded:', loadedTokens);
-      } else {
-        console.log('ℹ️ No existing token configuration found');
-      }
-    } catch (error) {
-      console.error('Error loading token configuration:', error);
-    }
-  };
-
 
 
   // Ensure virtual terminal exists and get terminal_id
@@ -566,7 +619,7 @@ const VirtualTerminals: React.FC = () => {
       const { data: existingTerminal, error: fetchError } = await supabase
         .from('terminals')
         .select('terminal_id, pairing_code')
-        .eq('merchant_id', userContext.merchantId)
+        .eq('merchant_id', merchantId)
         .eq('device_type', 'virtual')
         .single();
 
@@ -581,12 +634,13 @@ const VirtualTerminals: React.FC = () => {
       }
 
       // Create new virtual terminal
+      const pairingCode = Math.floor(100000 + Math.random() * 900000).toString();
       const virtualTerminalData = {
         merchant_id: merchantId,
         name: 'Virtual Terminal',
         device_type: 'virtual',
         status: 'active',
-        pairing_code: pairingInfo.pairingKey || Math.floor(100000 + Math.random() * 900000).toString()
+        pairing_code: pairingCode
       };
 
       const { data: newTerminal, error: createError } = await supabase
@@ -607,60 +661,86 @@ const VirtualTerminals: React.FC = () => {
       return null;
     }
   };
-
-  // Save token configuration
-  const saveTokenConfiguration = async () => {
-    if (!merchantId) {
-      alert('Error: Merchant ID not available');
-      return;
-    }
-
-    if (selectedTokens.length !== 3) {
-      alert('Please select exactly 3 tokens before saving');
-      return;
-    }
-
-    // Validate that all selected tokens are different
-    const sortedTokens = [...selectedTokens].sort((a, b) => a.priority - b.priority);
-    const uniqueSymbols = new Set(sortedTokens.map(token => token.symbol));
-    
-    if (uniqueSymbols.size !== 3) {
-      alert('Error: All 3 selected tokens must be different cryptocurrencies. Please select 3 unique tokens.');
-      return;
-    }
-
-    setIsLoading(true);
+  
+  // Save token configuration to database
+  const saveTokenConfiguration = async (): Promise<void> => {
     try {
+      setIsLoading(true);
+      
+      // Check if we have a virtual terminal ID
       // Ensure virtual terminal exists and get terminal_id
       const terminalId = await ensureVirtualTerminal();
       if (!terminalId) {
         throw new Error('Failed to create or find virtual terminal');
       }
       
+      // Sort tokens by priority
+      const sortedTokens = [...selectedTokens].sort((a, b) => (a.priority || 999) - (b.priority || 999));
+      
       // Map tokens to database structure
-      const tokenConfig = {
+      const tokenConfig: any = {
         terminal_id: terminalId,
         merchant_id: merchantId,
         crypto_1: sortedTokens[0].symbol,
         crypto_1_blockchain: getBlockchainForToken(sortedTokens[0].symbol),
         crypto_1_enabled: true,
-        crypto_2: sortedTokens[1].symbol,
-        crypto_2_blockchain: getBlockchainForToken(sortedTokens[1].symbol),
-        crypto_2_enabled: true,
-        crypto_3: sortedTokens[2].symbol,
-        crypto_3_blockchain: getBlockchainForToken(sortedTokens[2].symbol),
-        crypto_3_enabled: true
+        updated_at: new Date().toISOString()
         // Note: configured_by field removed due to UUID format mismatch with Clerk user IDs
       };
+      
+      // Add second token if available
+      if (sortedTokens.length >= 2) {
+        tokenConfig.crypto_2 = sortedTokens[1].symbol;
+        tokenConfig.crypto_2_blockchain = getBlockchainForToken(sortedTokens[1].symbol);
+        tokenConfig.crypto_2_enabled = true;
+      } else {
+        // Clear second token if not selected
+        tokenConfig.crypto_2 = null;
+        tokenConfig.crypto_2_blockchain = null;
+        tokenConfig.crypto_2_enabled = false;
+      }
+      
+      // Add third token if available
+      if (sortedTokens.length >= 3) {
+        tokenConfig.crypto_3 = sortedTokens[2].symbol;
+        tokenConfig.crypto_3_blockchain = getBlockchainForToken(sortedTokens[2].symbol);
+        tokenConfig.crypto_3_enabled = true;
+      } else {
+        // Clear third token if not selected
+        tokenConfig.crypto_3 = null;
+        tokenConfig.crypto_3_blockchain = null;
+        tokenConfig.crypto_3_enabled = false;
+      }
 
       console.log('🔍 Saving token configuration:', tokenConfig);
 
-      // Save to terminal_crypto_config table
-      const { error } = await supabase
+      // First check if a record already exists
+      const { data: existingConfig } = await supabase
         .from('terminal_crypto_config')
-        .upsert(tokenConfig, {
-          onConflict: 'terminal_id'
-        });
+        .select('id')
+        .eq('terminal_id', terminalId)
+        .single();
+
+      let error;
+      
+      if (existingConfig) {
+        // Update existing record
+        console.log('🔄 Updating existing token configuration');
+        const { error: updateError } = await supabase
+          .from('terminal_crypto_config')
+          .update(tokenConfig)
+          .eq('terminal_id', terminalId);
+          
+        error = updateError;
+      } else {
+        // Insert new record
+        console.log('➕ Creating new token configuration');
+        const { error: insertError } = await supabase
+          .from('terminal_crypto_config')
+          .insert(tokenConfig);
+          
+        error = insertError;
+      }
 
       if (error) {
         console.error('Database error:', error);
@@ -739,10 +819,10 @@ const VirtualTerminals: React.FC = () => {
                     {isFirstTimeSetup ? (
                       <div>
                         <p className="text-sm text-gray-600 mb-2">
-                          🔒 No virtual terminal password has been set up yet.
+                          No virtual terminal password has been set up yet.
                         </p>
                         <p className="text-sm text-blue-600 font-medium">
-                          Create your first password below to secure your virtual terminals.
+                          Create your first password for your virtual terminals.
                         </p>
                       </div>
                     ) : (
@@ -1057,15 +1137,20 @@ const VirtualTerminals: React.FC = () => {
                 {/* Save Configuration Button */}
                 <div className="pt-4 border-t">
                   <Button 
-                    onClick={saveTokenConfiguration}
-                    disabled={selectedTokens.length !== 3 || isLoading}
+                    onClick={() => saveTokenConfiguration()}
+                    disabled={selectedTokens.length < 1 || isLoading}
                     className="w-full"
                   >
                     {isLoading ? 'Saving...' : 'Save Token Configuration'}
                   </Button>
-                  {selectedTokens.length !== 3 && (
+                  {selectedTokens.length === 0 && (
                     <p className="text-sm text-gray-500 mt-2 text-center">
-                      Please select exactly 3 tokens to save configuration
+                      Please select at least 1 token to save configuration
+                    </p>
+                  )}
+                  {selectedTokens.length > 0 && selectedTokens.length < 3 && (
+                    <p className="text-sm text-blue-500 mt-2 text-center">
+                      You've selected {selectedTokens.length} token{selectedTokens.length > 1 ? 's' : ''}. You can add up to 3 tokens total.
                     </p>
                   )}
                 </div>
@@ -1266,7 +1351,7 @@ const VirtualTerminals: React.FC = () => {
                           setPairingInfo({
                             ...pairingInfo,
                             pairingKey: newKey,
-                            lastUsed: undefined
+                            lastUsed: null
                           });
                           // TODO: Add confirmation dialog and API call
                           alert('New pairing key generated!');
