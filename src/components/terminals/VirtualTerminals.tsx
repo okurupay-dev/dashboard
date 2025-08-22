@@ -186,7 +186,7 @@ const VirtualTerminals: React.FC = () => {
         autoLogout: true,
         defaultCurrency: 'USD',
         virtualTerminalEnabled: true,
-        hasWallet: walletData && walletData.length > 0,
+        hasWallet: !!(walletData && walletData.length > 0),
         walletCount: walletData ? walletData.length : 0,
         pairingKey: terminalData?.pairing_code || null,
         pairingKeyActive: terminalData?.status === 'active',
