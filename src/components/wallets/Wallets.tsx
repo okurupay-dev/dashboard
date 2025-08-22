@@ -386,20 +386,9 @@ const Wallets: React.FC = () => {
                       <span className="text-sm">Verified</span>
                     </div>
                   ) : (
-                    <button
-                      onClick={() => handleVerifyNetwork(network.id)}
-                      disabled={!walletConnection?.address || verifyingNetwork === network.id}
-                      className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                    >
-                      {verifyingNetwork === network.id ? (
-                        <>
-                          <Loader2 className="h-3 w-3 animate-spin mr-1 inline" />
-                          Verifying...
-                        </>
-                      ) : (
-                        'Verify Network'
-                      )}
-                    </button>
+                    <span className="text-sm text-gray-500">
+                      Connect wallet to verify
+                    </span>
                   )}
                 </div>
               )}
