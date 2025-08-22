@@ -667,6 +667,13 @@ const getBlockchainForToken = (symbol: string): string => {
     try {
       setIsLoading(true);
       
+      // Validate that exactly 3 tokens are selected
+      if (selectedTokens.length !== 3) {
+        alert('Please select exactly 3 tokens before saving');
+        setIsLoading(false);
+        return;
+      }
+      
       // Check if we have a virtual terminal ID
       // Ensure virtual terminal exists and get terminal_id
       const terminalId = await ensureVirtualTerminal();
