@@ -75,6 +75,12 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
   useEffect(() => {
     const initializeWeb3 = async () => {
       try {
+        // Don't re-initialize if already connected
+        if (isConnected) {
+          console.log('⏭️ Skipping initialization - wallet already connected');
+          return;
+        }
+        
         setIsInitializing(true);
         console.log('🔧 Detecting Web3 wallets...');
         
@@ -95,8 +101,11 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
       }
     };
 
-    initializeWeb3();
-  }, [user, metadata]);
+    // Only initialize once when component mounts or user/metadata changes but wallet isn't connected
+    if (user && metadata && !isConnected) {
+      initializeWeb3();
+    }
+  }, [user, metadata, isConnected]);
 
   // Connect wallet using real Web3 provider
   const handleConnectWallet = async () => {
