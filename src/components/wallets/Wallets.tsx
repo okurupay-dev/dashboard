@@ -472,10 +472,16 @@ const Wallets: React.FC = () => {
               <WalletConnectWidget 
                 onWalletConnected={(walletInfo) => {
                   console.log('Wallet connected:', walletInfo);
+                  setWalletConnection({
+                    address: walletInfo.address,
+                    provider: walletInfo.provider,
+                    chainId: walletInfo.chainId
+                  });
                   loadVerifiedNetworks();
                 }}
                 onWalletDisconnected={() => {
                   console.log('Wallet disconnected');
+                  setWalletConnection(null);
                   loadVerifiedNetworks();
                 }}
               />
