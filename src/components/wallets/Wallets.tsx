@@ -86,6 +86,13 @@ const Wallets: React.FC = () => {
   const [verifyingNetwork, setVerifyingNetwork] = useState<string | null>(null);
   const [isWalletSectionCollapsed, setIsWalletSectionCollapsed] = useState(false);
 
+  // Auto-collapse wallet section when all networks are verified
+  useEffect(() => {
+    if (allNetworksVerified && walletConnection?.address) {
+      setIsWalletSectionCollapsed(true);
+    }
+  }, [allNetworksVerified, walletConnection?.address]);
+
   // Load verified networks from database
   const loadVerifiedNetworks = async () => {
     if (!user) return;
