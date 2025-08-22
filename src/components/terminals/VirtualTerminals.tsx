@@ -689,7 +689,7 @@ const getBlockchainForToken = (symbol: string): string => {
         terminal_id: terminalId,
         merchant_id: merchantId,
         crypto_1: sortedTokens[0].symbol,
-        crypto_1_blockchain: getBlockchainForToken(sortedTokens[0].symbol),
+        crypto_1_blockchain: sortedTokens[0].network, // Use token's network directly
         crypto_1_enabled: true,
         updated_at: new Date().toISOString()
         // Note: configured_by field removed due to UUID format mismatch with Clerk user IDs
@@ -698,7 +698,7 @@ const getBlockchainForToken = (symbol: string): string => {
       // Add second token if available
       if (sortedTokens.length >= 2) {
         tokenConfig.crypto_2 = sortedTokens[1].symbol;
-        tokenConfig.crypto_2_blockchain = getBlockchainForToken(sortedTokens[1].symbol);
+        tokenConfig.crypto_2_blockchain = sortedTokens[1].network; // Use token's network directly
         tokenConfig.crypto_2_enabled = true;
       } else {
         // Clear second token if not selected
@@ -710,7 +710,7 @@ const getBlockchainForToken = (symbol: string): string => {
       // Add third token if available
       if (sortedTokens.length >= 3) {
         tokenConfig.crypto_3 = sortedTokens[2].symbol;
-        tokenConfig.crypto_3_blockchain = getBlockchainForToken(sortedTokens[2].symbol);
+        tokenConfig.crypto_3_blockchain = sortedTokens[2].network; // Use token's network directly
         tokenConfig.crypto_3_enabled = true;
       } else {
         // Clear third token if not selected
