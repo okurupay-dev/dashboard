@@ -166,18 +166,31 @@ const VirtualTerminals: React.FC = () => {
         return;
       }
       
-      // Mock data for now - replace with actual API call
+      // Load virtual terminal data from database
+      const { data: terminalData, error } = await supabase
+        .from('terminals')
+        .select('pairing_code, status, created_at')
+        .eq('merchant_id', userContext.merchantId)
+        .eq('device_type', 'virtual')
+        .single();
+      
+      // Load wallet status
+      const { data: walletData } = await supabase
+        .from('merchant_wallets')
+        .select('wallet_id')
+        .eq('merchant_id', userContext.merchantId);
+      
       const data = {
         terminalName: 'Main Terminal',
         sessionTimeout: '30',
         autoLogout: true,
         defaultCurrency: 'USD',
         virtualTerminalEnabled: true,
-        hasWallet: true,
-        walletCount: 1,
-        pairingKey: 'VT-ABC123',
-        pairingKeyActive: true,
-        pairingKeyLastUsed: new Date().toISOString(),
+        hasWallet: walletData && walletData.length > 0,
+        walletCount: walletData ? walletData.length : 0,
+        pairingKey: terminalData?.pairing_code || null,
+        pairingKeyActive: terminalData?.status === 'active',
+        pairingKeyLastUsed: terminalData?.created_at || null,
         passwordLastChanged: new Date().toISOString(),
         hasPassword: true
       };
@@ -196,20 +209,75 @@ const VirtualTerminals: React.FC = () => {
         walletCount: data.walletCount
       });
       
-      // Generate default 6-digit pairing key if none exists
-      const generatePairingKey = () => {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-        let result = 'VT-';
-        for (let i = 0; i < 6; i++) {
-          result += chars.charAt(Math.floor(Math.random() * chars.length));
+      // Regenerate pairing key
+      const regeneratePairingKey = async () => {
+        if (!userContext.merchantId) {
+          console.error('No merchant ID available');
+          return;
         }
-        return result;
+
+        try {
+          // Generate new 6-digit numeric key
+          const newKey = Math.floor(100000 + Math.random() * 900000).toString();
+          
+          // Update in database
+          const { error } = await supabase
+            .from('terminals')
+            .update({ pairing_code: newKey })
+            .eq('merchant_id', userContext.merchantId)
+            .eq('device_type', 'virtual');
+          
+          if (error) {
+            console.error('Error updating pairing key:', error);
+            alert('Error regenerating pairing key. Please try again.');
+            return;
+          }
+          
+          // Update local state
+          setPairingInfo(prev => ({
+            ...prev,
+            pairingKey: newKey,
+            lastUsed: undefined
+          }));
+          
+          alert('New pairing key generated successfully!');
+        } catch (error) {
+          console.error('Error regenerating pairing key:', error);
+          alert('Error regenerating pairing key. Please try again.');
+        }
+      };
+
+      // Generate 6-digit numeric pairing key if none exists
+      const generatePairingKey = () => {
+        return Math.floor(100000 + Math.random() * 900000).toString();
       };
   
-      const defaultPairingKey = data.pairingKey || generatePairingKey();
+      let pairingKey = data.pairingKey;
+      
+      // If no pairing key exists in database, generate and save one
+      if (!pairingKey) {
+        pairingKey = generatePairingKey();
+        
+        // Save new pairing key to database
+        const { error: updateError } = await supabase
+          .from('terminals')
+          .upsert({
+            merchant_id: userContext.merchantId,
+            device_type: 'virtual',
+            pairing_code: pairingKey,
+            status: 'active',
+            terminal_name: 'Virtual Terminal'
+          }, {
+            onConflict: 'merchant_id,device_type'
+          });
+        
+        if (updateError) {
+          console.error('Error saving pairing key:', updateError);
+        }
+      }
       
       setPairingInfo({
-        pairingKey: defaultPairingKey,
+        pairingKey: pairingKey,
         isActive: data.pairingKeyActive || false,
         lastUsed: data.pairingKeyLastUsed || undefined
       });
@@ -406,7 +474,7 @@ const VirtualTerminals: React.FC = () => {
       const { data: virtualTerminal, error: terminalError } = await supabase
         .from('terminals')
         .select('terminal_id')
-        .eq('merchant_id', merchantId)
+        .eq('merchant_id', userContext.merchantId)
         .eq('device_type', 'virtual')
         .single();
 
@@ -491,7 +559,7 @@ const VirtualTerminals: React.FC = () => {
       const { data: existingTerminal, error: fetchError } = await supabase
         .from('terminals')
         .select('terminal_id, pairing_code')
-        .eq('merchant_id', merchantId)
+        .eq('merchant_id', userContext.merchantId)
         .eq('device_type', 'virtual')
         .single();
 
@@ -1150,7 +1218,7 @@ const VirtualTerminals: React.FC = () => {
                                 {pairingInfo.pairingKey}
                               </div>
                               <div className="text-xs text-gray-500 mt-1">
-                                6-digit pairing code • {pairingInfo.isActive ? 'Active' : 'Inactive'} • Last used: {pairingInfo.lastUsed || 'Never'}
+                                6-digit pairing code • {pairingInfo.isActive ? 'Active' : 'Inactive'} • Last used: {pairingInfo.lastUsed ? new Date(pairingInfo.lastUsed).toLocaleDateString() : 'Never'}
                               </div>
                             </div>
                           </div>
