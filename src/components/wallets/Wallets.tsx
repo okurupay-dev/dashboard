@@ -471,9 +471,14 @@ const Wallets: React.FC = () => {
             ) : (
               /* Has Unverified Networks - Show WalletConnect Widget */
               <WalletConnectWidget 
-                onNetworkVerified={loadVerifiedNetworks}
-                verifyingNetwork={verifyingNetwork}
-                setVerifyingNetwork={setVerifyingNetwork}
+                onWalletConnected={(walletInfo) => {
+                  console.log('Wallet connected:', walletInfo);
+                  loadVerifiedNetworks();
+                }}
+                onWalletDisconnected={() => {
+                  console.log('Wallet disconnected');
+                  loadVerifiedNetworks();
+                }}
               />
             )}
           </div>
