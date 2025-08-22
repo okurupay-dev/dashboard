@@ -430,7 +430,10 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
           {/* Connect Button */}
           <div className="space-y-4">
             <Button
-              onClick={handleConnectWallet}
+              onClick={() => {
+                console.log('🖱️ Button clicked!');
+                handleConnectWallet();
+              }}
               className="w-full max-w-sm mx-auto"
               size="lg"
               disabled={isConnecting}
