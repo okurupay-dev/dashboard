@@ -198,7 +198,13 @@ const Wallets: React.FC = () => {
 
       // Prepare user info for verification tracking
       const userInfo = {
-        name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.fullName || 'Unknown User',
+        name: user.fullName || 
+              (user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : null) ||
+              user.firstName || 
+              user.lastName ||
+              user.username ||
+              user.emailAddresses?.[0]?.emailAddress?.split('@')[0] ||
+              'Unknown User',
         email: user.emailAddresses?.[0]?.emailAddress || 'Unknown Email',
         clerk_user_id: user.id
       };
