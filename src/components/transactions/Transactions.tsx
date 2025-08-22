@@ -590,75 +590,7 @@ const Transactions = () => {
         </CardContent>
       </Card>
 
-      {/* Mock Data Section - Only shown when no real transactions exist */}
-      {!hasRealTransactions && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <span>Sample Transactions</span>
-              <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
-                Demo Data
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="bg-yellow-50 p-4 border-b border-yellow-100">
-              <p className="text-sm text-yellow-800">
-                <strong>Note:</strong> The transactions below are sample data for demonstration purposes only.
-                Real transaction data will appear in the Merchant Transactions section above once your business starts processing payments.
-              </p>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 text-gray-700">
-                  <tr>
-                    <th className="py-3 px-4 text-left">Transaction ID</th>
-                    <th className="py-3 px-4 text-left">Date</th>
-                    <th className="py-3 px-4 text-left">Location</th>
-                    <th className="py-3 px-4 text-left">Terminal</th>
-                    <th className="py-3 px-4 text-left">Staff</th>
-                    <th className="py-3 px-4 text-left">Amount</th>
-                    <th className="py-3 px-4 text-left">Crypto</th>
-                    <th className="py-3 px-4 text-left">Chain</th>
-                    <th className="py-3 px-4 text-left">Status</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {fallbackTransactions.slice(0, 5).map((transaction) => (
-                    <tr key={transaction.id} className="hover:bg-gray-50">
-                      <td className="py-3 px-4 font-medium">{transaction.id}</td>
-                      <td className="py-3 px-4">{transaction.date}</td>
-                      <td className="py-3 px-4">{transaction.location || 'N/A'}</td>
-                      <td className="py-3 px-4">{transaction.terminal || 'N/A'}</td>
-                      <td className="py-3 px-4">{transaction.staff || 'N/A'}</td>
-                      <td className="py-3 px-4">${transaction.amount.toFixed(2)}</td>
-                      <td className="py-3 px-4">{transaction.crypto}</td>
-                      <td className="py-3 px-4">{transaction.chain || 'N/A'}</td>
-                      <td className="py-3 px-4">
-                        <StatusBadge status={transaction.status} />
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => handleViewTransaction(transaction)}
-                          disabled
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                            <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-                          </svg>
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* No demo data shown in production - only real transactions */}
 
       {/* Pagination Controls */}
       {(hasRealTransactions ? totalTransactions : filteredTransactions.length) > 0 && (

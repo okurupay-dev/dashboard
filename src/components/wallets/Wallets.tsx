@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Badge } from '../ui/badge';
+import { Button } from '../ui/button';
+import { CheckCircle, AlertTriangle, Wallet, ExternalLink, Copy, Check, ChevronDown, ChevronUp, Loader2, AlertCircle, Shield } from 'lucide-react';
 import { useUser } from '@clerk/clerk-react';
 import { supabase } from '../../lib/supabase/client';
-import { Wallet, Shield, CheckCircle, AlertCircle, AlertTriangle, Loader2, ExternalLink } from 'lucide-react';
 import { WalletConnectWidget } from './WalletConnectWidget';
 
 // Supported networks configuration
@@ -81,6 +84,7 @@ const Wallets: React.FC = () => {
   const [verifiedNetworks, setVerifiedNetworks] = useState<VerifiedNetwork[]>([]);
   const [walletConnection, setWalletConnection] = useState<ConnectedWalletInfo | null>(null);
   const [verifyingNetwork, setVerifyingNetwork] = useState<string | null>(null);
+  const [isWalletSectionCollapsed, setIsWalletSectionCollapsed] = useState(false);
 
   // Load verified networks from database
   const loadVerifiedNetworks = async () => {
@@ -398,48 +402,81 @@ const Wallets: React.FC = () => {
       </div>
 
       {/* WalletConnect Widget - Conditional Display */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Connect Your Wallet</h2>
-        
-        {allNetworksVerified ? (
-          /* All Networks Verified - Show Completion Message */
-          <div className="text-center py-8">
-            <div className="flex justify-center mb-4">
-              <CheckCircle className="h-16 w-16 text-green-500" />
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-semibold text-gray-900">Connect Your Wallet</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsWalletSectionCollapsed(!isWalletSectionCollapsed)}
+                className="p-1 h-6 w-6"
+              >
+                {isWalletSectionCollapsed ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronUp className="h-4 w-4" />
+                )}
+              </Button>
+              {!allNetworksVerified && (
+                <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-300">
+                  Action Required
+                </Badge>
+              )}
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              All Available Networks Verified
-            </h3>
-            <p className="text-gray-600 mb-6 max-w-md mx-auto">
-              You have successfully verified wallet addresses on all currently supported networks. 
-              New wallet connection will be available when additional blockchain networks are supported.
-            </p>
-            
-            {/* Important Notice */}
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-left">
-              <div className="flex items-start">
-                <AlertTriangle className="h-5 w-5 text-amber-500 mr-2 mt-0.5 flex-shrink-0" />
-                <div className="text-sm">
-                  <p className="font-medium text-amber-800 mb-1">Important Notice</p>
-                  <p className="text-amber-700 mb-3">
-                    Verified wallet addresses are <strong>immutable and cannot be altered</strong> for security and compliance reasons.
-                  </p>
-                  <p className="text-amber-700">
-                    For questions or support regarding your wallet addresses, please contact our team at{' '}
-                    <a href="mailto:support@okuru.com" className="font-medium text-amber-800 hover:text-amber-900 underline">
-                      support@okuru.com
-                    </a>
-                  </p>
+            {isWalletSectionCollapsed && allNetworksVerified && (
+              <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
+                All Networks Verified
+              </Badge>
+            )}
+          </div>
+        </div>
+        
+        {!isWalletSectionCollapsed && (
+          <div className="p-6">
+            {allNetworksVerified ? (
+              /* All Networks Verified - Show Completion Message */
+              <div className="text-center py-8">
+                <div className="flex justify-center mb-4">
+                  <CheckCircle className="h-16 w-16 text-green-500" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  All Available Networks Verified
+                </h3>
+                <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                  You have successfully verified wallet addresses on all currently supported networks. 
+                  New wallet connection will be available when additional blockchain networks are supported.
+                </p>
+                
+                {/* Important Notice */}
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-left">
+                  <div className="flex items-start">
+                    <AlertTriangle className="h-5 w-5 text-amber-500 mr-2 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm">
+                      <p className="font-medium text-amber-800 mb-1">Important Notice</p>
+                      <p className="text-amber-700 mb-3">
+                        Verified wallet addresses are <strong>immutable and cannot be altered</strong> for security and compliance reasons.
+                      </p>
+                      <p className="text-amber-700">
+                        For questions or support regarding your wallet addresses, please contact our team at{' '}
+                        <a href="mailto:support@okuru.com" className="font-medium text-amber-800 hover:text-amber-900 underline">
+                          support@okuru.com
+                        </a>
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              /* Has Unverified Networks - Show WalletConnect Widget */
+              <WalletConnectWidget 
+                onNetworkVerified={loadVerifiedNetworks}
+                verifyingNetwork={verifyingNetwork}
+                setVerifyingNetwork={setVerifyingNetwork}
+              />
+            )}
           </div>
-        ) : (
-          /* Has Unverified Networks - Show WalletConnect Widget */
-          <WalletConnectWidget 
-            onWalletConnected={handleWalletConnect}
-            onWalletDisconnected={handleWalletDisconnect}
-          />
         )}
       </div>
 

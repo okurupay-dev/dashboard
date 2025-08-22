@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Badge } from '../ui/badge';
-import { virtualTerminalService } from '../../lib/supabase/services';
-import { supabase } from '../../lib/supabase/client';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useUser } from '@clerk/clerk-react';
+import { supabase } from '../../lib/supabase/client';
 
 // Types for Virtual Terminal Management
 interface VirtualTerminalPassword {
@@ -23,6 +22,7 @@ interface AcceptedToken {
   priority: number;
   isSelected: boolean;
   coingeckoId: string;
+  network: string;
 }
 
 interface TerminalSettings {
@@ -79,22 +79,23 @@ const VirtualTerminals: React.FC = () => {
   // Password form state
   const [isLoading, setIsLoading] = useState(false);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [isTokenSectionCollapsed, setIsTokenSectionCollapsed] = useState(false);
   const isFirstTimeSetup = !passwordInfo.lastChanged;
   
   const [availableTokens] = useState<AcceptedToken[]>([
     // Ethereum Network - Top 5
-    { id: '1', symbol: 'ETH', name: 'Ethereum', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'ethereum' },
-    { id: '2', symbol: 'USDC', name: 'Circle USDC', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'usd-coin' },
-    { id: '3', symbol: 'USDT', name: 'Tether USDT', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'tether' },
-    { id: '4', symbol: 'DAI', name: 'MakerDAO DAI', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'dai' },
-    { id: '5', symbol: 'WBTC', name: 'Wrapped BTC', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'wrapped-bitcoin' },
+    { id: '1', symbol: 'ETH', name: 'Ethereum', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'ethereum', network: 'Ethereum' },
+    { id: '2', symbol: 'USDC', name: 'Circle USDC', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'usd-coin', network: 'Ethereum' },
+    { id: '3', symbol: 'USDT', name: 'Tether USDT', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'tether', network: 'Ethereum' },
+    { id: '4', symbol: 'DAI', name: 'MakerDAO DAI', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'dai', network: 'Ethereum' },
+    { id: '5', symbol: 'WBTC', name: 'Wrapped BTC', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'wrapped-bitcoin', network: 'Ethereum' },
     
     // Base Network - Top 5
-    { id: '6', symbol: 'ETH', name: 'Base ETH', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'ethereum' },
-    { id: '7', symbol: 'USDC', name: 'Circle USDC (Base)', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'usd-coin' },
-    { id: '8', symbol: 'cbETH', name: 'Coinbase cbETH', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'coinbase-wrapped-staked-eth' },
-    { id: '9', symbol: 'DEGEN', name: 'DEGEN', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'degen-base' },
-    { id: '10', symbol: 'USDT', name: 'Tether USDT (Base)', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'tether' },
+    { id: '6', symbol: 'ETH', name: 'Base ETH', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'ethereum', network: 'Base' },
+    { id: '7', symbol: 'USDC', name: 'Circle USDC (Base)', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'usd-coin', network: 'Base' },
+    { id: '8', symbol: 'cbETH', name: 'Coinbase cbETH', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'coinbase-wrapped-staked-eth', network: 'Base' },
+    { id: '9', symbol: 'DEGEN', name: 'DEGEN', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'degen-base', network: 'Base' },
+    { id: '10', symbol: 'USDT', name: 'Tether USDT (Base)', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'tether', network: 'Base' },
   ]);
 
   const [selectedTokens, setSelectedTokens] = useState<AcceptedToken[]>(
@@ -786,130 +787,187 @@ const VirtualTerminals: React.FC = () => {
           )}
           <Card>
             <CardHeader>
-              <CardTitle>Accepted Payment Tokens</CardTitle>
-              <p className="text-sm text-gray-600">
-                Select up to 3 tokens that your virtual terminals will accept for payments.
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Selected Tokens */}
-              <div>
-                <h3 className="font-medium text-gray-900 mb-4">
-                  Selected Tokens ({selectedTokens.length}/3)
-                </h3>
-                <div className="space-y-3">
-                  {selectedTokens.map((token, index) => (
-                    <div
-                      key={token.id}
-                      className="flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg"
-                    >
-                      <div className="flex items-center space-x-4">
-                        <div className="flex items-center justify-center w-8 h-8 bg-blue-100 rounded-full text-blue-600 font-medium">
-                          {index + 1}
-                        </div>
-                        <img 
-                          src={getCoinGeckoImageUrl(token.coingeckoId)} 
-                          alt={token.symbol}
-                          className="w-8 h-8 rounded-full"
-                          onError={(e) => {
-                            // Fallback to a generic token icon if CoinGecko image fails
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
-                        <div>
-                          <div className="font-medium">{token.symbol}</div>
-                          <div className="text-sm text-gray-600">{token.name}</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleTokenSelect(token)}
-                        >
-                          Remove
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Available Tokens */}
-              <div>
-                <h3 className="font-medium text-gray-900 mb-4">Available Tokens</h3>
-                
-                {/* Ethereum Network Tokens */}
-                <div className="mb-6">
-                  <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
-                    <span className="w-3 h-3 bg-blue-500 rounded-full mr-2"></span>
-                    Ethereum Network
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {availableTokens
-                      .filter(token => !selectedTokens.find(selected => selected.id === token.id) && ['1', '2', '3', '4', '5'].includes(token.id))
-                      .map((token) => (
-                        <div
-                          key={token.id}
-                          className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50"
-                        >
-                          <div>
-                            <div className="font-medium">{token.symbol}</div>
-                            <div className="text-sm text-gray-600">{token.name}</div>
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleTokenSelect(token)}
-                            disabled={selectedTokens.length >= 3}
-                          >
-                            Add
-                          </Button>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-
-                {/* Base Network Tokens */}
+              <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
-                    <span className="w-3 h-3 bg-blue-600 rounded-full mr-2"></span>
-                    Base Network
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {availableTokens
-                      .filter(token => !selectedTokens.find(selected => selected.id === token.id) && ['6', '7', '8', '9', '10'].includes(token.id))
-                      .map((token) => (
-                        <div
-                          key={token.id}
-                          className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50"
-                        >
+                  <CardTitle className="flex items-center gap-2">
+                    Accepted Payment Tokens
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsTokenSectionCollapsed(!isTokenSectionCollapsed)}
+                      className="p-1 h-6 w-6"
+                    >
+                      {isTokenSectionCollapsed ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronUp className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </CardTitle>
+                  <p className="text-sm text-gray-600">
+                    Select up to 3 tokens that your virtual terminals will accept for payments.
+                  </p>
+                </div>
+                {isTokenSectionCollapsed && selectedTokens.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {selectedTokens.map((token) => (
+                      <Badge key={token.id} variant="outline" className="flex items-center gap-1">
+                        <span className={`w-2 h-2 rounded-full ${
+                          token.network === 'Ethereum' ? 'bg-blue-500' : 'bg-purple-500'
+                        }`}></span>
+                        {token.symbol} ({token.network})
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </CardHeader>
+            {!isTokenSectionCollapsed && (
+              <CardContent className="space-y-6">
+                {/* Selected Tokens */}
+                <div>
+                  <h3 className="font-medium text-gray-900 mb-4">
+                    Selected Tokens ({selectedTokens.length}/3)
+                  </h3>
+                  <div className="space-y-3">
+                    {selectedTokens.map((token, index) => (
+                      <div
+                        key={token.id}
+                        className="flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg"
+                      >
+                        <div className="flex items-center space-x-4">
+                          <div className="flex items-center justify-center w-8 h-8 bg-blue-100 rounded-full text-blue-600 font-medium">
+                            {index + 1}
+                          </div>
+                          <img 
+                            src={getCoinGeckoImageUrl(token.coingeckoId)} 
+                            alt={token.symbol}
+                            className="w-8 h-8 rounded-full"
+                            onError={(e) => {
+                              // Fallback to a generic token icon if CoinGecko image fails
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
                           <div>
-                            <div className="font-medium">{token.symbol}</div>
+                            <div className="font-medium flex items-center gap-2">
+                              {token.symbol}
+                              <Badge variant="outline" className={`text-xs ${
+                                token.network === 'Ethereum' ? 'bg-blue-100 text-blue-800 border-blue-300' : 'bg-purple-100 text-purple-800 border-purple-300'
+                              }`}>
+                                {token.network}
+                              </Badge>
+                            </div>
                             <div className="text-sm text-gray-600">{token.name}</div>
                           </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleTokenSelect(token)}
-                            disabled={selectedTokens.length >= 3}
                           >
-                            Add
+                            Remove
                           </Button>
                         </div>
-                      ))}
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
 
-              <Button
-                onClick={saveTokenConfiguration}
-                disabled={selectedTokens.length !== 3 || isLoading}
-                className="w-full"
-              >
-                {isLoading ? 'Saving...' : 'Save Token Configuration'}
-              </Button>
-            </CardContent>
+                {/* Available Tokens */}
+                <div>
+                  <h3 className="font-medium text-gray-900 mb-4">Available Tokens</h3>
+                  
+                  {/* Ethereum Network Tokens */}
+                  <div className="mb-6">
+                    <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
+                      <span className="w-3 h-3 bg-blue-500 rounded-full mr-2"></span>
+                      Ethereum Network
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {availableTokens
+                        .filter(token => !selectedTokens.find(selected => selected.id === token.id) && token.network === 'Ethereum')
+                        .map((token) => (
+                          <div
+                            key={token.id}
+                            className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50"
+                          >
+                            <div>
+                              <div className="font-medium flex items-center gap-2">
+                                {token.symbol}
+                                <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 border-blue-300">
+                                  Ethereum
+                                </Badge>
+                              </div>
+                              <div className="text-sm text-gray-600">{token.name}</div>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleTokenSelect(token)}
+                              disabled={selectedTokens.length >= 3}
+                            >
+                              Add
+                            </Button>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+
+                  {/* Base Network Tokens */}
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
+                      <span className="w-3 h-3 bg-purple-500 rounded-full mr-2"></span>
+                      Base Network
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {availableTokens
+                        .filter(token => !selectedTokens.find(selected => selected.id === token.id) && token.network === 'Base')
+                        .map((token) => (
+                          <div
+                            key={token.id}
+                            className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50"
+                          >
+                            <div>
+                              <div className="font-medium flex items-center gap-2">
+                                {token.symbol}
+                                <Badge variant="outline" className="text-xs bg-purple-100 text-purple-800 border-purple-300">
+                                  Base
+                                </Badge>
+                              </div>
+                              <div className="text-sm text-gray-600">{token.name}</div>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleTokenSelect(token)}
+                              disabled={selectedTokens.length >= 3}
+                            >
+                              Add
+                            </Button>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Save Configuration Button */}
+                <div className="pt-4 border-t">
+                  <Button 
+                    onClick={saveTokenConfiguration}
+                    disabled={selectedTokens.length !== 3 || isLoading}
+                    className="w-full"
+                  >
+                    {isLoading ? 'Saving...' : 'Save Token Configuration'}
+                  </Button>
+                  {selectedTokens.length !== 3 && (
+                    <p className="text-sm text-gray-500 mt-2 text-center">
+                      Please select exactly 3 tokens to save configuration
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            )}
           </Card>
         </TabsContent>
 
