@@ -575,72 +575,12 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
           </div>
         )}
 
-        {/* Network Verification */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h4 className="font-medium text-gray-900">Network Verification</h4>
-            <div className="text-sm text-gray-600">
-              {networkVerifications.filter(nv => nv.isVerified).length} of {networkVerifications.length} verified
-            </div>
+        {error && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center space-x-2">
+            <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+            <p className="text-sm text-red-700">{error}</p>
           </div>
-
-          <div className="space-y-3">
-            {networkVerifications.map((network) => (
-              <div key={network.chainId} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    network.isVerified 
-                      ? 'bg-green-100' 
-                      : 'bg-gray-100'
-                  }`}>
-                    {network.isVerified ? (
-                      <CheckCircle className="h-5 w-5 text-green-600" />
-                    ) : (
-                      <div className="w-3 h-3 bg-gray-400 rounded-full" />
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{network.chainName}</p>
-                    <p className="text-xs text-gray-600">
-                      {network.address.slice(0, 6)}...{network.address.slice(-4)}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  {network.isVerified ? (
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-green-600 font-medium">Verified</span>
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                    </div>
-                  ) : (
-                    <Button
-                      onClick={() => handleVerifyNetwork(network.chainId)}
-                      disabled={network.isVerifying}
-                      size="sm"
-                      className="bg-blue-600 hover:bg-blue-700"
-                    >
-                      {network.isVerifying ? (
-                        <>
-                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2"></div>
-                          Verifying...
-                        </>
-                      ) : (
-                        'Verify Network'
-                      )}
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center space-x-2">
-              <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
-          )}
+        )}
 
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-start space-x-3">
