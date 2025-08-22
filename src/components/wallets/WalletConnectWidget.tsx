@@ -227,116 +227,86 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
       // Step 4: Save wallet connection to database
       console.log('💾 Saving wallet connection to database...');
       try {
-        // First, check if wallet address already exists
+        // First, get or create merchant wallet
+        let merchantWalletId: string;
+        
+        const { data: existingMerchantWallet, error: merchantWalletError } = await supabase
+          .from('merchant_wallets')
+          .select('wallet_id')
+          .eq('merchant_id', merchantId)
+          .maybeSingle();
+
+        if (existingMerchantWallet) {
+          merchantWalletId = existingMerchantWallet.wallet_id;
+          console.log('✅ Found existing merchant wallet:', merchantWalletId);
+        } else {
+          // Create merchant wallet first
+          const { data: newMerchantWallet, error: createWalletError } = await supabase
+            .from('merchant_wallets')
+            .insert({
+              merchant_id: merchantId
+            })
+            .select('wallet_id')
+            .single();
+
+          if (createWalletError || !newMerchantWallet) {
+            console.error('❌ Failed to create merchant wallet:', createWalletError);
+            throw new Error('Failed to create merchant wallet');
+          }
+
+          merchantWalletId = newMerchantWallet.wallet_id;
+          console.log('✅ Created new merchant wallet:', merchantWalletId);
+        }
+
+        // Now check if wallet address already exists for this merchant wallet
         const blockchainName = walletConnectConfig.chains.find(c => c.id === connection.chainId)?.name || 'Ethereum';
-        const { data: existingWallet, error: checkError } = await supabase
+        const { data: existingAddress, error: addressCheckError } = await supabase
           .from('wallet_addresses')
           .select('address_id, address, blockchain, is_verified')
+          .eq('wallet_id', merchantWalletId)
           .eq('address', connection.address.toLowerCase())
           .eq('blockchain', blockchainName)
           .maybeSingle();
 
-        let addressId: string;
-
-        if (existingWallet && !checkError) {
-          // Update existing wallet with verification
+        if (existingAddress) {
+          // Update existing address with verification
           const { error: updateError } = await supabase
             .from('wallet_addresses')
             .update({
               is_verified: true,
               verification_signature: signature,
-              verified_at: new Date().toISOString(),
-              verified_by_user_id: user.id
+              verified_at: new Date().toISOString()
             })
-            .eq('address_id', existingWallet.address_id);
+            .eq('address_id', existingAddress.address_id);
 
           if (updateError) {
             console.error('❌ Failed to update wallet verification:', updateError);
             throw new Error('Failed to verify wallet address');
           }
 
-          addressId = existingWallet.address_id;
-          console.log('✅ Updated existing wallet verification');
+          console.log('✅ Updated existing wallet address verification');
         } else {
-          // Create new wallet address record - use a simpler approach
+          // Create new wallet address record
           console.log('📝 Creating new wallet address record...');
-          const walletData = {
-            address: connection.address.toLowerCase(),
-            blockchain: blockchainName,
-            is_verified: true,
-            verification_signature: signature,
-            verified_at: new Date().toISOString(),
-            verified_by_user_id: user.id
-          };
-          
-          console.log('Wallet data to insert:', walletData);
-          
-          const { data: newWallet, error: insertError } = await supabase
+          const { data: newAddress, error: insertError } = await supabase
             .from('wallet_addresses')
-            .insert(walletData)
+            .insert({
+              wallet_id: merchantWalletId,
+              address: connection.address.toLowerCase(),
+              blockchain: blockchainName,
+              is_verified: true,
+              verification_signature: signature,
+              verified_at: new Date().toISOString()
+            })
             .select('address_id')
             .single();
 
-          if (insertError) {
+          if (insertError || !newAddress) {
             console.error('❌ Failed to create wallet address:', insertError);
-            console.error('Insert error details:', insertError);
-            
-            // Try a fallback approach - maybe the table structure is different
-            console.log('🔄 Trying fallback approach...');
-            const { data: fallbackWallet, error: fallbackError } = await supabase
-              .from('wallet_addresses')
-              .insert({
-                address: connection.address.toLowerCase(),
-                blockchain: blockchainName,
-                is_verified: true
-              })
-              .select('address_id')
-              .single();
-              
-            if (fallbackError) {
-              console.error('❌ Fallback also failed:', fallbackError);
-              throw new Error(`Failed to save wallet address: ${insertError.message}`);
-            }
-            
-            if (!fallbackWallet) {
-              throw new Error('Failed to create wallet address record');
-            }
-            
-            addressId = fallbackWallet.address_id;
-            console.log('✅ Created wallet address with fallback approach');
-          } else {
-            if (!newWallet) {
-              throw new Error('Failed to create wallet address record');
-            }
-            addressId = newWallet.address_id;
-            console.log('✅ Created new wallet address record');
-          }
-        }
-
-        // Link wallet to merchant if not already linked
-        const { data: existingLink, error: linkCheckError } = await supabase
-          .from('merchant_wallets')
-          .select('wallet_id')
-          .eq('merchant_id', merchantId)
-          .eq('wallet_id', addressId)
-          .maybeSingle();
-
-        if (!existingLink) {
-          const { error: linkError } = await supabase
-            .from('merchant_wallets')
-            .insert({
-              merchant_id: merchantId,
-              wallet_id: addressId,
-              is_primary: true,
-              added_by_user_id: user.id
-            });
-
-          if (linkError) {
-            console.error('❌ Failed to link wallet to merchant:', linkError);
-            throw new Error('Failed to link wallet to merchant account');
+            throw new Error('Failed to save wallet address');
           }
 
-          console.log('✅ Linked wallet to merchant account');
+          console.log('✅ Created new wallet address record');
         }
 
         console.log('✅ Wallet connection saved to database successfully');
