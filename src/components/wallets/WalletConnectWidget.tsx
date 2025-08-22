@@ -136,10 +136,16 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
       }));
       
       setNetworkVerifications(networkVerifs);
+      console.log('📝 Network verifications set:', networkVerifs);
 
       setWalletInfo(realWalletInfo);
+      console.log('💾 Wallet info set:', realWalletInfo);
+      
       setIsConnected(true);
+      console.log('🔗 isConnected set to true');
+      
       onWalletConnected(realWalletInfo);
+      console.log('📞 onWalletConnected callback called');
       
       console.log('🎉 Wallet connection completed successfully!');
       
@@ -360,8 +366,12 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
     console.log('Removing address:', addr);
   };
 
+  // Debug render conditions
+  console.log('🎨 Render state:', { isInitializing, isConnected, walletInfo: !!walletInfo });
+
   // Loading state
   if (isInitializing) {
+    console.log('🔄 Rendering loading state');
     return (
       <div className="bg-white border border-gray-200 rounded-lg p-6">
         <div className="text-center">
@@ -373,6 +383,7 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
   }
 
   if (!isConnected) {
+    console.log('🚫 Rendering connect wallet screen');
     return (
       <div className="bg-white border border-gray-200 rounded-lg p-6">
         <div className="text-center">
@@ -449,6 +460,7 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
     );
   }
 
+  console.log('✅ Rendering connected wallet screen');
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-6">
       <div className="space-y-6">
