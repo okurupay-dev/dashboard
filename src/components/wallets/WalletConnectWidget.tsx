@@ -100,9 +100,11 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
 
   // Connect wallet using real Web3 provider
   const handleConnectWallet = async () => {
+    console.log('🎯 handleConnectWallet called');
     try {
       setError(null);
       setIsConnecting(true);
+      console.log('🔄 Set connecting state to true');
       
       console.log('🔗 Connecting to wallet...');
       const connection: Web3WalletConnection = await web3WalletProvider.connectWallet();
