@@ -579,7 +579,7 @@ const getBlockchainForToken = (symbol: string): string => {
   // Handle token selection and reordering
   const handleTokenSelect = (token: AcceptedToken) => {
     if (selectedTokens.length >= 3 && !selectedTokens.find(t => t.id === token.id)) {
-      alert('You must select exactly 3 tokens - please remove a token before adding a new one');
+      alert('You can select up to 3 tokens - please remove a token before adding a new one');
       return;
     }
 
@@ -667,9 +667,9 @@ const getBlockchainForToken = (symbol: string): string => {
     try {
       setIsLoading(true);
       
-      // Validate that exactly 3 tokens are selected
-      if (selectedTokens.length !== 3) {
-        alert('Please select exactly 3 tokens before saving');
+      // Validate that at least 1 token is selected
+      if (selectedTokens.length < 1) {
+        alert('Please select at least 1 token before saving');
         setIsLoading(false);
         return;
       }
@@ -995,7 +995,7 @@ const getBlockchainForToken = (symbol: string): string => {
                     </Button>
                   </CardTitle>
                   <p className="text-sm text-gray-600">
-                    Select exactly 3 tokens that your virtual terminals will accept for payments.
+                    Select at least 1 token (up to 3) that your virtual terminals will accept for payments.
                   </p>
                 </div>
                 {isTokenSectionCollapsed && selectedTokens.length > 0 && (
@@ -1145,19 +1145,19 @@ const getBlockchainForToken = (symbol: string): string => {
                 <div className="pt-4 border-t">
                   <Button 
                     onClick={() => saveTokenConfiguration()}
-                    disabled={selectedTokens.length !== 3 || isLoading}
+                    disabled={selectedTokens.length < 1 || isLoading}
                     className="w-full"
                   >
                     {isLoading ? 'Saving...' : 'Save Token Configuration'}
                   </Button>
                   {selectedTokens.length === 0 && (
                     <p className="text-sm text-gray-500 mt-2 text-center">
-                      Please select exactly 3 tokens to save configuration
+                      Please select at least 1 token to save configuration
                     </p>
                   )}
                   {selectedTokens.length > 0 && selectedTokens.length < 3 && (
-                    <p className="text-sm text-orange-500 mt-2 text-center">
-                      You've selected {selectedTokens.length} token{selectedTokens.length > 1 ? 's' : ''}. Please select exactly 3 tokens to continue.
+                    <p className="text-sm text-blue-500 mt-2 text-center">
+                      You've selected {selectedTokens.length} token{selectedTokens.length > 1 ? 's' : ''}. You can add up to 3 tokens total.
                     </p>
                   )}
                 </div>
