@@ -6,6 +6,7 @@ export interface WalletStatus {
   hasWallet: boolean;
   walletCount: number;
   verifiedNetworks: string[];
+  shouldShowIndicator: boolean;
   loading: boolean;
   error: string | null;
 }
@@ -19,6 +20,7 @@ export const useWalletStatus = (): WalletStatus => {
     hasWallet: false,
     walletCount: 0,
     verifiedNetworks: [],
+    shouldShowIndicator: false,
     loading: true,
     error: null
   });
@@ -39,16 +41,16 @@ export const useWalletStatus = (): WalletStatus => {
 
         if (walletError) throw walletError;
 
-        // Query wallet_addresses to get verified networks
+        // Query wallet_addresses to get verified networks - use a simpler approach
         const { data: addressData, error: addressError } = await supabase
           .from('wallet_addresses')
           .select(`
             blockchain,
             is_verified,
-            merchant_wallets!inner(merchant_id)
+            wallet_id
           `)
-          .eq('merchant_wallets.merchant_id', userContext.merchantId)
-          .eq('is_verified', true);
+          .eq('is_verified', true)
+          .in('wallet_id', walletData?.map(w => w.wallet_id) || []);
 
         if (addressError) throw addressError;
 
@@ -60,13 +62,28 @@ export const useWalletStatus = (): WalletStatus => {
         // Use Array.from instead of spread operator to avoid TypeScript issues
         const verifiedNetworks = Array.from(new Set(networks));
 
-        // Consider a wallet connected only if there are verified networks
-        const hasVerifiedWallet = walletData && walletData.length > 0 && verifiedNetworks.length > 0;
+        // For debugging only
+        console.log('Wallet data:', walletData);
+        console.log('Address data:', addressData);
+        console.log('Verified networks:', verifiedNetworks);
+        
+        // If we have any verified networks at all, consider the wallet as verified
+        const hasVerifiedWallet = verifiedNetworks.length > 0;
+        
+        // If the user is on the wallets page, don't show the indicator
+        // This prevents showing 'required' on the wallets page itself
+        const isOnWalletsPage = window.location.pathname.includes('/wallets');
+        const shouldShowIndicator = !hasVerifiedWallet && !isOnWalletsPage;
+        
+        console.log('Has verified wallet:', hasVerifiedWallet);
+        console.log('Is on wallets page:', isOnWalletsPage);
+        console.log('Should show indicator:', shouldShowIndicator);
         
         setStatus({
           hasWallet: hasVerifiedWallet,
           walletCount: walletData?.length || 0,
           verifiedNetworks,
+          shouldShowIndicator: !hasVerifiedWallet && !isOnWalletsPage,
           loading: false,
           error: null
         });
@@ -76,6 +93,7 @@ export const useWalletStatus = (): WalletStatus => {
           hasWallet: false,
           walletCount: 0,
           verifiedNetworks: [],
+          shouldShowIndicator: !window.location.pathname.includes('/wallets'),
           loading: false,
           error: err.message
         });
