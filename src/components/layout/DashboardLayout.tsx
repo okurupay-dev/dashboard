@@ -238,7 +238,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between p-4 border-b bg-white flex-shrink-0">
+        <div className="flex items-center justify-between p-4 border-b flex-shrink-0" style={{ background: 'linear-gradient(135deg, #ffffff 0%, #999999 100%)' }}>
           <div>
             <h1 className="text-2xl font-bold text-gray-800 tracking-tight">
               {currentPath === '/dashboard' ? 'Dashboard' : ''}
