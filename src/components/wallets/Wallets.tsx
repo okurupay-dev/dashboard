@@ -301,10 +301,10 @@ const Wallets: React.FC = () => {
 
   // Auto-collapse wallet section when all networks are verified
   useEffect(() => {
-    if (allNetworksVerified && walletConnection?.address) {
+    if (allNetworksVerified) {
       setIsWalletSectionCollapsed(true);
     }
-  }, [allNetworksVerified, walletConnection?.address]);
+  }, [allNetworksVerified]);
 
   if (loading) {
     return (
