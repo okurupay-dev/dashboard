@@ -26,6 +26,14 @@ interface NetworkVerification {
   isVerifying: boolean;
 }
 
+interface WalletInfo {
+  address: string;
+  balance: string;
+  chainId: number;
+  chainName: string;
+  provider?: string;
+}
+
 interface WalletAddress {
   address: string;
   chainId: number;
@@ -55,6 +63,9 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSigning, setIsSigning] = useState(false);
   const [networkVerifications, setNetworkVerifications] = useState<NetworkVerification[]>([]);
+  const [showAddresses, setShowAddresses] = useState(false);
+  const [showTokens, setShowTokens] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Clerk user data
   const { user } = useUser();
@@ -97,18 +108,19 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
       const connection: Web3WalletConnection = await web3WalletProvider.connectWallet();
       console.log('✅ Wallet connected:', connection);
       
-      // Step 2: Get token balances
-      console.log('💰 Getting token balances...');
-      const balances = await web3WalletProvider.getBalances(connection.address);
-      console.log('✅ Token balances retrieved:', balances);
+      // Step 2: Get token balance
+      console.log('💰 Getting token balance...');
+      const balance = await web3WalletProvider.getBalance(connection.address);
+      console.log('✅ Token balance retrieved:', balance);
       
       // Step 3: Create wallet info object
       const chainName = walletConnectConfig.chains.find(c => c.id === connection.chainId)?.name || 'Unknown';
       const realWalletInfo: WalletInfo = {
         address: connection.address,
-        balance: balances.ETH || '0',
+        balance: balance || '0',
         chainId: connection.chainId,
-        chainName
+        chainName,
+        provider: 'MetaMask'
       };
       
       // Step 4: Initialize network verifications for supported chains
@@ -307,96 +319,52 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
   };
 
   // Refresh token balances
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      // You could add a toast notification here
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+    }
+  };
+
   const handleRefreshBalances = async () => {
     if (!walletInfo) return;
     
     try {
       setIsRefreshing(true);
-      console.log('🔄 Refreshing token balances...');
+      const balance = await web3WalletProvider.getBalance(walletInfo.address);
       
-      // Get fresh ETH balance
-      const ethBalance = await web3WalletProvider.getBalance(walletInfo.address);
+      // Update wallet info with new balance
+      setWalletInfo(prev => prev ? {
+        ...prev,
+        balance: balance || '0'
+      } : null);
       
-      // Update token balances with real data
-      const updatedTokens = walletInfo.tokens.map(token => {
-        if (token.symbol === 'ETH') {
-          return {
-            ...token,
-            balance: ethBalance,
-            usdValue: (parseFloat(ethBalance) * 2500).toFixed(2) // Mock USD value
-          };
-        }
-        return token;
-      });
-      
-      const updatedWalletInfo = {
-        ...walletInfo,
-        tokens: updatedTokens
-      };
-      
-      setWalletInfo(updatedWalletInfo);
-      onWalletConnected(updatedWalletInfo);
-      
-      console.log('✅ Token balances refreshed');
     } catch (error) {
-      console.error('❌ Failed to refresh balances:', error);
-      setError('Failed to refresh balances. Please try again.');
+      console.error('Failed to refresh balance:', error);
     } finally {
       setIsRefreshing(false);
     }
   };
 
-  // Sign ownership proof
-  const handleSignOwnership = async (address: string) => {
-    try {
-      console.log('✍️ Signing ownership proof for address:', address);
-      
-      // Simulate signature process
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Update address as verified
-      if (walletInfo) {
-        const updatedAddresses = walletInfo.addresses.map(addr => 
-          addr.address === address ? { ...addr, isVerified: true } : addr
-        );
-        
-        const updatedWalletInfo = {
-          ...walletInfo,
-          addresses: updatedAddresses
-        };
-        
-        setWalletInfo(updatedWalletInfo);
-        onWalletConnected(updatedWalletInfo);
-      }
-      
-      console.log('✅ Ownership verified for address:', address);
-    } catch (error) {
-      console.error('❌ Failed to sign ownership proof:', error);
-      setError('Failed to verify ownership. Please try again.');
-    }
+  const handleAddAddress = async (chainId: number) => {
+    // Implementation for adding a new address for a specific chain
+    console.log('Adding address for chain:', chainId);
   };
 
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch (error) {
-      console.error('Failed to copy:', error);
-    }
+  const handleRemoveAddress = async (addr: WalletAddress) => {
+    // Implementation for removing an address
+    console.log('Removing address:', addr);
   };
 
+  // Loading state
   if (isInitializing) {
     return (
       <div className="bg-white border border-gray-200 rounded-lg p-6">
         <div className="text-center">
-          <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          </div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">
-            Initializing WalletConnect
-          </h3>
-          <p className="text-gray-600">
-            Setting up wallet connection infrastructure...
-          </p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Initializing wallet connection...</p>
         </div>
       </div>
     );
@@ -443,17 +411,12 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
               onClick={handleConnectWallet}
               className="w-full max-w-sm mx-auto"
               size="lg"
-              disabled={isConnecting || isSigning}
+              disabled={isConnecting}
             >
               {isConnecting ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                   Connecting to Wallet...
-                </>
-              ) : isSigning ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Please Sign Message...
                 </>
               ) : (
                 <>
@@ -611,95 +574,6 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
                   Click "Verify Network" for each blockchain to sign ownership proof and save your wallet address for that network.
                 </p>
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Multi-Chain Addresses */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h4 className="font-medium text-gray-900">Multi-Chain Addresses</h4>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowAddresses(!showAddresses)}
-            >
-              {showAddresses ? 'Hide' : 'Show'} Addresses
-            </Button>
-          </div>
-
-          {showAddresses && walletInfo && (
-            <div className="space-y-2">
-              {walletInfo.addresses.map((address, index) => (
-                <div key={`${address.address}-${index}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                      address.isVerified ? 'bg-green-100' : 'bg-yellow-100'
-                    }`}>
-                      {address.isVerified ? (
-                        <CheckCircle className="w-4 h-4 text-green-600" />
-                      ) : (
-                        <AlertCircle className="w-4 h-4 text-yellow-600" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{address.chainName}</p>
-                      <code className="text-xs text-gray-600">{address.address}</code>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    {!address.isVerified && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleSignOwnership(address.address)}
-                      >
-                        Verify
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => copyToClipboard(address.address)}
-                    >
-                      <Copy className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Actions */}
-        <div className="flex flex-wrap gap-3">
-          <Button
-            variant="outline"
-            onClick={() => window.open(`https://etherscan.io/address/${walletInfo?.address}`, '_blank')}
-          >
-            <ExternalLink className="h-4 w-4 mr-2" />
-            View on Explorer
-          </Button>
-          
-          <Button
-            variant="outline"
-            onClick={() => setShowTokens(!showTokens)}
-          >
-            <Key className="h-4 w-4 mr-2" />
-            {showTokens ? 'Hide' : 'Manage'} Tokens
-          </Button>
-        </div>
-
-        {/* Security Notice */}
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <div className="flex items-start space-x-3">
-            <Shield className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <h4 className="font-medium text-green-800">Your Wallet, Your Control</h4>
-              <p className="text-sm text-green-700 mt-1">
-                You're connecting your existing wallet via WalletConnect. Okuru never has access to your private keys or funds. 
-                You maintain complete control and can disconnect at any time.
-              </p>
             </div>
           </div>
         </div>
