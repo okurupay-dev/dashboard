@@ -180,6 +180,13 @@ const VirtualTerminals: React.FC = () => {
         .select('wallet_id')
         .eq('merchant_id', userContext.merchantId);
       
+      // Check if password exists in database
+      const { data: passwordData } = await supabase
+        .from('virtual_terminal_passwords')
+        .select('password_hash, created_at, updated_at')
+        .eq('merchant_id', userContext.merchantId)
+        .single();
+      
       const data = {
         terminalName: 'Main Terminal',
         sessionTimeout: '30',
@@ -191,8 +198,8 @@ const VirtualTerminals: React.FC = () => {
         pairingKey: terminalData?.pairing_code || null,
         pairingKeyActive: terminalData?.status === 'active',
         pairingKeyLastUsed: terminalData?.created_at || null,
-        passwordLastChanged: new Date().toISOString(),
-        hasPassword: true
+        passwordLastChanged: passwordData?.updated_at || passwordData?.created_at || null,
+        hasPassword: !!passwordData?.password_hash
       };
       
       // Update all state from database response
