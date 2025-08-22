@@ -60,8 +60,11 @@ export const useWalletStatus = (): WalletStatus => {
         // Use Array.from instead of spread operator to avoid TypeScript issues
         const verifiedNetworks = Array.from(new Set(networks));
 
+        // Consider a wallet connected only if there are verified networks
+        const hasVerifiedWallet = walletData && walletData.length > 0 && verifiedNetworks.length > 0;
+        
         setStatus({
-          hasWallet: walletData && walletData.length > 0,
+          hasWallet: hasVerifiedWallet,
           walletCount: walletData?.length || 0,
           verifiedNetworks,
           loading: false,

@@ -199,8 +199,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
               </svg>
               <span className="ml-1">Wallets</span>
               {!hasWallet && (
-                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
-                  Required
+                <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-100 text-yellow-800 opacity-80">
+                  required
                 </span>
               )}
             </div>
