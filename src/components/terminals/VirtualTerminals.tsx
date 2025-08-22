@@ -24,6 +24,8 @@ interface AcceptedToken {
   isSelected: boolean;
   coingeckoId: string;
   network: string;
+  disabled?: boolean;
+  comingSoon?: boolean;
 }
 
 interface TerminalSettings {
@@ -117,21 +119,18 @@ const VirtualTerminals = (): React.ReactElement => {
   const isFirstTimeSetup = !passwordInfo.lastChanged;
   
   const [availableTokens] = useState<AcceptedToken[]>([
-    // Ethereum Network - Top 5
-    { id: '1', symbol: 'ETH', name: 'Ethereum', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'ethereum', network: 'Ethereum' },
-    { id: '2', symbol: 'USDC', name: 'Circle USDC', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'usd-coin', network: 'Ethereum' },
-    { id: '3', symbol: 'USDT', name: 'Tether USDT', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'tether', network: 'Ethereum' },
-    { id: '4', symbol: 'DAI', name: 'MakerDAO DAI', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'dai', network: 'Ethereum' },
-    { id: '5', symbol: 'WBTC', name: 'Wrapped BTC', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'wrapped-bitcoin', network: 'Ethereum' },
+    // Ethereum Network - Top 5 (Coming Soon)
+    { id: '1', symbol: 'ETH', name: 'Ethereum (Coming Soon)', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'ethereum', network: 'Ethereum', disabled: true, comingSoon: true },
+    { id: '2', symbol: 'USDC', name: 'Circle USDC (Coming Soon)', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'usd-coin', network: 'Ethereum', disabled: true, comingSoon: true },
+    { id: '3', symbol: 'USDT', name: 'Tether USDT (Coming Soon)', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'tether', network: 'Ethereum', disabled: true, comingSoon: true },
+    { id: '4', symbol: 'DAI', name: 'MakerDAO DAI (Coming Soon)', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'dai', network: 'Ethereum', disabled: true, comingSoon: true },
+    { id: '5', symbol: 'WBTC', name: 'Wrapped BTC (Coming Soon)', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'wrapped-bitcoin', network: 'Ethereum', disabled: true, comingSoon: true },
     
-    // Base Network - Top Tokens
-    { id: '6', symbol: 'ETH', name: 'Base ETH', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'ethereum', network: 'Base' },
-    { id: '7', symbol: 'USDC', name: 'Circle USDC (Base)', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'usd-coin', network: 'Base' },
-    { id: '8', symbol: 'cbETH', name: 'Coinbase cbETH', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'coinbase-wrapped-staked-eth', network: 'Base' },
-    { id: '9', symbol: 'DEGEN', name: 'DEGEN', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'degen-base', network: 'Base' },
-    { id: '10', symbol: 'USDT', name: 'Tether USDT (Base)', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'tether', network: 'Base' },
-    { id: '11', symbol: 'DAI', name: 'DAI (Base)', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'dai', network: 'Base' },
-    { id: '12', symbol: 'USDbC', name: 'USDbC', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'usd-base-coin', network: 'Base' },
+    // Base Network - Available Tokens
+    { id: '7', symbol: 'USDC', name: 'Circle USDC (Base)', walletAddress: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', priority: 0, isSelected: false, coingeckoId: 'usd-coin', network: 'Base' },
+    { id: '10', symbol: 'USDT', name: 'Tether USDT (Base)', walletAddress: '0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2', priority: 0, isSelected: false, coingeckoId: 'tether', network: 'Base' },
+    { id: '11', symbol: 'DAI', name: 'DAI (Base)', walletAddress: '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb', priority: 0, isSelected: false, coingeckoId: 'dai', network: 'Base' },
+    { id: '12', symbol: 'USDbC', name: 'USDbC', walletAddress: '0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA', priority: 0, isSelected: false, coingeckoId: 'usd-base-coin', network: 'Base' },
   ]);
 
   // Get user context for database operations (following Wallets.tsx pattern)
@@ -585,6 +584,12 @@ const getBlockchainForToken = (symbol: string, network?: string): string => {
 
   // Handle token selection and reordering
   const handleTokenSelect = (token: AcceptedToken) => {
+    // Prevent selecting disabled/coming soon tokens
+    if (token.disabled || token.comingSoon) {
+      alert('This token is coming soon and not yet available for selection.');
+      return;
+    }
+    
     if (selectedTokens.length >= 3 && !selectedTokens.find(t => t.id === token.id)) {
       alert('You can select up to 3 tokens - please remove a token before adding a new one');
       return;
@@ -1087,7 +1092,7 @@ const getBlockchainForToken = (symbol: string, network?: string): string => {
                         .map((token) => (
                           <div
                             key={token.id}
-                            className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50"
+                            className={`flex items-center justify-between p-3 border border-gray-200 rounded-lg ${token.disabled ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
                           >
                             <div>
                               <div className="font-medium flex items-center gap-2">
@@ -1095,6 +1100,11 @@ const getBlockchainForToken = (symbol: string, network?: string): string => {
                                 <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 border-blue-300">
                                   Ethereum
                                 </Badge>
+                                {token.comingSoon && (
+                                  <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800 border-amber-300">
+                                    Coming Soon
+                                  </Badge>
+                                )}
                               </div>
                               <div className="text-sm text-gray-600">{token.name}</div>
                             </div>
@@ -1102,9 +1112,9 @@ const getBlockchainForToken = (symbol: string, network?: string): string => {
                               variant="outline"
                               size="sm"
                               onClick={() => handleTokenSelect(token)}
-                              disabled={selectedTokens.length >= 3}
+                              disabled={selectedTokens.length >= 3 || token.disabled}
                             >
-                              Add
+                              {token.comingSoon ? 'Coming Soon' : 'Add'}
                             </Button>
                           </div>
                         ))}
@@ -1123,7 +1133,7 @@ const getBlockchainForToken = (symbol: string, network?: string): string => {
                         .map((token) => (
                           <div
                             key={token.id}
-                            className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50"
+                            className={`flex items-center justify-between p-3 border border-gray-200 rounded-lg ${token.disabled ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
                           >
                             <div>
                               <div className="font-medium flex items-center gap-2">
@@ -1131,6 +1141,11 @@ const getBlockchainForToken = (symbol: string, network?: string): string => {
                                 <Badge variant="outline" className="text-xs bg-purple-100 text-purple-800 border-purple-300">
                                   Base
                                 </Badge>
+                                {token.comingSoon && (
+                                  <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800 border-amber-300">
+                                    Coming Soon
+                                  </Badge>
+                                )}
                               </div>
                               <div className="text-sm text-gray-600">{token.name}</div>
                             </div>
@@ -1138,9 +1153,9 @@ const getBlockchainForToken = (symbol: string, network?: string): string => {
                               variant="outline"
                               size="sm"
                               onClick={() => handleTokenSelect(token)}
-                              disabled={selectedTokens.length >= 3}
+                              disabled={selectedTokens.length >= 3 || token.disabled}
                             >
-                              Add
+                              {token.comingSoon ? 'Coming Soon' : 'Add'}
                             </Button>
                           </div>
                         ))}
