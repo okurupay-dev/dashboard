@@ -56,13 +56,32 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
   onWalletConnected,
   onWalletDisconnected
 }) => {
+  // Initialize state from sessionStorage if available
+  const getStoredWalletInfo = (): WalletInfo | null => {
+    try {
+      const stored = sessionStorage.getItem('walletInfo');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const getStoredNetworkVerifications = (): NetworkVerification[] => {
+    try {
+      const stored = sessionStorage.getItem('networkVerifications');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  };
+
   const [isInitializing, setIsInitializing] = useState(true);
-  const [isConnected, setIsConnected] = useState(false);
-  const [walletInfo, setWalletInfo] = useState<WalletInfo | null>(null);
+  const [isConnected, setIsConnected] = useState(!!getStoredWalletInfo());
+  const [walletInfo, setWalletInfo] = useState<WalletInfo | null>(getStoredWalletInfo());
   const [error, setError] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSigning, setIsSigning] = useState(false);
-  const [networkVerifications, setNetworkVerifications] = useState<NetworkVerification[]>([]);
+  const [networkVerifications, setNetworkVerifications] = useState<NetworkVerification[]>(getStoredNetworkVerifications());
   const [showAddresses, setShowAddresses] = useState(false);
   const [showTokens, setShowTokens] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -78,6 +97,14 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
   useEffect(() => {
     const initializeWeb3 = async () => {
       try {
+        // If wallet is already connected from sessionStorage, skip initialization
+        if (isConnected && walletInfo) {
+          console.log('⏭️ Wallet already connected from storage, skipping initialization');
+          setIsInitializing(false);
+          setHasInitialized(true);
+          return;
+        }
+
         // Prevent re-initialization if already done
         if (hasInitialized) {
           console.log('⏭️ Skipping initialization - already initialized');
@@ -150,9 +177,15 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
       
       setNetworkVerifications(networkVerifs);
       console.log('📝 Network verifications set:', networkVerifs);
+      
+      // Store in sessionStorage to persist across re-mounts
+      sessionStorage.setItem('networkVerifications', JSON.stringify(networkVerifs));
 
       setWalletInfo(realWalletInfo);
       console.log('💾 Wallet info set:', realWalletInfo);
+      
+      // Store wallet info in sessionStorage
+      sessionStorage.setItem('walletInfo', JSON.stringify(realWalletInfo));
       
       setIsConnected(true);
       console.log('🔗 isConnected set to true');
@@ -296,13 +329,16 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
       }
       
       // Update verification state to verified
-      setNetworkVerifications(prev => 
-        prev.map(nv => 
-          nv.chainId === chainId 
-            ? { ...nv, isVerified: true, isVerifying: false }
-            : nv
-        )
+      const updatedVerifications = networkVerifications.map(nv => 
+        nv.chainId === chainId 
+          ? { ...nv, isVerified: true, isVerifying: false }
+          : nv
       );
+      
+      setNetworkVerifications(updatedVerifications);
+      
+      // Update sessionStorage
+      sessionStorage.setItem('networkVerifications', JSON.stringify(updatedVerifications));
       
       console.log('✅ Network verification completed successfully!');
     } catch (error) {
@@ -328,8 +364,14 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
       web3WalletProvider.disconnect();
       setWalletInfo(null);
       setIsConnected(false);
+      setNetworkVerifications([]);
       setShowAddresses(false);
       setShowTokens(false);
+      
+      // Clear sessionStorage
+      sessionStorage.removeItem('walletInfo');
+      sessionStorage.removeItem('networkVerifications');
+      
       onWalletDisconnected();
       
       console.log('✅ Wallet disconnected successfully');
