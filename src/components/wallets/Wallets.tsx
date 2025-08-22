@@ -474,8 +474,11 @@ const Wallets: React.FC = () => {
                   console.log('Wallet connected:', walletInfo);
                   setWalletConnection({
                     address: walletInfo.address,
-                    provider: walletInfo.provider,
-                    chainId: walletInfo.chainId
+                    provider: 'MetaMask',
+                    chainId: walletInfo.chainId,
+                    isConnected: true,
+                    addresses: [],
+                    tokens: []
                   });
                   loadVerifiedNetworks();
                 }}
