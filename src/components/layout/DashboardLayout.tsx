@@ -125,7 +125,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100 overflow-hidden">
       {/* Sidebar */}
-      <div className="w-64 bg-white shadow-lg p-6 flex flex-col flex-shrink-0 overflow-y-auto">
+      <div className="w-64 shadow-lg p-6 flex flex-col flex-shrink-0 overflow-y-auto" style={{ background: 'linear-gradient(135deg, #ffffff 0%, #999999 100%)' }}>
         <div className="flex items-center mb-10 px-2">
           <img src={logo} alt="Okuru Logo" className="h-12 w-auto" />
         </div>
