@@ -249,11 +249,13 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
             </h1>
           </div>
           <div className="flex items-center">
-            <img 
-              src={merchantInfo.logo} 
-              alt={`${merchantInfo.name} Logo`} 
-              className="h-5 w-auto mr-1.5" 
-            />
+            {merchantInfo.logo && merchantInfo.logo !== logo ? (
+              <img 
+                src={merchantInfo.logo} 
+                alt={`${merchantInfo.name} Logo`} 
+                className="h-5 w-auto mr-1.5" 
+              />
+            ) : null}
             <span className="text-sm font-medium text-gray-700">{merchantInfo.name}</span>
           </div>
         </div>
