@@ -15,10 +15,15 @@ interface WalletConnectWidgetProps {
 interface ConnectedWalletInfo {
   address: string;
   chainId: number;
-  provider: string;
-  isConnected: boolean;
-  addresses: WalletAddress[];
-  tokens: TokenBalance[];
+  chainName: string;
+}
+
+interface NetworkVerification {
+  chainId: number;
+  chainName: string;
+  address: string;
+  isVerified: boolean;
+  isVerifying: boolean;
 }
 
 interface WalletAddress {
@@ -45,13 +50,11 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
 }) => {
   const [isInitializing, setIsInitializing] = useState(true);
   const [isConnected, setIsConnected] = useState(false);
-  const [walletInfo, setWalletInfo] = useState<ConnectedWalletInfo | null>(null);
+  const [walletInfo, setWalletInfo] = useState<WalletInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showAddresses, setShowAddresses] = useState(false);
-  const [showTokens, setShowTokens] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSigning, setIsSigning] = useState(false);
+  const [networkVerifications, setNetworkVerifications] = useState<NetworkVerification[]>([]);
   
   // Clerk user data
   const { user } = useUser();
@@ -69,94 +72,6 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
           setError('No Web3 wallet detected. Please install MetaMask or another Web3 wallet.');
           setIsInitializing(false);
           return;
-        }
-        
-        // Check if user already has a verified wallet in the database
-        if (user && metadata?.merchantId) {
-          console.log('🔍 Checking for existing wallet connections...');
-          try {
-            const { data: existingWallets, error } = await supabase
-              .from('merchant_wallets')
-              .select(`
-                wallet_id,
-                is_primary,
-                wallet_addresses!merchant_wallets_wallet_id_fkey (
-                  address_id,
-                  address,
-                  blockchain,
-                  is_verified,
-                  verified_at
-                )
-              `)
-              .eq('merchant_id', metadata.merchantId)
-              .eq('wallet_addresses.is_verified', true);
-
-            if (existingWallets && existingWallets.length > 0) {
-              console.log('✅ Found existing verified wallet connections:', existingWallets);
-              
-              // Get the primary wallet or first verified wallet
-              const primaryWallet = existingWallets.find(w => w.is_primary) || existingWallets[0];
-              const walletAddress = (primaryWallet.wallet_addresses as any);
-              
-              if (walletAddress && walletAddress.address) {
-                // Try to reconnect to the existing wallet
-                console.log('🔄 Attempting to reconnect to existing wallet...');
-                try {
-                  const connection = await web3WalletProvider.connectWallet();
-                  
-                  // Check if the connected wallet matches the stored one
-                  if (connection.address.toLowerCase() === walletAddress.address.toLowerCase()) {
-                    console.log('✅ Successfully reconnected to existing wallet');
-                    
-                    // Get token balances
-                    const ethBalance = await web3WalletProvider.getBalance(connection.address);
-                    
-                    // Create wallet info
-                    const reconnectedWalletInfo: ConnectedWalletInfo = {
-                      address: connection.address,
-                      chainId: connection.chainId,
-                      provider: connection.provider,
-                      isConnected: true,
-                      addresses: [
-                        {
-                          address: connection.address,
-                          chainId: connection.chainId,
-                          chainName: walletConnectConfig.chains.find(c => c.id === connection.chainId)?.name || 'Unknown',
-                          isVerified: true,
-                          addedAt: walletAddress.verified_at || new Date().toISOString()
-                        }
-                      ],
-                      tokens: [
-                        {
-                          symbol: 'ETH',
-                          name: 'Ethereum',
-                          balance: ethBalance,
-                          decimals: 18,
-                          address: 'native',
-                          chainId: connection.chainId,
-                          usdValue: (parseFloat(ethBalance) * 2500).toFixed(2)
-                        }
-                      ]
-                    };
-
-                    setWalletInfo(reconnectedWalletInfo);
-                    setIsConnected(true);
-                    onWalletConnected(reconnectedWalletInfo);
-                    
-                    console.log('✅ Wallet reconnection complete');
-                  } else {
-                    console.log('⚠️ Connected wallet does not match stored wallet');
-                  }
-                } catch (reconnectError) {
-                  console.log('⚠️ Could not automatically reconnect wallet:', reconnectError);
-                  // This is fine - user can manually connect
-                }
-              }
-            }
-          } catch (dbError) {
-            console.log('⚠️ Could not check existing wallets:', dbError);
-            // This is fine - user can manually connect
-          }
         }
         
         console.log('✅ Web3 wallet detection complete');
@@ -178,187 +93,197 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
       setError(null);
       setIsConnecting(true);
       
-      console.log('🚀 Connecting to Web3 wallet...');
-      
-      // Step 1: Connect to wallet
+      console.log('🔗 Connecting to wallet...');
       const connection: Web3WalletConnection = await web3WalletProvider.connectWallet();
       console.log('✅ Wallet connected:', connection);
       
-      // Step 2: Get user info for signature
-      if (!user) {
-        throw new Error('User information not available. Please refresh and try again.');
-      }
+      // Step 2: Get token balances
+      console.log('💰 Getting token balances...');
+      const balances = await web3WalletProvider.getBalances(connection.address);
+      console.log('✅ Token balances retrieved:', balances);
       
-      const userEmail = user.primaryEmailAddress?.emailAddress || user.emailAddresses?.[0]?.emailAddress;
-      if (!userEmail) {
-        throw new Error('User email not available. Please contact support.');
-      }
-
-      // Handle users without merchant metadata by fetching from database
-      let merchantId = metadata?.merchantId;
-      if (!merchantId) {
-        console.log('⚠️ No merchant metadata found, fetching from database...');
-        try {
-          const { data: userData, error } = await supabase
-            .from('users')
-            .select('merchant_id')
-            .eq('clerk_user_id', user.id)
-            .single();
-          
-          if (error || !userData?.merchant_id) {
-            throw new Error('Merchant account not found. Please contact support to set up your merchant account.');
-          }
-          
-          merchantId = userData.merchant_id;
-          console.log('✅ Found merchant ID from database:', merchantId);
-        } catch (dbError) {
-          console.error('❌ Database lookup failed:', dbError);
-          throw new Error('Unable to verify merchant account. Please contact support.');
-        }
-      }
-      
-      setIsSigning(true);
-      console.log('✍️ Requesting signature for merchant ownership...');
-      
-      // Step 3: Sign merchant ownership message
-      const { signature, message } = await web3WalletProvider.signMerchantOwnership(merchantId, userEmail);
-      console.log('✅ Signature obtained successfully');
-      
-      // Step 4: Save wallet connection to database
-      console.log('💾 Saving wallet connection to database...');
-      try {
-        // First, get or create merchant wallet
-        let merchantWalletId: string;
-        
-        const { data: existingMerchantWallet, error: merchantWalletError } = await supabase
-          .from('merchant_wallets')
-          .select('wallet_id')
-          .eq('merchant_id', merchantId)
-          .maybeSingle();
-
-        if (existingMerchantWallet) {
-          merchantWalletId = existingMerchantWallet.wallet_id;
-          console.log('✅ Found existing merchant wallet:', merchantWalletId);
-        } else {
-          // Create merchant wallet first
-          const { data: newMerchantWallet, error: createWalletError } = await supabase
-            .from('merchant_wallets')
-            .insert({
-              merchant_id: merchantId
-            })
-            .select('wallet_id')
-            .single();
-
-          if (createWalletError || !newMerchantWallet) {
-            console.error('❌ Failed to create merchant wallet:', createWalletError);
-            throw new Error('Failed to create merchant wallet');
-          }
-
-          merchantWalletId = newMerchantWallet.wallet_id;
-          console.log('✅ Created new merchant wallet:', merchantWalletId);
-        }
-
-        // Now check if wallet address already exists for this merchant wallet
-        const blockchainName = walletConnectConfig.chains.find(c => c.id === connection.chainId)?.name || 'Ethereum';
-        const { data: existingAddress, error: addressCheckError } = await supabase
-          .from('wallet_addresses')
-          .select('address_id, address, blockchain, is_verified')
-          .eq('wallet_id', merchantWalletId)
-          .eq('address', connection.address.toLowerCase())
-          .eq('blockchain', blockchainName)
-          .maybeSingle();
-
-        if (existingAddress) {
-          // Update existing address with verification
-          const { error: updateError } = await supabase
-            .from('wallet_addresses')
-            .update({
-              is_verified: true,
-              verification_signature: signature,
-              verified_at: new Date().toISOString()
-            })
-            .eq('address_id', existingAddress.address_id);
-
-          if (updateError) {
-            console.error('❌ Failed to update wallet verification:', updateError);
-            throw new Error('Failed to verify wallet address');
-          }
-
-          console.log('✅ Updated existing wallet address verification');
-        } else {
-          // Create new wallet address record
-          console.log('📝 Creating new wallet address record...');
-          const { data: newAddress, error: insertError } = await supabase
-            .from('wallet_addresses')
-            .insert({
-              wallet_id: merchantWalletId,
-              address: connection.address.toLowerCase(),
-              blockchain: blockchainName,
-              is_verified: true,
-              verification_signature: signature,
-              verified_at: new Date().toISOString()
-            })
-            .select('address_id')
-            .single();
-
-          if (insertError || !newAddress) {
-            console.error('❌ Failed to create wallet address:', insertError);
-            throw new Error('Failed to save wallet address');
-          }
-
-          console.log('✅ Created new wallet address record');
-        }
-
-        console.log('✅ Wallet connection saved to database successfully');
-      } catch (dbError) {
-        console.error('❌ Database operation failed:', dbError);
-        // Don't throw here - allow the UI connection to proceed even if DB save fails
-        // The user can retry the connection later
-      }
-      
-      // Step 5: Get token balances
-      const ethBalance = await web3WalletProvider.getBalance(connection.address);
-      
-      // Create wallet info with real data
-      const realWalletInfo: ConnectedWalletInfo = {
+      // Step 3: Create wallet info object
+      const chainName = walletConnectConfig.chains.find(c => c.id === connection.chainId)?.name || 'Unknown';
+      const realWalletInfo: WalletInfo = {
         address: connection.address,
+        balance: balances.ETH || '0',
         chainId: connection.chainId,
-        provider: connection.provider,
-        isConnected: true,
-        addresses: [
-          {
-            address: connection.address,
-            chainId: connection.chainId,
-            chainName: walletConnectConfig.chains.find(c => c.id === connection.chainId)?.name || 'Unknown',
-            isVerified: true, // Verified through signature
-            addedAt: new Date().toISOString()
-          }
-        ],
-        tokens: [
-          {
-            symbol: 'ETH',
-            name: 'Ethereum',
-            balance: ethBalance,
-            decimals: 18,
-            address: 'native',
-            chainId: connection.chainId,
-            usdValue: (parseFloat(ethBalance) * 2500).toFixed(2) // Mock USD value
-          }
-        ]
+        chainName
       };
+      
+      // Step 4: Initialize network verifications for supported chains
+      const supportedChains = walletConnectConfig.chains;
+      const networkVerifs: NetworkVerification[] = supportedChains.map(chain => ({
+        chainId: chain.id,
+        chainName: chain.name,
+        address: connection.address,
+        isVerified: false,
+        isVerifying: false
+      }));
+      
+      setNetworkVerifications(networkVerifs);
 
       setWalletInfo(realWalletInfo);
       setIsConnected(true);
       onWalletConnected(realWalletInfo);
       
-      console.log('✅ Wallet setup complete with signature verification');
+      console.log('🎉 Wallet connection completed successfully!');
       
     } catch (error: any) {
       console.error('❌ Failed to connect wallet:', error);
       setError(error.message || 'Failed to connect wallet. Please try again.');
+      setIsConnected(false);
+      setWalletInfo(null);
     } finally {
       setIsConnecting(false);
-      setIsSigning(false);
+    }
+  };
+
+  const handleVerifyNetwork = async (chainId: number) => {
+    try {
+      setError(null);
+      
+      // Update verification state
+      setNetworkVerifications(prev => 
+        prev.map(nv => 
+          nv.chainId === chainId 
+            ? { ...nv, isVerifying: true }
+            : nv
+        )
+      );
+      
+      // Get user metadata
+      if (!user || !metadata?.merchantId) {
+        throw new Error('User authentication or merchant data not available');
+      }
+      
+      const merchantId = metadata.merchantId;
+      const userEmail = user.primaryEmailAddress?.emailAddress || user.emailAddresses[0]?.emailAddress;
+      
+      if (!userEmail) {
+        throw new Error('User email not available');
+      }
+      
+      console.log('✍️ Requesting signature for network verification...', { chainId, merchantId });
+      
+      // Sign merchant ownership message for this network
+      const { signature, message } = await web3WalletProvider.signMerchantOwnership(merchantId, userEmail);
+      console.log('✅ Signature obtained successfully');
+      
+      // Save wallet connection to database for this network
+      console.log('💾 Saving network verification to database...');
+      
+      // Get or create merchant wallet
+      let merchantWalletId: string;
+      
+      const { data: existingMerchantWallet, error: merchantWalletError } = await supabase
+        .from('merchant_wallets')
+        .select('wallet_id')
+        .eq('merchant_id', merchantId)
+        .maybeSingle();
+
+      if (existingMerchantWallet) {
+        merchantWalletId = existingMerchantWallet.wallet_id;
+        console.log('✅ Found existing merchant wallet:', merchantWalletId);
+      } else {
+        // Create merchant wallet first
+        const { data: newMerchantWallet, error: createWalletError } = await supabase
+          .from('merchant_wallets')
+          .insert({
+            merchant_id: merchantId
+          })
+          .select('wallet_id')
+          .single();
+
+        if (createWalletError || !newMerchantWallet) {
+          console.error('❌ Failed to create merchant wallet:', createWalletError);
+          throw new Error('Failed to create merchant wallet');
+        }
+
+        merchantWalletId = newMerchantWallet.wallet_id;
+        console.log('✅ Created new merchant wallet:', merchantWalletId);
+      }
+
+      // Get blockchain name and wallet address
+      const blockchainName = walletConnectConfig.chains.find(c => c.id === chainId)?.name || 'Unknown';
+      const walletAddress = walletInfo?.address;
+      
+      if (!walletAddress) {
+        throw new Error('Wallet address not available');
+      }
+
+      // Check if wallet address already exists for this network
+      const { data: existingAddress, error: addressCheckError } = await supabase
+        .from('wallet_addresses')
+        .select('address_id, address, blockchain, is_verified')
+        .eq('wallet_id', merchantWalletId)
+        .eq('address', walletAddress.toLowerCase())
+        .eq('blockchain', blockchainName)
+        .maybeSingle();
+
+      if (existingAddress) {
+        // Update existing address with verification
+        const { error: updateError } = await supabase
+          .from('wallet_addresses')
+          .update({
+            is_verified: true,
+            verification_signature: signature,
+            verified_at: new Date().toISOString()
+          })
+          .eq('address_id', existingAddress.address_id);
+
+        if (updateError) {
+          console.error('❌ Failed to update wallet verification:', updateError);
+          throw new Error('Failed to verify wallet address');
+        }
+
+        console.log('✅ Updated existing wallet address verification');
+      } else {
+        // Create new wallet address record
+        console.log('📝 Creating new wallet address record...');
+        const { data: newAddress, error: insertError } = await supabase
+          .from('wallet_addresses')
+          .insert({
+            wallet_id: merchantWalletId,
+            address: walletAddress.toLowerCase(),
+            blockchain: blockchainName,
+            is_verified: true,
+            verification_signature: signature,
+            verified_at: new Date().toISOString()
+          })
+          .select('address_id')
+          .single();
+
+        if (insertError || !newAddress) {
+          console.error('❌ Failed to create wallet address:', insertError);
+          throw new Error('Failed to save wallet address');
+        }
+
+        console.log('✅ Created new wallet address record');
+      }
+      
+      // Update verification state to verified
+      setNetworkVerifications(prev => 
+        prev.map(nv => 
+          nv.chainId === chainId 
+            ? { ...nv, isVerified: true, isVerifying: false }
+            : nv
+        )
+      );
+      
+      console.log('✅ Network verification completed successfully!');
+    } catch (error) {
+      console.error('❌ Network verification failed:', error);
+      setError(error instanceof Error ? error.message : 'Failed to verify network');
+      
+      // Reset verification state
+      setNetworkVerifications(prev => 
+        prev.map(nv => 
+          nv.chainId === chainId 
+            ? { ...nv, isVerifying: false }
+            : nv
+        )
+      );
     }
   };
 
@@ -610,54 +535,84 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
           </div>
         )}
 
-        {/* Token Balances */}
-        <div className="space-y-3">
+        {/* Network Verification */}
+        <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h4 className="font-medium text-gray-900">Token Balances</h4>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleRefreshBalances}
-                disabled={isRefreshing}
-              >
-                <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowTokens(!showTokens)}
-              >
-                {showTokens ? 'Hide' : 'Show'} Tokens
-              </Button>
+            <h4 className="font-medium text-gray-900">Network Verification</h4>
+            <div className="text-sm text-gray-600">
+              {networkVerifications.filter(nv => nv.isVerified).length} of {networkVerifications.length} verified
             </div>
           </div>
 
-          {showTokens && walletInfo && (
-            <div className="space-y-2">
-              {walletInfo.tokens.map((token, index) => (
-                <div key={`${token.symbol}-${token.chainId}-${index}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                      <span className="text-xs font-medium text-blue-600">{token.symbol}</span>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{token.name}</p>
-                      <p className="text-xs text-gray-600">
-                        {walletConnectConfig.chains.find(c => c.id === token.chainId)?.name}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-gray-900">{token.balance} {token.symbol}</p>
-                    {token.usdValue && (
-                      <p className="text-xs text-gray-600">${token.usdValue}</p>
+          <div className="space-y-3">
+            {networkVerifications.map((network) => (
+              <div key={network.chainId} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    network.isVerified 
+                      ? 'bg-green-100' 
+                      : 'bg-gray-100'
+                  }`}>
+                    {network.isVerified ? (
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                    ) : (
+                      <div className="w-3 h-3 bg-gray-400 rounded-full" />
                     )}
                   </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{network.chainName}</p>
+                    <p className="text-xs text-gray-600">
+                      {network.address.slice(0, 6)}...{network.address.slice(-4)}
+                    </p>
+                  </div>
                 </div>
-              ))}
+                
+                <div className="flex items-center space-x-2">
+                  {network.isVerified ? (
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm text-green-600 font-medium">Verified</span>
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                    </div>
+                  ) : (
+                    <Button
+                      onClick={() => handleVerifyNetwork(network.chainId)}
+                      disabled={network.isVerifying}
+                      size="sm"
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      {network.isVerifying ? (
+                        <>
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2"></div>
+                          Verifying...
+                        </>
+                      ) : (
+                        'Verify Network'
+                      )}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center space-x-2">
+              <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+              <p className="text-sm text-red-700">{error}</p>
             </div>
           )}
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start space-x-3">
+              <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <h5 className="font-medium text-blue-800 mb-1">Network Verification</h5>
+                <p className="text-sm text-blue-700">
+                  Click "Verify Network" for each blockchain to sign ownership proof and save your wallet address for that network.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Multi-Chain Addresses */}
