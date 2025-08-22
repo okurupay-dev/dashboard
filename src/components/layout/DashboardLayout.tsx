@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useWalletStatus } from '../../hooks/useWalletStatus';
 import { Link, useLocation } from 'react-router-dom';
 import { useClerk, useUser } from '@clerk/clerk-react';
 import { useAutoUserSync } from '../../lib/clerk/sessionUtils';
@@ -19,6 +20,7 @@ interface DashboardLayoutProps {
 }
 
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
+  const { hasWallet } = useWalletStatus();
   const location = useLocation();
   const currentPath = location.pathname;
   const { signOut } = useClerk();
@@ -187,11 +189,20 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
           </Link>
           {/* 6. Wallets */}
           <Link to="/wallets">
-            <div className={`sidebar-item flex items-center p-4 rounded-lg transition-all duration-200 ${currentPath === '/wallets' ? 'bg-blue-50 text-blue-700 font-medium shadow-sm' : 'hover:bg-gray-50 text-gray-700'}`}>
+            <div 
+              className={`sidebar-item flex items-center p-4 rounded-lg transition-all duration-200 
+                ${currentPath === '/wallets' ? 'bg-blue-50 text-blue-700 font-medium shadow-sm' : 'hover:bg-gray-50 text-gray-700'}
+                ${!hasWallet ? 'wallet-attention-border' : ''}`}
+            >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
               </svg>
               <span className="ml-1">Wallets</span>
+              {!hasWallet && (
+                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                  Required
+                </span>
+              )}
             </div>
           </Link>
           {/* 7. Analytics */}
@@ -267,5 +278,27 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
     </div>
   );
 };
+
+// Add CSS for the wallet attention animation
+const walletAttentionStyle = `
+  @keyframes walletBorderPulse {
+    0% { box-shadow: 0 0 0 0 rgba(252, 211, 77, 0.7); }
+    70% { box-shadow: 0 0 0 4px rgba(252, 211, 77, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(252, 211, 77, 0); }
+  }
+
+  .wallet-attention-border {
+    animation: walletBorderPulse 2s infinite;
+    border: 1px solid #fcd34d;
+    background: linear-gradient(135deg, rgba(252, 211, 77, 0.1) 0%, rgba(252, 211, 77, 0.05) 100%);
+  }
+`;
+
+// Add the style to the document head
+if (typeof document !== 'undefined') {
+  const styleElement = document.createElement('style');
+  styleElement.textContent = walletAttentionStyle;
+  document.head.appendChild(styleElement);
+}
 
 export default DashboardLayout;
