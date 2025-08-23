@@ -9,7 +9,6 @@ import Settings from './components/settings/Settings';
 import Terminals from './components/terminals/Terminals';
 import VirtualTerminals from './components/terminals/VirtualTerminals';
 import Staff from './components/staff/Staff';
-import Automations from './components/automations/Automations';
 import Wallets from './components/wallets/Wallets';
 import CustomSignIn from './components/auth/ClerkSignIn';
 
@@ -65,7 +64,6 @@ function App() {
               <Route path="analytics" element={<Analytics />} />
               <Route path="settings" element={<Settings />} />
               <Route path="staff" element={<Staff />} />
-              <Route path="automations" element={<Automations />} />
               <Route path="wallets" element={<Wallets />} />
             </Route>
             
@@ -113,7 +111,6 @@ function App() {
             <Route path="analytics" element={<Analytics />} />
             <Route path="settings" element={<Settings />} />
             <Route path="staff" element={<Staff />} />
-            <Route path="automations" element={<Automations />} />
             <Route path="wallets" element={<Wallets />} />
           </Route>
           

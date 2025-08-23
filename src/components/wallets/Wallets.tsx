@@ -354,7 +354,7 @@ const Wallets: React.FC = () => {
                 )}
               </div>
               <div className="mb-3">
-                <p className="text-xs font-medium text-gray-500 mb-2">Top 5 Processable Assets:</p>
+                <p className="text-xs font-medium text-gray-500 mb-2">Processable Tokens:</p>
                 <div className="flex flex-wrap gap-1">
                   {network.tokens.map((token, index) => (
                     <span 
@@ -367,12 +367,12 @@ const Wallets: React.FC = () => {
                 </div>
                 {network.id === 'ethereum' && (
                   <p className="text-xs text-gray-500 mt-2">
-                    ETH Mainnet • Circle USDC • Tether USDT • MakerDAO DAI • Wrapped BTC
+                    Coming Soon. 
                   </p>
                 )}
                 {network.id === 'base' && (
                   <p className="text-xs text-gray-500 mt-2">
-                    Base ETH • Circle USDC • Coinbase cbETH • DEGEN • Tether USDT
+                    USDC • DAI • USDT • USDbC  
                   </p>
                 )}
               </div>

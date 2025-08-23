@@ -237,39 +237,53 @@ const Transactions = () => {
           pageSize
         );
         
-        console.log('Transactions loaded:', response);
+        console.log('Direct DB transactions loaded:', response);
+        console.log('Response structure:', {
+          hasResponse: !!response,
+          hasTransactions: !!(response?.transactions),
+          isArray: Array.isArray(response?.transactions),
+          transactionCount: response?.transactions?.length || 0,
+          totalCount: response?.totalCount
+        });
         
-        if (response && response.transactions) {
-          // Map the API response to our Transaction type
-          const formattedTransactions = response.transactions.map((tx: any) => ({
-            id: tx.transaction_id,
-            date: new Date(tx.created_at).toLocaleString(),
-            amount: tx.amount_fiat,
-            crypto: `${tx.amount_crypto} ${tx.crypto_currency}`,
-            status: tx.status as TransactionStatus,
-            location: tx.locations?.name || 'Unknown',
-            locationId: tx.location_id,
-            terminal: tx.terminals?.name || 'Unknown',
-            terminalId: tx.terminal_id,
-            staff: tx.staff?.name || 'Unknown',
-            chain: tx.blockchain || 'Unknown',
-            txHash: tx.tx_hash || '',
-            confirmations: tx.confirmations || 0,
-            fee: tx.fee || 0,
-            tip: tx.tip || 0
-          }));
+        if (response && response.transactions && Array.isArray(response.transactions)) {
+          // Map the database response to our Transaction type
+          const formattedTransactions = response.transactions.map((tx: any) => {
+            console.log('Processing transaction:', tx);
+            return {
+              id: tx.transaction_id,
+              date: new Date(tx.created_at).toLocaleString(),
+              amount: tx.amount_fiat,
+              crypto: `${tx.amount_crypto} ${tx.crypto_currency}`,
+              status: tx.status as TransactionStatus,
+              location: tx.locations?.name || 'Unknown Location',
+              locationId: tx.location_id,
+              terminal: tx.terminals?.name || 'Unknown Terminal',
+              terminalId: tx.terminal_id,
+              staff: tx.staff?.name || 'Unknown Staff',
+              chain: tx.blockchain || 'Unknown Chain',
+              txHash: tx.tx_hash || '',
+              confirmations: tx.confirmations || 0,
+              fee: tx.fee || 0,
+              tip: tx.tip || 0
+            };
+          });
+          
+          console.log('Formatted transactions from DB:', formattedTransactions);
           
           setTransactions(formattedTransactions);
           setFilteredTransactions(formattedTransactions);
-          setHasRealTransactions(formattedTransactions.length > 0);
+          setHasRealTransactions(true);
           
-          setTotalTransactions(response.totalCount || 0);
-          setTotalPages(response.totalPages || 1);
+          setTotalTransactions(response.totalCount || formattedTransactions.length);
+          setTotalPages(response.totalPages || Math.ceil(formattedTransactions.length / pageSize));
         } else {
-          console.log('No transactions found, using fallback data');
-          setTransactions(fallbackTransactions);
-          setFilteredTransactions(fallbackTransactions);
-          setHasRealTransactions(false);
+          console.log('No transactions in database yet');
+          setTransactions([]);
+          setFilteredTransactions([]);
+          setHasRealTransactions(true); // Connected to DB successfully
+          setTotalTransactions(0);
+          setTotalPages(1);
         }
       } catch (err) {
         console.error('Error loading transactions:', err);

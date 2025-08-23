@@ -178,15 +178,6 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
               <span className="ml-1">Staff</span>
             </div>
           </Link>
-          {/* 5. Automations */}
-          <Link to="/automations">
-            <div className={`sidebar-item flex items-center p-4 rounded-lg transition-all duration-200 ${currentPath === '/automations' ? 'bg-blue-50 text-blue-700 font-medium shadow-sm' : 'hover:bg-gray-50 text-gray-700'}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              <span className="ml-1">Automations</span>
-            </div>
-          </Link>
           {/* 6. Wallets */}
           <Link to="/wallets">
             <div 

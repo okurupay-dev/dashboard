@@ -14,7 +14,6 @@ const fallbackData = {
     todaySales: { amount: 0, currency: 'USD', change: 0 },
     transactions: { count: 0, change: 0 },
     averageSale: { amount: 0, currency: 'USD', change: 0 },
-    automationsTriggered: { count: 0, change: 0, lastTriggered: null }
   },
   recentTransactions: [] as any[],
   cryptos: [] as any[],
@@ -90,11 +89,6 @@ const Dashboard = () => {
             currency: 'USD',
             change: 0
           },
-          automationsTriggered: {
-            count: stats.automationsTriggered || 0,
-            change: 0,
-            lastTriggered: null // Match expected type
-          }
         } : fallbackData.stats;
 
         // Transform transactions to match expected format
@@ -276,9 +270,6 @@ const Dashboard = () => {
   };
   
   // Navigation handlers for Quick Actions
-  const handleCreateAutomation = () => {
-    navigate('/automations');
-  };
   
   const handleExportData = () => {
     // This would typically trigger a data export function
@@ -297,9 +288,6 @@ const Dashboard = () => {
     console.log(`Quick action triggered: ${action}`);
     
     switch(action) {
-      case 'createAutomation':
-        handleCreateAutomation();
-        break;
       case 'exportTodayData':
         handleExportData();
         break;

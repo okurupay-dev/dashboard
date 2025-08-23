@@ -51,17 +51,12 @@ interface StatsCardsProps {
       currency: string;
       change: number;
     };
-    automationsTriggered: {
-      count: number;
-      change: number;
-      lastTriggered: string;
-    };
   };
 }
 
 const StatsCards: React.FC<StatsCardsProps> = ({ stats }) => {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
       <StatCard
         title="Today's Sales"
         value={`${stats.todaySales.currency} ${stats.todaySales.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
@@ -89,17 +84,6 @@ const StatsCards: React.FC<StatsCardsProps> = ({ stats }) => {
         icon={
           <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-          </svg>
-        }
-      />
-      <StatCard
-        title="Automations Triggered"
-        value={stats.automationsTriggered.count.toString()}
-        change={stats.automationsTriggered.change}
-        footer={`Last triggered ${stats.automationsTriggered.lastTriggered}`}
-        icon={
-          <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.5 4.06c0-1.336 1.616-2.005 2.56-1.06l4.5 4.5c.945.945.276 2.56-1.06 2.56H3.5c-1.336 0-2.005-1.616-1.06-2.56l4.5-4.5c.945-.945 2.56-.276 2.56 1.06V16a2 2 0 0 0 2 2h.5a2 2 0 0 0 2-2V4.06z"></path>
           </svg>
         }
       />
