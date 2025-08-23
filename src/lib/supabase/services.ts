@@ -412,10 +412,31 @@ export const transactionService = {
   // Get paginated transactions
   getTransactions: async (userContext: UserContext, page = 1, limit = 10) => {
     try {
+      console.log('🔍 Transaction Service Debug:', {
+        userContext,
+        merchantId: userContext.merchantId,
+        page,
+        limit
+      });
+
       validateMerchantAccess(userContext.merchantId, userContext.merchantId);
 
       const offset = (page - 1) * limit;
 
+      // First, try a simple query to check if we can access transactions at all
+      const { data: simpleData, error: simpleError } = await supabase
+        .from('transactions')
+        .select('transaction_id, merchant_id, created_at')
+        .eq('merchant_id', userContext.merchantId)
+        .limit(5);
+
+      console.log('🔍 Simple transaction query result:', {
+        simpleData,
+        simpleError,
+        count: simpleData?.length || 0
+      });
+
+      // Now try the full query
       const { data, error, count } = await supabase
         .from('transactions')
         .select(`
@@ -428,7 +449,17 @@ export const transactionService = {
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
-      if (error) throw error;
+      console.log('🔍 Full transaction query result:', {
+        data,
+        error,
+        count,
+        dataLength: data?.length || 0
+      });
+
+      if (error) {
+        console.error('❌ Transaction query error:', error);
+        throw error;
+      }
 
       return {
         transactions: data || [],
@@ -437,6 +468,7 @@ export const transactionService = {
         totalPages: Math.ceil((count || 0) / limit)
       };
     } catch (error) {
+      console.error('❌ Transaction service error:', error);
       handleSupabaseError(error);
     }
   },

@@ -168,28 +168,16 @@ export const useSupabaseAuth = () => {
   const { user } = useUser();
   const { metadata } = useUserMetadata();
 
-  // Set up Supabase auth context with Clerk user data
+  // Set up Supabase auth context with Clerk user ID
   const getAuthenticatedClient = async () => {
     if (!user || !metadata) {
       throw new Error('User not authenticated');
     }
 
-    // Create custom JWT payload for Supabase RLS
-    const customClaims = {
-      clerk_user_id: user.id,
-      merchant_id: metadata.merchantId,
-      role: metadata.role,
-      approved: metadata.approved
-    };
-
-    // Set custom claims in Supabase session
-    // Note: In production, this should be handled by a secure backend endpoint
-    // that validates the Clerk session and creates a Supabase JWT
-    await supabase.auth.setSession({
-      access_token: `custom_token_${user.id}`,
-      refresh_token: '',
-    });
-
+    // For now, we'll use the direct Supabase client
+    // In production, you'd need to configure Clerk JWT integration with Supabase
+    // or use a backend service to validate Clerk sessions and create Supabase tokens
+    
     return supabase;
   };
 
