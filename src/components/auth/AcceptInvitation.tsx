@@ -223,7 +223,12 @@ const AcceptInvitation: React.FC = () => {
         });
 
       if (userError) {
-        throw userError;
+        console.error('❌ User insert error:', userError);
+        if (userError.message.includes('duplicate') || userError.message.includes('already exists')) {
+          console.log('🔄 User already exists, proceeding with sign-in');
+        } else {
+          throw userError;
+        }
       }
 
       // 3. Update pending user status to mark invitation as used
@@ -239,20 +244,28 @@ const AcceptInvitation: React.FC = () => {
         console.error('Error updating pending user:', updateError);
       }
 
+      console.log('✅ User creation and invitation update completed');
+
       // 4. Sign in the user
+      console.log('🔐 Attempting to sign in user...');
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: invitation.email,
         password: password
       });
 
       if (signInError) {
+        console.error('❌ Sign in error:', signInError);
         throw signInError;
       }
+
+      console.log('✅ User signed in successfully');
+      console.log('🚀 Redirecting to merchant dashboard...');
 
       // Redirect to merchant dashboard for all invited users
       window.location.href = 'https://dashboard.okurupay.com';
 
     } catch (err: any) {
+      console.error('❌ Invitation acceptance failed:', err);
       setError(err.message || 'Failed to accept invitation');
       setCreating(false);
     }
