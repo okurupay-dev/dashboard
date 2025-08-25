@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useUser } from '@clerk/clerk-react';
+import { useAuth } from '../../contexts/AuthContext';
 import { dashboardService, transactionService } from '../../lib/supabase/services';
-import { getUserMetadata } from '../../lib/clerk/sessionUtils';
 import StatsCards from './StatsCards';
 import TransactionsTable from './TransactionsTable';
 import CryptoCards from './CryptoCards';
@@ -23,7 +22,7 @@ const fallbackData = {
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { user } = useUser();
+  const { userData, merchantData } = useAuth();
   const [selectedLocation, setSelectedLocation] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,24 +45,24 @@ const Dashboard = () => {
   // Load dashboard data from Supabase APIs
   useEffect(() => {
     const loadDashboardData = async () => {
-      if (!user) return;
+      if (!userData || !merchantData) return;
       
       try {
         setLoading(true);
         setError(null);
         
-        const metadata = getUserMetadata(user);
-        if (!metadata?.merchantId || !metadata?.approved) {
-          console.log('User metadata not ready, using fallback data');
+        const merchantId = merchantData.merchant_id;
+        if (!merchantId || !userData.approved) {
+          console.log('User not approved, using fallback data');
           setLoading(false);
           return;
         }
 
         const userContext = {
-          userId: user.id,
-          merchantId: metadata.merchantId,
-          role: metadata.role as 'admin' | 'merchant' | 'staff',
-          approved: metadata.approved
+          userId: userData.auth_user_id!,
+          merchantId: merchantId,
+          role: userData.role as 'admin' | 'merchant' | 'staff',
+          approved: userData.approved
         };
 
         // Load all dashboard data in parallel
@@ -234,7 +233,7 @@ const Dashboard = () => {
           stats: transformedStats,
           recentTransactions: transformedTransactions,
           cryptos: processableAssets,
-          merchant: { name: metadata.businessName || 'Your Business', logo: null },
+          merchant: { name: merchantData.name || 'Your Business', logo: null },
           locations: [{ id: 'all', name: 'All Locations' }]
         });
       } catch (err) {
@@ -247,13 +246,13 @@ const Dashboard = () => {
     };
 
     loadDashboardData();
-  }, [user, selectedLocation]);
+  }, [userData, merchantData, selectedLocation]);
 
   // Prepare data for components
   const data = {
     user: {
-      id: user?.id || 'unknown',
-      name: user?.firstName || 'User',
+      id: userData?.auth_user_id || 'unknown',
+      name: userData?.name || 'User',
       notifications: 0
     },
     merchant: {

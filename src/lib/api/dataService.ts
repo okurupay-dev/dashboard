@@ -1,5 +1,4 @@
-import { useUser } from '@clerk/clerk-react';
-import { useUserMetadata } from '../clerk/sessionUtils';
+import { useAuth } from '../../contexts/AuthContext';
 
 // Base API configuration
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://api.okurupay.com';
@@ -8,23 +7,24 @@ const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://api.okurupay
 interface UserContext {
   userId: string;
   merchantId: string;
-  role: string;
+  userRole: string;
+  isApproved: boolean;
 }
 
 // Hook to get current user context for API calls
-export const useUserContext = () => {
-  const { user } = useUser();
-  const { metadata } = useUserMetadata();
+export const useAuthContext = () => {
+  const { userData } = useAuth();
   
-  if (!user || !metadata.merchantId) {
+  if (!userData?.auth_user_id || !userData.merchant_id) {
     return null;
   }
   
   return {
-    userId: user.id,
-    merchantId: metadata.merchantId,
-    role: metadata.role
-  } as UserContext;
+    userId: userData.auth_user_id,
+    merchantId: userData.merchant_id,
+    userRole: userData.role,
+    isApproved: userData.approved
+  };
 };
 
 // Generic API request function with user context
@@ -40,7 +40,7 @@ const apiRequest = async (
     'Authorization': `Bearer ${process.env.REACT_APP_API_TOKEN}`,
     'X-User-ID': userContext.userId,
     'X-Merchant-ID': userContext.merchantId,
-    'X-User-Role': userContext.role,
+    'X-User-Role': userContext.userRole,
     ...options.headers,
   };
 
@@ -188,8 +188,8 @@ export const automationService = {
 };
 
 // React hooks for data fetching with user context
-export const useUserData = () => {
-  const userContext = useUserContext();
+export const useAuthData = () => {
+  const userContext = useAuthContext();
   
   return {
     userContext,

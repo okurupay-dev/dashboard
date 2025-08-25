@@ -5,7 +5,7 @@ import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import { useUser } from '@clerk/clerk-react';
+import { useAuth } from '../../contexts/AuthContext';
 import { useForm } from 'react-hook-form';
 import { supabase } from '../../lib/supabase/client';
 
@@ -92,7 +92,7 @@ const VirtualTerminals = (): React.ReactElement => {
   const [isTokenSectionCollapsed, setIsTokenSectionCollapsed] = useState(false);
   
   // User and merchant context
-  const { user } = useUser();
+  const { userData, merchantData } = useAuth();
   const [merchantId, setMerchantId] = useState<string | null>(null);
   
   // Terminal settings
@@ -138,26 +138,24 @@ const VirtualTerminals = (): React.ReactElement => {
 
   // Get merchant ID from user metadata or database (same pattern as Wallets.tsx)
   const loadMerchantId = async () => {
-    if (!user) return;
+    if (!userData) return;
     
     try {
-      // Get merchant ID from user metadata or database
-      const metadata = user.publicMetadata as any;
-      let foundMerchantId = metadata?.merchantId;
+      // Get merchant ID from merchant data
+      let foundMerchantId = merchantData?.merchant_id;
       
       if (!foundMerchantId) {
-        const { data: userData } = await supabase
+        const { data: userDataQuery } = await supabase
           .from('users')
           .select('merchant_id')
-          .eq('clerk_user_id', user.id)
+          .eq('auth_user_id', userData?.auth_user_id)
           .single();
         foundMerchantId = userData?.merchant_id;
       }
       
       console.log('🔍 Merchant ID extraction:', {
-        fromMetadata: metadata?.merchantId,
-        fromDatabase: foundMerchantId,
-        userId: user.id
+        fromMerchantData: foundMerchantId,
+        userId: userData?.auth_user_id
       });
       
       setMerchantId(foundMerchantId);
@@ -171,7 +169,7 @@ const VirtualTerminals = (): React.ReactElement => {
 
   // Create user context object for database operations
   const userContext: UserContext = {
-    userId: user?.id || '',
+    userId: userData?.auth_user_id || '',
     merchantId: merchantId || '',
     role: 'merchant',
     approved: true
@@ -491,10 +489,10 @@ const getBlockchainForToken = (symbol: string, network?: string): string => {
 
   // Load merchant ID and data on component mount
   useEffect(() => {
-    if (user) {
+    if (userData) {
       loadMerchantId();
     }
-  }, [user]);
+  }, [userData]);
 
   // Load virtual terminal settings when merchant ID is available
   useEffect(() => {

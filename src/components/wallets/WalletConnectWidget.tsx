@@ -3,8 +3,8 @@ import { Wallet, Shield, CheckCircle, AlertCircle, ExternalLink, User, Key, Copy
 import { Button } from '../ui/button';
 import { walletConnectConfig, supportedWallets } from '../../lib/wallet/walletConnectConfig';
 import { web3WalletProvider, Web3WalletConnection } from '../../lib/wallet/web3WalletProvider';
-import { useUser } from '@clerk/clerk-react';
-import { useUserMetadata } from '../../lib/clerk/sessionUtils';
+import { useAuth } from '../../contexts/AuthContext';
+// Removed clerk import
 import { supabase } from '../../lib/supabase/client';
 
 interface WalletConnectWidgetProps {
@@ -86,9 +86,8 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
   const [showTokens, setShowTokens] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // Clerk user data
-  const { user } = useUser();
-  const { metadata } = useUserMetadata();
+  // Supabase user data
+  const { userData, merchantData } = useAuth();
 
   // Track if component has been initialized to prevent re-initialization
   const [hasInitialized, setHasInitialized] = useState(false);
@@ -219,12 +218,12 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
       );
       
       // Get user metadata
-      if (!user || !metadata?.merchantId) {
+      if (!userData || !merchantData?.merchant_id) {
         throw new Error('User authentication or merchant data not available');
       }
-      
-      const merchantId = metadata.merchantId;
-      const userEmail = user.primaryEmailAddress?.emailAddress || user.emailAddresses[0]?.emailAddress;
+
+      const merchantId = merchantData.merchant_id;
+      const userEmail = userData.email;
       
       if (!userEmail) {
         throw new Error('User email not available');

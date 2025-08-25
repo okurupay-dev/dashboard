@@ -55,7 +55,7 @@ export const userSyncService = {
       const { data: existingUser } = await supabase
         .from('users')
         .select('user_id')
-        .eq('clerk_user_id', clerkUser.id)
+        .eq('auth_user_id', clerkUser.id)
         .single();
 
       if (!existingUser) {
@@ -63,7 +63,7 @@ export const userSyncService = {
         const { data: newUser, error: userError } = await supabase
           .from('users')
           .insert({
-            clerk_user_id: clerkUser.id,
+            auth_user_id: clerkUser.id,
             merchant_id: merchantId,
             name: clerkUser.fullName || clerkUser.firstName || 'User',
             email: clerkUser.primaryEmailAddress?.emailAddress || '',
@@ -89,7 +89,7 @@ export const userSyncService = {
             role: role || 'merchant',
             approved: approved || false
           })
-          .eq('clerk_user_id', clerkUser.id)
+          .eq('auth_user_id', clerkUser.id)
           .select()
           .single();
 
@@ -115,7 +115,7 @@ export const userSyncService = {
           *,
           merchants(*)
         `)
-        .eq('clerk_user_id', clerkUserId)
+        .eq('auth_user_id', clerkUserId)
         .single();
 
       if (error && error.code !== 'PGRST116') {
@@ -129,9 +129,52 @@ export const userSyncService = {
     }
   },
 
+  // Fetch user data from database with merchant_id filtering
+  fetchUserData: async (authUserId: string): Promise<any | null> => {
+    try {
+      // Get current user session to extract merchant_id from JWT
+      const { data: { session } } = await supabase.auth.getSession()
+      const merchantIdFromJWT = session?.user?.user_metadata?.merchant_id
+
+      const { data, error } = await supabase
+        .from('users')
+        .select(`
+          user_id,
+          merchant_id,
+          name,
+          email,
+          role,
+          employee_id,
+          status,
+          approved,
+          created_at,
+          updated_at,
+          auth_user_id
+        `)
+        .eq('auth_user_id', authUserId)
+        .single()
+
+      if (error) {
+        console.error('Error fetching user data:', error)
+        return null
+      }
+
+      // Security check: Ensure user belongs to the merchant from JWT
+      if (merchantIdFromJWT && data.merchant_id !== merchantIdFromJWT) {
+        console.error('Security violation: User merchant_id does not match JWT merchant_id')
+        return null
+      }
+
+      return data
+    } catch (error) {
+      console.error('Error in fetchUserData:', error)
+      return null
+    }
+  },
+
   // Create basic user record for testing (without merchant metadata)
   createBasicUser: async (userData: {
-    clerk_user_id: string;
+    auth_user_id: string;
     name: string;
     email: string;
     role: string;

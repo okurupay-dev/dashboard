@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useUser } from '@clerk/clerk-react';
-import { useUserMetadata } from '../../lib/clerk/sessionUtils';
+import { useAuth } from '../../contexts/AuthContext';
+// Removed clerk import
 import { transactionService, userSyncService } from '../../lib/supabase/services';
 import { supabase } from '../../lib/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -159,7 +159,7 @@ const StatusBadge: React.FC<{ status: TransactionStatus }> = ({ status }) => {
 };
 
 const Transactions = () => {
-  const { user } = useUser();
+  const { userData } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -193,7 +193,7 @@ const Transactions = () => {
 
   // Load transactions from API and set up real-time sync
   useEffect(() => {
-    if (!user) return;
+    if (!userData) return;
 
     const loadTransactions = async () => {
       try {
@@ -201,14 +201,14 @@ const Transactions = () => {
         setError(null);
         setSyncStatus('connecting');
         
-        console.log('Loading transactions for user:', user.id);
+        console.log('Loading transactions for user:', userData?.auth_user_id);
         
         // Always get merchant ID from database
         let merchantId = null;
-        console.log('Fetching merchant ID from database for user:', user.id);
+        console.log('Fetching merchant ID from database for user:', userData?.auth_user_id);
         
         // Get user data from database using Clerk ID
-        const dbUser = await userSyncService.getUserByClerkId(user.id);
+        const dbUser = await userSyncService.getUserByClerkId(userData?.auth_user_id);
         if (dbUser && dbUser.merchant_id) {
           merchantId = dbUser.merchant_id;
           console.log('Merchant ID from database:', merchantId);
@@ -225,7 +225,7 @@ const Transactions = () => {
         // Load transactions for this merchant
         // Create proper UserContext object using database values
         const userContext = {
-          userId: user.id,
+          userId: userData?.auth_user_id,
           merchantId: merchantId,
           role: dbUser?.role || 'merchant',
           approved: dbUser?.approved || false
@@ -300,11 +300,11 @@ const Transactions = () => {
 
     // Set up real-time subscription for transactions
     const setupRealtimeSubscription = async () => {
-      if (!user) return;
+      if (!userData) return;
 
       try {
         // Get merchant ID for filtering
-        const dbUser = await userSyncService.getUserByClerkId(user.id);
+        const dbUser = await userSyncService.getUserByClerkId(userData?.auth_user_id);
         const merchantId = dbUser?.merchant_id;
 
         if (!merchantId) {
@@ -360,7 +360,7 @@ const Transactions = () => {
         realtimeSubscription.current = null;
       }
     };
-  }, [user, currentPage, pageSize]);
+  }, [userData, currentPage, pageSize]);
 
   // Apply filtering to transactions
   useEffect(() => {

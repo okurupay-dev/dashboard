@@ -12,8 +12,7 @@ import TerminalsTable from './TerminalsTable';
 import TerminalDetailPanel from './TerminalDetailPanel';
 import { Badge } from '../ui/badge';
 import { terminalService } from '../../lib/services/terminalService';
-import { useUser } from '@clerk/clerk-react';
-import { getMerchantId } from '../../lib/clerk/sessionUtils';
+import { useAuth } from '../../contexts/AuthContext';
 
 const sampleNetworkStatus: NetworkStatus = {
   status: 'online',
@@ -21,26 +20,26 @@ const sampleNetworkStatus: NetworkStatus = {
 };
 
 const Terminals: React.FC = () => {
-  const { user } = useUser();
+  const { userData, merchantData } = useAuth();
   const [locations, setLocations] = useState<Location[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<string>('');
-  const [selectedTerminal, setSelectedTerminal] = useState<string | null>(null);
-  const [networkStatus, setNetworkStatus] = useState<NetworkStatus>(sampleNetworkStatus);
   const [terminals, setTerminals] = useState<Terminal[]>([]);
-  const [terminalStats, setTerminalStats] = useState<TerminalStats | null>(null);
+  const [selectedTerminal, setSelectedTerminal] = useState<Terminal | null>(null);
   const [terminalDetails, setTerminalDetails] = useState<TerminalDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [terminalStats, setTerminalStats] = useState<TerminalStats | null>(null);
+  const [networkStatus, setNetworkStatus] = useState<NetworkStatus>(sampleNetworkStatus);
 
   // Load initial data
   useEffect(() => {
     const loadInitialData = async () => {
-      if (!user) return;
+      if (!userData || !merchantData) return;
       
       try {
         setLoading(true);
-        const merchantId = await getMerchantId(user);
+        const merchantId = merchantData.merchant_id;
         if (!merchantId) {
           setError('Unable to determine merchant ID');
           return;
@@ -63,15 +62,15 @@ const Terminals: React.FC = () => {
     };
 
     loadInitialData();
-  }, [user]);
+  }, [userData]);
 
   // Load terminals when user is available
   useEffect(() => {
     const loadTerminals = async () => {
-      if (!user) return;
+      if (!userData) return;
       
       try {
-        const merchantId = await getMerchantId(user);
+        const merchantId = merchantData?.merchant_id;
         if (!merchantId) return;
 
         // Load all terminals for merchant (not filtered by location)
@@ -89,7 +88,7 @@ const Terminals: React.FC = () => {
     };
 
     loadTerminals();
-  }, [user]);
+  }, [userData]);
 
 
   // Load terminal details when a terminal is selected
@@ -101,7 +100,7 @@ const Terminals: React.FC = () => {
       }
       
       try {
-        const details = await terminalService.getTerminalDetails(selectedTerminal);
+        const details = await terminalService.getTerminalDetails(selectedTerminal.id);
         setTerminalDetails(details);
       } catch (err) {
         console.error('Error loading terminal details:', err);
@@ -115,10 +114,10 @@ const Terminals: React.FC = () => {
   // Real-time sync - refresh terminal data every 30 seconds
   useEffect(() => {
     const refreshInterval = setInterval(async () => {
-      if (!user || !selectedLocation) return;
+      if (!userData || !selectedLocation) return;
       
       try {
-        const merchantId = await getMerchantId(user);
+        const merchantId = merchantData?.merchant_id;
         if (!merchantId) return;
 
         // Refresh terminals data
@@ -147,17 +146,22 @@ const Terminals: React.FC = () => {
       } catch (err) {
         console.error('Error refreshing terminal data:', err);
       }
-    }, 30000); // Refresh every 30 seconds
+    }, 30000); // 30 seconds
 
-    return () => clearInterval(refreshInterval);
-  }, [user, selectedLocation]);
+    return () => {
+      if (userData) {
+        clearInterval(refreshInterval);
+      }
+    };
+  }, [userData, selectedLocation]);
 
   const handleLocationChange = (locationId: string) => {
     setSelectedLocation(locationId);
   };
 
-  const handleTerminalChange = (terminalId: string) => {
-    setSelectedTerminal(terminalId);
+  const handleTerminalSelect = (terminalId: string) => {
+    const terminal = terminals.find(t => t.id === terminalId);
+    setSelectedTerminal(terminal || null);
   };
 
   const handleDisableTerminal = async (terminalId: string) => {
@@ -300,9 +304,9 @@ const Terminals: React.FC = () => {
           
           <TerminalsTable
             terminals={terminals}
-            onSelectTerminal={handleTerminalChange}
+            onSelectTerminal={handleTerminalSelect}
             onDisableTerminal={handleDisableTerminal}
-            selectedTerminalId={selectedTerminal}
+            selectedTerminalId={selectedTerminal?.id || null}
           />
         </div>
       </div>

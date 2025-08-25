@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { supabase } from '../../lib/supabase/client';
-import { useUser } from '@clerk/clerk-react';
+import { useAuth } from '../../contexts/AuthContext';
 import { FileText, ExternalLink } from 'lucide-react';
 
 interface UserProfile {
@@ -33,7 +33,7 @@ interface NotificationSettings {
 }
 
 const Settings: React.FC = () => {
-  const { user } = useUser();
+  const { userData } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
@@ -69,13 +69,13 @@ const Settings: React.FC = () => {
   // Load user and company data from database
   useEffect(() => {
     const loadUserData = async () => {
-      if (!user?.id) return;
+      if (!userData?.auth_user_id) return;
 
       try {
         setLoading(true);
 
         // Get user profile from database
-        const { data: userData, error: userError } = await supabase
+        const { data: userDataQuery, error: userError } = await supabase
           .from('users')
           .select(`
             user_id,
@@ -84,7 +84,7 @@ const Settings: React.FC = () => {
             role,
             merchant_id
           `)
-          .eq('clerk_user_id', user.id)
+          .eq('auth_user_id', userData?.auth_user_id)
           .single();
 
         if (userError) {
@@ -169,20 +169,20 @@ const Settings: React.FC = () => {
     };
 
     loadUserData();
-  }, [user?.id]);
+  }, [userData?.auth_user_id]);
 
   // Save user preferences (only editable fields)
   const handleSavePreferences = async () => {
-    if (!user?.id) return;
+    if (!userData?.auth_user_id) return;
 
     try {
       setSaving(true);
 
       // Get user_id first
-      const { data: userData, error: userError } = await supabase
+      const { data: userDataQuery, error: userError } = await supabase
         .from('users')
         .select('user_id')
-        .eq('clerk_user_id', user.id)
+        .eq('auth_user_id', userData?.auth_user_id)
         .single();
 
       if (userError || !userData) {

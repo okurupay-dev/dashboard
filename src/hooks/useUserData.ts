@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useUserContext, dashboardService } from '../lib/api/dataService';
+import { useAuthContext, dashboardService } from '../lib/api/dataService';
 
 // Hook for dashboard stats with user context
 export const useDashboardStats = () => {
-  const userContext = useUserContext();
+  const userContext = useAuthContext();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -54,8 +54,8 @@ export const useDashboardStats = () => {
 };
 
 // Hook for user transactions
-export const useUserTransactions = (limit = 10) => {
-  const userContext = useUserContext();
+export const useAuthTransactions = (limit = 10) => {
+  const userContext = useAuthContext();
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -87,8 +87,8 @@ export const useUserTransactions = (limit = 10) => {
 };
 
 // Hook for user portfolio
-export const useUserPortfolio = () => {
-  const userContext = useUserContext();
+export const useAuthPortfolio = () => {
+  const userContext = useAuthContext();
   const [portfolio, setPortfolio] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -120,8 +120,8 @@ export const useUserPortfolio = () => {
 };
 
 // Hook for user terminals
-export const useUserTerminals = () => {
-  const userContext = useUserContext();
+export const useAuthTerminals = () => {
+  const userContext = useAuthContext();
   const [terminals, setTerminals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -153,8 +153,8 @@ export const useUserTerminals = () => {
 };
 
 // Hook for user staff
-export const useUserStaff = () => {
-  const userContext = useUserContext();
+export const useAuthStaff = () => {
+  const userContext = useAuthContext();
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -186,8 +186,8 @@ export const useUserStaff = () => {
 };
 
 // Hook for user automations
-export const useUserAutomations = () => {
-  const userContext = useUserContext();
+export const useAuthAutomations = () => {
+  const userContext = useAuthContext();
   const [automations, setAutomations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

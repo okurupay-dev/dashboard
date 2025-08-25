@@ -78,7 +78,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
       if (session?.user) {
-        fetchUserData(session.user.id).then(userData => {
+        // Check user role and redirect super_admin to admin dashboard
+        const userRole = session.user.user_metadata?.role
+        if (userRole === 'super_admin') {
+          window.location.href = '/admin-dashboard'
+          return
+        }
+        
+        // Only allow merchant_admin and staff roles in merchant dashboard
+        if (!['merchant_admin', 'staff'].includes(userRole)) {
+          console.error('Unauthorized role for merchant dashboard:', userRole)
+          supabase.auth.signOut()
+          return
+        }
+
+        fetchUserData(session.user?.id).then(userData => {
           setUserData(userData)
           if (userData?.merchant_id) {
             fetchMerchantData(userData.merchant_id).then(setMerchantData)
@@ -94,7 +108,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null)
         
         if (session?.user) {
-          const userData = await fetchUserData(session.user.id)
+          // Check user role on auth state change
+          const userRole = session.user.user_metadata?.role
+          if (userRole === 'super_admin') {
+            window.location.href = '/admin-dashboard'
+            return
+          }
+          
+          if (!['merchant_admin', 'staff'].includes(userRole)) {
+            console.error('Unauthorized role for merchant dashboard:', userRole)
+            supabase.auth.signOut()
+            return
+          }
+
+          const userData = await fetchUserData(session.user?.id)
           setUserData(userData)
           if (userData?.merchant_id) {
             const merchantData = await fetchMerchantData(userData.merchant_id)
@@ -131,7 +158,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { error: dbError } = await supabase
         .from('users')
         .insert({
-          auth_user_id: data.user.id,
+          auth_user_id: data.user?.id,
           email,
           ...userDataInput,
         })

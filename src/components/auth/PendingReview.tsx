@@ -1,10 +1,10 @@
 import React from 'react';
-import { useClerk } from '@clerk/clerk-react';
+import { useAuth } from '../../contexts/AuthContext';
 import logo from '../../assets/images/logo.svg';
 import { Button } from '../ui/button';
 
 const PendingReview: React.FC = () => {
-  const { signOut } = useClerk();
+  const { signOut } = useAuth();
 
   const handleSignOut = () => {
     signOut();

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase/client';
-import { useUserContext } from '../lib/api/dataService';
+import { useAuthContext } from '../lib/api/dataService';
 
 export interface WalletStatus {
   hasWallet: boolean;
@@ -15,7 +15,7 @@ export interface WalletStatus {
  * Hook to check if a merchant has connected wallets
  */
 export const useWalletStatus = (): WalletStatus => {
-  const userContext = useUserContext();
+  const userContext = useAuthContext();
   const [status, setStatus] = useState<WalletStatus>({
     hasWallet: false,
     walletCount: 0,

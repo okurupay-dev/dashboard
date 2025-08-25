@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
-import { useUser } from '@clerk/clerk-react';
+import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase/client';
 import { UserPlus, Key, Edit, Trash2, Shield, Users, X } from 'lucide-react';
 
 interface StaffMember {
   user_id: string;
-  clerk_user_id?: string;
+  auth_user_id?: string;
   name: string;
   email: string;
   employee_id: string;
@@ -31,7 +31,7 @@ interface StaffPermissions {
 }
 
 const Staff: React.FC = () => {
-  const { user } = useUser();
+  const { userData } = useAuth();
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,10 +45,10 @@ const Staff: React.FC = () => {
   // Load staff data and user info
   useEffect(() => {
     loadStaffData();
-  }, [user]);
+  }, [userData]);
 
   const loadStaffData = async () => {
-    if (!user) {
+    if (!userData) {
       console.log('❌ No user found, skipping staff data load');
       return;
     }
@@ -57,13 +57,13 @@ const Staff: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      console.log('🔍 Loading staff data for user:', user.id);
+      console.log('🔍 Loading staff data for user:', userData?.auth_user_id);
       
       // Get current user info
       const { data: currentUser, error: userError } = await supabase
         .from('users')
         .select('merchant_id, role')
-        .eq('clerk_user_id', user.id)
+        .eq('auth_user_id', userData?.auth_user_id)
         .single();
 
       if (userError) {

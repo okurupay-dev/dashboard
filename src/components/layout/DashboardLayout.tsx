@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useWalletStatus } from '../../hooks/useWalletStatus';
 import { Link, useLocation } from 'react-router-dom';
-import { useClerk, useUser } from '@clerk/clerk-react';
-import { useAutoUserSync } from '../../lib/clerk/sessionUtils';
+import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase/client';
 import logo from '../../assets/images/logo.svg';
 
@@ -12,7 +11,7 @@ const isDevelopment = process.env.NODE_ENV === 'development';
 // This would typically come from a context or API call
 interface MerchantInfo {
   name: string;
-  logo?: string;
+  logoUrl?: string;
 }
 
 interface DashboardLayoutProps {
@@ -23,87 +22,25 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const { shouldShowIndicator } = useWalletStatus();
   const location = useLocation();
   const currentPath = location.pathname;
-  const { signOut } = useClerk();
-  const { user } = useUser();
+  const { signOut, userData, merchantData } = useAuth();
   const [userName, setUserName] = useState<string>('Loading...');
   const [merchantInfo, setMerchantInfo] = useState<MerchantInfo>({
     name: 'Loading...',
-    logo: logo
+    logoUrl: logo
   });
   
-  // Automatically sync user to database on dashboard access
-  useAutoUserSync();
-
   // Fetch user name and merchant info from database
   useEffect(() => {
-    const fetchUserData = async () => {
-      if (!user?.id) return;
-
-      try {
-        const { data: userData, error } = await supabase
-          .from('users')
-          .select('name, merchant_id')
-          .eq('clerk_user_id', user.id)
-          .single();
-
-        if (error) {
-          console.error('Error fetching user data:', error);
-          // Fallback to Clerk user data if database fetch fails
-          setUserName(user.firstName || user.emailAddresses[0]?.emailAddress || 'User');
-          return;
-        }
-
-        if (userData?.name) {
-          setUserName(userData.name);
-        } else {
-          // Fallback to Clerk user data if no name in database
-          setUserName(user.firstName || user.emailAddresses[0]?.emailAddress || 'User');
-        }
-
-        // Fetch merchant info if user has a merchant_id
-        if (userData?.merchant_id) {
-          try {
-            const { data: merchantData, error: merchantError } = await supabase
-              .from('merchants')
-              .select('name, logo_url')
-              .eq('merchant_id', userData.merchant_id)
-              .maybeSingle();
-
-            if (!merchantError && merchantData) {
-              setMerchantInfo({
-                name: merchantData.name || 'Unknown Merchant',
-                logo: merchantData.logo_url || logo
-              });
-            } else {
-              console.log('No merchant data found or error:', merchantError);
-              setMerchantInfo({
-                name: 'Merchant Dashboard',
-                logo: logo
-              });
-            }
-          } catch (merchantError) {
-            console.log('Error fetching merchant data:', merchantError);
-            setMerchantInfo({
-              name: 'Merchant Dashboard',
-              logo: logo
-            });
-          }
-        } else {
-          // No merchant_id, use default
-          setMerchantInfo({
-            name: 'Merchant Dashboard',
-            logo: logo
-          });
-        }
-      } catch (error) {
-        console.error('Error fetching user data:', error);
-        // Fallback to Clerk user data
-        setUserName(user.firstName || user.emailAddresses[0]?.emailAddress || 'User');
-      }
-    };
-
-    fetchUserData();
-  }, [user?.id]);
+    if (userData) {
+      setUserName(userData.name || 'User');
+    }
+    if (merchantData) {
+      setMerchantInfo({
+        name: merchantData.name || 'Unknown Merchant',
+        logoUrl: merchantData.logo_url || undefined
+      });
+    }
+  }, [userData, merchantData]);
   
 
 
@@ -251,9 +188,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
             </h1>
           </div>
           <div className="flex items-center">
-            {merchantInfo.logo && merchantInfo.logo !== logo ? (
+            {merchantInfo.logoUrl && merchantInfo.logoUrl !== logo ? (
               <img 
-                src={merchantInfo.logo} 
+                src={merchantInfo.logoUrl} 
                 alt={`${merchantInfo.name} Logo`} 
                 className="h-5 w-auto mr-1.5" 
               />

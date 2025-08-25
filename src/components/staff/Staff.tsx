@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Card } from '../ui/card';
+import { Users, Plus, Search, Filter, MoreHorizontal, Trash2, UserCheck, UserX, Mail, UserPlus, Edit, Key, X, Check, Shield } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { usePermissions } from '../../hooks/usePermissions';
+import { PermissionGate } from '../common/PermissionGate';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
-import { useUser } from '@clerk/clerk-react';
 import { supabase } from '../../lib/supabase/client';
-import { Users, UserPlus, Edit, Key, X, Check, Shield } from 'lucide-react';
 
 interface StaffMember {
   user_id: string;
-  clerk_user_id?: string;
+  auth_user_id?: string;
   name: string;
   email: string;
   employee_id: string;
@@ -59,7 +61,7 @@ const defaultPermissions = {
 };
 
 const Staff: React.FC = () => {
-  const { user } = useUser();
+  const { userData } = useAuth();
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [pendingStaff, setPendingStaff] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,10 +97,10 @@ const Staff: React.FC = () => {
   // Load staff data and user info
   useEffect(() => {
     loadStaffData();
-  }, [user]);
+  }, [userData]);
 
   const loadStaffData = async () => {
-    if (!user) {
+    if (!userData) {
       console.log('❌ No user found, skipping staff data load');
       return;
     }
@@ -107,13 +109,13 @@ const Staff: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      console.log('🔍 Loading staff data for user:', user.id);
+      console.log('🔍 Loading staff data for user:', userData?.auth_user_id);
       
       // Get current user info
       const { data: currentUser, error: userError } = await supabase
         .from('users')
         .select('merchant_id, role')
-        .eq('clerk_user_id', user.id)
+        .eq('auth_user_id', userData?.auth_user_id)
         .single();
 
       if (userError) {
@@ -195,7 +197,7 @@ const Staff: React.FC = () => {
   const handleCreateStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!merchantId || !user) {
+    if (!merchantId || !userData) {
       alert('Error: Missing required data');
       return;
     }
@@ -261,8 +263,8 @@ const Staff: React.FC = () => {
             role: 'staff',
             role_permissions: formData.permissions,
             pin_hash: terminalPin,
-            initiated_by_name: user.fullName || user.firstName || 'Admin',
-            initiated_by_email: user.emailAddresses[0]?.emailAddress || '',
+            initiated_by_name: userData.name || 'Admin',
+            initiated_by_email: userData.email || '',
             approval_status: 'pending',
             merchant_id: merchantId,
             status: 'pending_invite',

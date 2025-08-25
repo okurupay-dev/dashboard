@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
-import { useUser } from '@clerk/clerk-react';
-import { useUserMetadata } from '../clerk/sessionUtils';
+import { useAuth } from '../../contexts/AuthContext';
+// Removed clerk import
 
 // Supabase configuration with error handling
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
@@ -42,7 +42,7 @@ export interface Database {
       users: {
         Row: {
           user_id: string;
-          clerk_user_id: string;
+          auth_user_id: string;
           merchant_id: string;
           name: string;
           email: string;
@@ -165,30 +165,32 @@ export type SupabaseClient = typeof supabase;
 
 // Hook to get authenticated Supabase client with user context
 export const useSupabaseAuth = () => {
-  const { user } = useUser();
-  const { metadata } = useUserMetadata();
+  const { userData, merchantData } = useAuth();
 
-  // Set up Supabase auth context with Clerk user ID
+  // Set up Supabase auth context with user data
   const getAuthenticatedClient = async () => {
-    if (!user || !metadata) {
+    if (!userData || !merchantData) {
       throw new Error('User not authenticated');
     }
 
-    // For now, we'll use the direct Supabase client
-    // In production, you'd need to configure Clerk JWT integration with Supabase
-    // or use a backend service to validate Clerk sessions and create Supabase tokens
-    
-    return supabase;
+    // Use the direct Supabase client with auth context
+    return {
+      client: supabase,
+      userId: userData.auth_user_id,
+      merchantId: merchantData.merchant_id,
+      userRole: userData.role,
+      isApproved: userData.approved
+    };
   };
 
   return {
     getAuthenticatedClient,
-    isAuthenticated: !!user && !!metadata,
-    userContext: user && metadata ? {
-      userId: user.id,
-      merchantId: metadata.merchantId,
-      role: metadata.role,
-      approved: metadata.approved
+    isAuthenticated: !!userData && !!merchantData,
+    userContext: userData && merchantData ? {
+      userId: userData.auth_user_id,
+      merchantId: merchantData.merchant_id,
+      userRole: userData.role,
+      isApproved: userData.approved
     } : null
   };
 };

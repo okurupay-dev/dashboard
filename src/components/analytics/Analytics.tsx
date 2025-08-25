@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useUser } from '@clerk/clerk-react';
+import { useAuth } from '../../contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { supabase } from '../../lib/supabase/client';
@@ -47,7 +47,7 @@ const sampleData = {
 };
 
 const Analytics: React.FC = () => {
-  const { user } = useUser();
+  const { userData } = useAuth();
   const [data, setData] = useState(sampleData);
   const [isExporting, setIsExporting] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -101,11 +101,11 @@ const Analytics: React.FC = () => {
 
   // Load merchant analytics data from database
   const loadMerchantAnalytics = async () => {
-    if (!user?.id) return;
+    if (!userData?.auth_user_id) return;
 
     try {
       // Get user and merchant info
-      const { data: userData, error: userError } = await supabase
+      const { data: userDataQuery, error: userError } = await supabase
         .from('users')
         .select(`
           user_id,
@@ -116,7 +116,7 @@ const Analytics: React.FC = () => {
             industry
           )
         `)
-        .eq('clerk_user_id', user.id)
+        .eq('auth_user_id', userData.auth_user_id)
         .single();
 
       if (userError || !userData) {
@@ -126,8 +126,8 @@ const Analytics: React.FC = () => {
       }
 
       // Set merchant info for display
-      if (userData.merchants) {
-        const merchant = Array.isArray(userData.merchants) ? userData.merchants[0] : userData.merchants;
+      if (userDataQuery.merchants) {
+        const merchant = Array.isArray(userDataQuery.merchants) ? userDataQuery.merchants[0] : userDataQuery.merchants;
         setMerchantInfo({
           name: merchant?.name || 'Unknown Merchant',
           id: merchant?.merchant_id || ''
@@ -289,7 +289,7 @@ const Analytics: React.FC = () => {
 
   // Load data on component mount
   useEffect(() => {
-    if (user?.id) {
+    if (userData?.auth_user_id) {
       loadMerchantAnalytics();
       fetchLiveConversionRates();
       
@@ -297,7 +297,7 @@ const Analytics: React.FC = () => {
       const interval = setInterval(fetchLiveConversionRates, 5 * 60 * 1000);
       return () => clearInterval(interval);
     }
-  }, [user?.id]);
+  }, [userData?.auth_user_id]);
 
   const handleExport = () => {
     setIsExporting(true);

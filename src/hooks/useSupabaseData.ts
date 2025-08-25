@@ -61,7 +61,7 @@ export const useDashboardStats = () => {
 };
 
 // Hook for user transactions
-export const useUserTransactions = (limit = 10) => {
+export const useAuthTransactions = (limit = 10) => {
   const { userData } = useAuth();
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,7 +105,7 @@ export const useUserTransactions = (limit = 10) => {
 };
 
 // Hook for user terminals
-export const useUserTerminals = () => {
+export const useAuthTerminals = () => {
   const { userData } = useAuth();
   const [terminals, setTerminals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -147,7 +147,7 @@ export const useUserTerminals = () => {
 };
 
 // Hook for user staff
-export const useUserStaff = () => {
+export const useAuthStaff = () => {
   const { userData } = useAuth();
   const [staff, setStaff] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -186,7 +186,7 @@ export const useUserStaff = () => {
 };
 
 // Hook for user automations
-export const useUserAutomations = () => {
+export const useAuthAutomations = () => {
   const { userData } = useAuth();
   const [automations, setAutomations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -225,7 +225,7 @@ export const useUserAutomations = () => {
 };
 
 // Hook for wallet data
-export const useUserWallets = () => {
+export const useAuthWallets = () => {
   const { userData } = useAuth();
   const [wallets, setWallets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

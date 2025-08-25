@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
-import { CheckCircle, AlertTriangle, Wallet, ExternalLink, Copy, Check, ChevronDown, ChevronUp, Loader2, AlertCircle, Shield } from 'lucide-react';
-import { useUser } from '@clerk/clerk-react';
+import { Badge } from '../ui/badge';
+import { Wallet, Shield, CheckCircle, AlertTriangle, Copy, Check, Loader2, AlertCircle, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { usePermissions } from '../../hooks/usePermissions';
+import { PermissionGate, RoleGate } from '../common/PermissionGate';
 import { supabase } from '../../lib/supabase/client';
 import { WalletConnectWidget } from './WalletConnectWidget';
 
@@ -36,7 +38,7 @@ interface VerifiedNetwork {
   verified_at: string | null;
   created_at: string;
   merchant_wallets: { merchant_id: string }[];
-  verified_by_user?: {
+  verified_by_userDataData: {
     name: string;
     email: string;
   };
@@ -70,7 +72,8 @@ interface TokenBalance {
 }
 
 const Wallets: React.FC = () => {
-  const { user } = useUser();
+  // Supabase user data
+  const { userData, merchantData } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [verifiedNetworks, setVerifiedNetworks] = useState<VerifiedNetwork[]>([]);
@@ -80,20 +83,19 @@ const Wallets: React.FC = () => {
 
   // Load verified networks from database
   const loadVerifiedNetworks = async () => {
-    if (!user) return;
+    if (!userData) return;
     
     try {
       setLoading(true);
       
-      // Get merchant ID from user metadata or database
-      const metadata = user.publicMetadata as any;
-      let merchantId = metadata?.merchantId;
+      // Get merchant ID from merchant data
+      let merchantId = merchantData?.merchant_id;
       
       if (!merchantId) {
-        const { data: userData } = await supabase
+        const { data: userDataQuery } = await supabase
           .from('users')
           .select('merchant_id')
-          .eq('clerk_user_id', user.id)
+          .eq('auth_user_id', userData?.auth_user_id)
           .single();
         merchantId = userData?.merchant_id;
       }
@@ -121,17 +123,17 @@ const Wallets: React.FC = () => {
 
       if (error) throw error;
       
-      // Parse user information from verification metadata
+      // Removed clerk information from verification metadata
       const networksWithUserInfo = (data || []).map(network => {
         let verifiedByUser = undefined;
         
         if (network.verification_signature) {
           try {
             const metadata = JSON.parse(network.verification_signature);
-            if (metadata.user) {
+            if (userData) {
               verifiedByUser = {
-                name: metadata.user.name,
-                email: metadata.user.email
+                name: userData.name,
+                email: userData.email
               };
             }
           } catch (e) {
@@ -142,7 +144,9 @@ const Wallets: React.FC = () => {
         
         return {
           ...network,
-          verified_by_user: verifiedByUser
+          verified_by_user: verifiedByUser,
+          verified_by_userData: verifiedByUser,
+          verified_by_userDataData: verifiedByUser || { name: '', email: '' }
         };
       });
       
@@ -157,7 +161,7 @@ const Wallets: React.FC = () => {
 
   // Handle network verification
   const handleVerifyNetwork = async (networkId: string) => {
-    if (!user || !walletConnection?.address) {
+    if (!userData || !walletConnection?.address) {
       setError('Please connect your wallet first');
       return;
     }
@@ -173,14 +177,14 @@ const Wallets: React.FC = () => {
       setError(null);
 
       // Get merchant ID
-      const metadata = user.publicMetadata as any;
+      const metadata = merchantData as any;
       let merchantId = metadata?.merchantId;
       
       if (!merchantId) {
-        const { data: userData } = await supabase
+        const { data: userDataQuery } = await supabase
           .from('users')
           .select('merchant_id')
-          .eq('clerk_user_id', user.id)
+          .eq('auth_user_id', userData?.auth_user_id)
           .single();
         merchantId = userData?.merchant_id;
       }
@@ -198,15 +202,9 @@ const Wallets: React.FC = () => {
 
       // Prepare user info for verification tracking
       const userInfo = {
-        name: user.fullName || 
-              (user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : null) ||
-              user.firstName || 
-              user.lastName ||
-              user.username ||
-              user.emailAddresses?.[0]?.emailAddress?.split('@')[0] ||
-              'Unknown User',
-        email: user.emailAddresses?.[0]?.emailAddress || 'Unknown Email',
-        clerk_user_id: user.id
+        name: userData?.name || 'Unknown User',
+        email: userData?.email || 'Unknown Email',
+        auth_user_id: userData?.auth_user_id
       };
 
       // Create verification metadata to include user info
@@ -275,10 +273,10 @@ const Wallets: React.FC = () => {
   };
 
   useEffect(() => {
-    if (user) {
+    if (userData) {
       loadVerifiedNetworks();
     }
-  }, [user]);
+  }, [userData]);
 
   const isNetworkVerified = (networkId: string) => {
     // Match by blockchain name since we're using the blockchain field from wallet_addresses
@@ -550,10 +548,10 @@ const Wallets: React.FC = () => {
                       {network.verified_at ? new Date(network.verified_at).toLocaleDateString() : 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {network.verified_by_user ? (
+                      {network.verified_by_userDataData ? (
                         <div>
-                          <div className="font-medium text-gray-900">{network.verified_by_user.name}</div>
-                          <div className="text-xs text-gray-500">{network.verified_by_user.email}</div>
+                          <div className="font-medium text-gray-900">{network.verified_by_userDataData.name}</div>
+                          <div className="text-xs text-gray-500">{network.verified_by_userDataData.email}</div>
                         </div>
                       ) : (
                         <span className="text-gray-400">Unknown</span>
