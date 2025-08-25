@@ -164,26 +164,45 @@ const AcceptInvitation: React.FC = () => {
     setError(null);
 
     try {
+      // Check if user already exists
+      const { data: existingUser } = await supabase.auth.getUser();
+      if (existingUser.user) {
+        console.log('🔄 User already authenticated, signing out first');
+        await supabase.auth.signOut();
+      }
+
       // 1. Create auth user account
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: invitation.email,
         password: password,
       });
 
+      console.log('🔍 Auth signup response:', { authData, authError });
+
       if (authError) {
+        console.error('❌ Auth signup error:', authError);
+        if (authError.message.includes('already registered')) {
+          setError('This email is already registered. Please contact your administrator.');
+          return;
+        }
         throw authError;
       }
 
-      console.log('✅ Auth user created:', authData.user?.id);
+      if (!authData.user?.id) {
+        throw new Error('No user ID returned from signup');
+      }
 
-      // Wait a moment for auth user to be fully created
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('✅ Auth user created:', authData.user.id);
 
-      // 2. Create user record in users table
+      // 2. Verify auth user exists before creating user record
+      const { data: verifyUser, error: verifyError } = await supabase.auth.getUser();
+      console.log('🔍 Verify auth user:', { verifyUser, verifyError });
+
+      // 3. Create user record in users table
       const { error: userError } = await supabase
         .from('users')
         .insert({
-          auth_user_id: authData.user?.id,
+          auth_user_id: authData.user.id,
           merchant_id: invitation.merchant_id,
           name: invitation.name,
           email: invitation.email,

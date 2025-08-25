@@ -38,6 +38,7 @@ FOR INSERT TO anon
 WITH CHECK (true); -- Allow anonymous users to insert during invitation acceptance
 
 -- 6. Add RLS policy for merchants table (needed for invitation acceptance)
+ALTER TABLE public.merchants ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "merchants_read_public" ON public.merchants;
 CREATE POLICY "merchants_read_public" ON public.merchants
 FOR SELECT TO anon, authenticated
