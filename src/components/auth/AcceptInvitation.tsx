@@ -58,7 +58,9 @@ const AcceptInvitation: React.FC = () => {
           expires_at,
           status,
           approval_status,
-          merchant:merchants!pending_users_merchant_id_uuid_fkey(name)
+          merchants!pending_users_merchant_id_uuid_fkey(
+            name
+          )
         `)
         .eq('invitation_token', invitationToken)
         .single();
@@ -76,13 +78,18 @@ const AcceptInvitation: React.FC = () => {
         return;
       }
 
-      // Check status based on your schema: status='pending_invite' and approval_status='approved'
+      // Check status - allow approved invitations that haven't been used yet
       const isValidStatus = data.approval_status === 'approved' && 
-                           (data.status === 'pending_invite' || data.status === 'invited');
+                           (data.status === 'pending_invite' || data.status === 'invited') &&
+                           data.approval_status !== 'completed'; // Prevent reuse
 
       if (!isValidStatus) {
         console.log('❌ Invalid status:', { status: data.status, approval_status: data.approval_status });
-        setError(`Invitation not ready. Status: ${data.status}, Approval: ${data.approval_status}`);
+        if (data.approval_status === 'completed') {
+          setError('This invitation has already been used.');
+        } else {
+          setError(`Invitation not ready. Status: ${data.status}, Approval: ${data.approval_status}`);
+        }
         return;
       }
 
@@ -93,10 +100,12 @@ const AcceptInvitation: React.FC = () => {
       }
 
       console.log('✅ Invitation validated successfully');
+      console.log('🏪 Merchant data:', data.merchants);
+      
       setInvitation({
         ...data,
         merchant_id: data.merchant_id_uuid, // Use the UUID field
-        merchant_name: (data.merchant as any)?.name || 'Unknown Merchant'
+        merchant_name: (data.merchants as any)?.name || 'Unknown Merchant'
       });
     } catch (err) {
       console.error('❌ Unexpected error:', err);
@@ -159,12 +168,12 @@ const AcceptInvitation: React.FC = () => {
         throw userError;
       }
 
-      // 3. Update pending user status
+      // 3. Update pending user status to mark invitation as used
       const { error: updateError } = await supabase
         .from('pending_users')
         .update({ 
           status: 'accepted',
-          accepted_at: new Date().toISOString()
+          approval_status: 'completed' // Mark as completed to prevent reuse
         })
         .eq('id', invitation.id);
 
