@@ -10,6 +10,7 @@ ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.merchant_wallets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.wallet_addresses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.okuru_merchant_analytics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pending_users ENABLE ROW LEVEL SECURITY;
 
 -- Transactions: Merchant data isolation
 CREATE POLICY "merchant_own_transactions" ON public.transactions
@@ -130,3 +131,14 @@ WITH CHECK (
     WHERE merchant_id::TEXT = (auth.jwt() -> 'user_metadata' ->> 'merchant_id')
   )
 );
+
+-- Pending Users: Allow public access for invitation validation (unauthenticated users need to read invitations)
+CREATE POLICY "public_pending_users_read" ON public.pending_users
+FOR SELECT TO anon, authenticated
+USING (true);
+
+-- Pending Users: Allow authenticated users to update their own invitation status
+CREATE POLICY "update_own_pending_invitation" ON public.pending_users
+FOR UPDATE TO authenticated
+USING (email = (auth.jwt() -> 'user_metadata' ->> 'email'))
+WITH CHECK (email = (auth.jwt() -> 'user_metadata' ->> 'email'));

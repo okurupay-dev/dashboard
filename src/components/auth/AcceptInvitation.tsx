@@ -29,6 +29,9 @@ const AcceptInvitation: React.FC = () => {
   useEffect(() => {
     if (token) {
       validateInvitation(token as string);
+    } else {
+      setError('No invitation token provided');
+      setLoading(false);
     }
   }, [token]);
 
