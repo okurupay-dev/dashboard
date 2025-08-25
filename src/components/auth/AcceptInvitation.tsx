@@ -34,6 +34,16 @@ const AcceptInvitation: React.FC = () => {
 
   const validateInvitation = async (invitationToken: string) => {
     try {
+      console.log('🔍 Validating invitation token:', invitationToken);
+      
+      // First, let's check what invitation exists with this token (any status)
+      const { data: allData, error: debugError } = await supabase
+        .from('pending_users')
+        .select('*')
+        .eq('invitation_token', invitationToken);
+      
+      console.log('🔍 All pending users with this token:', allData);
+      
       const { data, error } = await supabase
         .from('pending_users')
         .select(`
@@ -43,14 +53,34 @@ const AcceptInvitation: React.FC = () => {
           role,
           merchant_id,
           expires_at,
+          status,
+          approval_status,
           merchant:merchants(name)
         `)
         .eq('invitation_token', invitationToken)
-        .eq('status', 'invited')
         .single();
 
-      if (error || !data) {
+      console.log('🔍 Query result:', { data, error });
+
+      if (error) {
+        console.error('❌ Database error:', error);
+        setError(`Database error: ${error.message}`);
+        return;
+      }
+
+      if (!data) {
         setError('Invalid or expired invitation link');
+        return;
+      }
+
+      // Check various status combinations that might be valid
+      const validStatuses = ['invited', 'pending', 'approved'];
+      const isValidStatus = validStatuses.includes(data.status) || 
+                           (data.approval_status && data.approval_status === 'approved');
+
+      if (!isValidStatus) {
+        console.log('❌ Invalid status:', { status: data.status, approval_status: data.approval_status });
+        setError(`Invitation status is ${data.status}. Please contact your administrator.`);
         return;
       }
 
@@ -60,12 +90,14 @@ const AcceptInvitation: React.FC = () => {
         return;
       }
 
+      console.log('✅ Invitation validated successfully');
       setInvitation({
         ...data,
         merchant_name: (data.merchant as any)?.name || 'Unknown Merchant'
       });
     } catch (err) {
-      setError('Failed to validate invitation');
+      console.error('❌ Unexpected error:', err);
+      setError(`Failed to validate invitation: ${err}`);
     } finally {
       setLoading(false);
     }
