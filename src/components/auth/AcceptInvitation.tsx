@@ -164,22 +164,20 @@ const AcceptInvitation: React.FC = () => {
     setError(null);
 
     try {
-      // 1. Create user in Supabase Auth
+      // 1. Create auth user account
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: invitation.email,
         password: password,
-        options: {
-          data: {
-            role: invitation.role,
-            name: invitation.name,
-            merchant_id: invitation.merchant_id
-          }
-        }
       });
 
       if (authError) {
         throw authError;
       }
+
+      console.log('✅ Auth user created:', authData.user?.id);
+
+      // Wait a moment for auth user to be fully created
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       // 2. Create user record in users table
       const { error: userError } = await supabase
