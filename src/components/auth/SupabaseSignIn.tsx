@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { Navigate } from 'react-router-dom'
+import logo from '../../assets/images/logo.svg'
 
 const SupabaseSignIn: React.FC = () => {
   const [email, setEmail] = useState('')
@@ -36,7 +37,7 @@ const SupabaseSignIn: React.FC = () => {
           <div className="mx-auto h-12 w-auto flex items-center justify-center">
             <img
               className="h-12 w-auto"
-              src="/logo192.png"
+              src={logo}
               alt="Okuru"
             />
           </div>
