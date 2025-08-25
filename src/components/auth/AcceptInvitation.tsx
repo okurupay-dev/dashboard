@@ -204,6 +204,7 @@ const AcceptInvitation: React.FC = () => {
           password: password,
           options: {
             data: {
+              role: invitation.role, // This is what AuthContext checks for
               first_time_password: true,
               invitation_accepted: true,
               merchant_id: invitation.merchant_id
@@ -225,6 +226,20 @@ const AcceptInvitation: React.FC = () => {
               return;
             }
             authUserId = signInData.user!.id;
+            
+            // Update user metadata to include role for existing users
+            const { error: updateError } = await supabase.auth.updateUser({
+              data: {
+                role: invitation.role,
+                first_time_password: true,
+                invitation_accepted: true,
+                merchant_id: invitation.merchant_id
+              }
+            });
+            
+            if (updateError) {
+              console.error('⚠️ Warning: Could not update user metadata:', updateError);
+            }
           } else {
             throw authError;
           }
