@@ -9,8 +9,11 @@ interface InvitationData {
   name: string;
   role: string;
   merchant_id: string;
-  merchant_name: string;
   expires_at: string;
+  status: string;
+  approval_status: string;
+  merchant_name: string;
+  merchants?: { name: string };
 }
 
 const AcceptInvitation: React.FC = () => {
@@ -66,10 +69,11 @@ const AcceptInvitation: React.FC = () => {
 
       console.log('🔍 Pending user data:', { data, error });
       console.log('🔍 merchant_id_uuid value:', data?.merchant_id_uuid);
-      console.log('🔍 merchant_id value:', (data as any)?.merchant_id);
+      console.log('🔍 merchant_id value:', data?.merchant_id);
+      console.log('🔍 Full data object:', JSON.stringify(data, null, 2));
 
       // Check both possible merchant ID fields
-      const merchantId = data?.merchant_id_uuid || (data as any)?.merchant_id;
+      const merchantId = data?.merchant_id_uuid || data?.merchant_id;
       console.log('🔍 Using merchant ID:', merchantId);
 
       if (merchantId) {
@@ -123,13 +127,16 @@ const AcceptInvitation: React.FC = () => {
       }
 
       console.log('✅ Invitation validated successfully');
-      console.log('🏪 Merchant data:', data.merchants);
+      console.log('🏪 Merchant data:', (data as any).merchants);
       
-      setInvitation({
+      const invitationData: InvitationData = {
         ...data,
-        merchant_id: data.merchant_id_uuid, // Use the UUID field
-        merchant_name: (data.merchants as any)?.name || 'Unknown Merchant'
-      });
+        merchant_id: merchantId || data.merchant_id_uuid || data.merchant_id, // Use whichever merchant ID was found
+        merchant_name: ((data as any).merchants)?.name || 'Unknown Merchant',
+        merchants: (data as any).merchants
+      };
+      
+      setInvitation(invitationData);
     } catch (err) {
       console.error('❌ Unexpected error:', err);
       setError(`Failed to validate invitation: ${err}`);
