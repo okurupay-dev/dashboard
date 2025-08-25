@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase/client';
-import { Eye, EyeOff } from 'lucide-react';
 
 interface InvitationData {
   id: string;
@@ -24,9 +23,6 @@ const AcceptInvitation: React.FC = () => {
   const [invitation, setInvitation] = useState<InvitationData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
@@ -160,109 +156,35 @@ const AcceptInvitation: React.FC = () => {
     e.preventDefault();
     
     if (!invitation) return;
-    
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters long');
-      return;
-    }
 
     setCreating(true);
     setError(null);
 
     try {
-      // Check if user already exists
-      const { data: existingUser } = await supabase.auth.getUser();
-      if (existingUser.user) {
-        console.log('🔄 User already authenticated, signing out first');
-        await supabase.auth.signOut();
-      }
-
-      // 1. Create auth user account
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: invitation.email,
-        password: password,
-      });
-
-      console.log('🔍 Auth signup response:', { authData, authError });
-
-      if (authError) {
-        console.error('❌ Auth signup error:', authError);
-        if (authError.message.includes('already registered')) {
-          setError('This email is already registered. Please contact your administrator.');
-          return;
-        }
-        throw authError;
-      }
-
-      if (!authData.user?.id) {
-        throw new Error('No user ID returned from signup');
-      }
-
-      console.log('✅ Auth user created:', authData.user.id);
-
-      // 2. Verify auth user exists before creating user record
-      const { data: verifyUser, error: verifyError } = await supabase.auth.getUser();
-      console.log('🔍 Verify auth user:', { verifyUser, verifyError });
-
-      // 3. Create user record in users table
-      const { error: userError } = await supabase
-        .from('users')
-        .insert({
-          auth_user_id: authData.user.id,
-          merchant_id: invitation.merchant_id,
-          name: invitation.name,
-          email: invitation.email,
-          role: invitation.role === 'merchant_admin' ? 'merchant' : 'staff', // Map to schema roles
-          status: 'active',
-          approved: true
-        });
-
-      if (userError) {
-        console.error('❌ User insert error:', userError);
-        if (userError.message.includes('duplicate') || userError.message.includes('already exists')) {
-          console.log('🔄 User already exists, proceeding with sign-in');
-        } else {
-          throw userError;
-        }
-      }
-
-      // 3. Update pending user status to mark invitation as used
+      // Update pending user status to mark invitation as accepted
       const { error: updateError } = await supabase
         .from('pending_users')
         .update({ 
           status: 'accepted',
-          approval_status: 'completed' // Mark as completed to prevent reuse
+          approval_status: 'completed',
+          accepted_at: new Date().toISOString()
         })
         .eq('id', invitation.id);
 
       if (updateError) {
-        console.error('Error updating pending user:', updateError);
+        console.error('❌ Error updating pending user:', updateError);
+        throw updateError;
       }
 
-      console.log('✅ User creation and invitation update completed');
+      console.log('✅ Invitation marked as accepted');
 
-      // 4. Sign in the user
-      console.log('🔐 Attempting to sign in user...');
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: invitation.email,
-        password: password
-      });
-
-      if (signInError) {
-        console.error('❌ Sign in error:', signInError);
-        throw signInError;
-      }
-
-      console.log('✅ User signed in successfully');
-      console.log('🚀 Redirecting to merchant dashboard...');
-
-      // Redirect to merchant dashboard for all invited users
-      window.location.href = 'https://dashboard.okurupay.com';
+      // Redirect to login page with pre-filled email and instructions
+      const loginUrl = new URL('https://dashboard.okurupay.com/login');
+      loginUrl.searchParams.set('email', invitation.email);
+      loginUrl.searchParams.set('temp_password', 'true');
+      loginUrl.searchParams.set('message', 'Please login with your temporary password from the email');
+      
+      window.location.href = loginUrl.toString();
 
     } catch (err: any) {
       console.error('❌ Invitation acceptance failed:', err);
@@ -324,51 +246,17 @@ const AcceptInvitation: React.FC = () => {
           </div>
         )}
 
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+          <h3 className="font-medium text-yellow-900">Next Steps</h3>
+          <div className="mt-2 text-sm text-yellow-800">
+            <p>1. Check your email for the temporary password</p>
+            <p>2. Click "Accept Invitation" below to proceed to login</p>
+            <p>3. Use your temporary password to log in</p>
+            <p>4. You'll be required to create a new password on first login</p>
+          </div>
+        </div>
+
         <form onSubmit={handleAcceptInvitation} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Create Password *
-            </label>
-            <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                required
-                minLength={8}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center"
-              >
-                {showPassword ? (
-                  <EyeOff className="h-4 w-4 text-gray-400" />
-                ) : (
-                  <Eye className="h-4 w-4 text-gray-400" />
-                )}
-              </button>
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Password must be at least 8 characters long
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Confirm Password *
-            </label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              required
-              minLength={8}
-            />
-          </div>
-
           <button
             type="submit"
             disabled={creating}
@@ -377,10 +265,10 @@ const AcceptInvitation: React.FC = () => {
             {creating ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Creating Account...
+                Accepting Invitation...
               </>
             ) : (
-              'Accept Invitation & Create Account'
+              'Accept Invitation & Go to Login'
             )}
           </button>
         </form>
