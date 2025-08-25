@@ -89,6 +89,10 @@ const AcceptInvitation: React.FC = () => {
         // Add merchant data to the result
         if (merchantData) {
           (data as any).merchants = merchantData;
+        } else if (merchantError) {
+          console.error('❌ Merchant query failed:', merchantError);
+          // Set a fallback merchant name with the ID for debugging
+          (data as any).merchants = { name: `Merchant (${merchantId.slice(0, 8)}...)` };
         }
       } else {
         console.log('❌ No merchant ID found in pending user data');
@@ -129,13 +133,20 @@ const AcceptInvitation: React.FC = () => {
       console.log('✅ Invitation validated successfully');
       console.log('🏪 Merchant data:', (data as any).merchants);
       
+      // Use merchant name from the separate query if available
+      let merchantName = 'Unknown Merchant';
+      if ((data as any).merchants?.name) {
+        merchantName = (data as any).merchants.name;
+      }
+      
       const invitationData: InvitationData = {
         ...data,
         merchant_id: merchantId || data.merchant_id_uuid || data.merchant_id, // Use whichever merchant ID was found
-        merchant_name: ((data as any).merchants)?.name || 'Unknown Merchant',
+        merchant_name: merchantName,
         merchants: (data as any).merchants
       };
       
+      console.log('🏪 Final invitation data:', invitationData);
       setInvitation(invitationData);
     } catch (err) {
       console.error('❌ Unexpected error:', err);
