@@ -11,6 +11,7 @@ import VirtualTerminals from './components/terminals/VirtualTerminals';
 import Staff from './components/staff/Staff';
 import Wallets from './components/wallets/Wallets';
 import SupabaseSignIn from './components/auth/SupabaseSignIn';
+import AcceptInvitation from './components/auth/AcceptInvitation';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 
@@ -21,6 +22,7 @@ function App() {
         <Routes>
           {/* Public routes */}
           <Route path="/signin" element={<SupabaseSignIn />} />
+          <Route path="/accept-invitation" element={<AcceptInvitation />} />
           
           {/* Protected routes */}
           <Route path="/" element={
