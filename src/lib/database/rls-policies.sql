@@ -142,3 +142,8 @@ CREATE POLICY "update_own_pending_invitation" ON public.pending_users
 FOR UPDATE TO authenticated
 USING (email = (auth.jwt() -> 'user_metadata' ->> 'email'))
 WITH CHECK (email = (auth.jwt() -> 'user_metadata' ->> 'email'));
+
+-- Merchants: Allow public read access for invitation validation (unauthenticated users need merchant info)
+CREATE POLICY "public_merchants_read_for_invitations" ON public.merchants
+FOR SELECT TO anon
+USING (true);

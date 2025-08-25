@@ -85,9 +85,9 @@ CREATE TABLE public.invoices (
   deploy_tx character varying,
   error_message text,
   CONSTRAINT invoices_pkey PRIMARY KEY (id),
-  CONSTRAINT invoices_transaction_id_fkey FOREIGN KEY (transaction_id) REFERENCES public.transactions(transaction_id),
+  CONSTRAINT invoices_terminal_id_fkey FOREIGN KEY (terminal_id) REFERENCES public.terminals(terminal_id),
   CONSTRAINT invoices_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
-  CONSTRAINT invoices_terminal_id_fkey FOREIGN KEY (terminal_id) REFERENCES public.terminals(terminal_id)
+  CONSTRAINT invoices_transaction_id_fkey FOREIGN KEY (transaction_id) REFERENCES public.transactions(transaction_id)
 );
 CREATE TABLE public.locations (
   location_id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -170,8 +170,8 @@ CREATE TABLE public.okuru_alerts (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT okuru_alerts_pkey PRIMARY KEY (alert_id),
-  CONSTRAINT okuru_alerts_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
-  CONSTRAINT okuru_alerts_acknowledged_by_fkey FOREIGN KEY (acknowledged_by) REFERENCES public.users(user_id)
+  CONSTRAINT okuru_alerts_acknowledged_by_fkey FOREIGN KEY (acknowledged_by) REFERENCES public.users(user_id),
+  CONSTRAINT okuru_alerts_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id)
 );
 CREATE TABLE public.okuru_company_settings (
   setting_id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -320,9 +320,11 @@ CREATE TABLE public.pending_users (
   invitation_token character varying UNIQUE,
   invitation_sent_at timestamp with time zone,
   accepted_at timestamp with time zone,
+  auth_user_id uuid,
   CONSTRAINT pending_users_pkey PRIMARY KEY (id),
   CONSTRAINT pending_users_merchant_id_uuid_fkey FOREIGN KEY (merchant_id_uuid) REFERENCES public.merchants(merchant_id),
   CONSTRAINT pending_users_initiated_by_fkey FOREIGN KEY (initiated_by) REFERENCES public.users(user_id),
+  CONSTRAINT pending_users_auth_user_id_fkey FOREIGN KEY (auth_user_id) REFERENCES auth.users(id),
   CONSTRAINT pending_users_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public.users(user_id)
 );
 CREATE TABLE public.staff_permissions (
@@ -349,8 +351,8 @@ CREATE TABLE public.terminal_audit_log (
   user_agent text,
   timestamp timestamp with time zone DEFAULT now(),
   CONSTRAINT terminal_audit_log_pkey PRIMARY KEY (audit_id),
-  CONSTRAINT terminal_audit_log_terminal_id_fkey FOREIGN KEY (terminal_id) REFERENCES public.terminals(terminal_id),
   CONSTRAINT terminal_audit_log_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
+  CONSTRAINT terminal_audit_log_terminal_id_fkey FOREIGN KEY (terminal_id) REFERENCES public.terminals(terminal_id),
   CONSTRAINT terminal_audit_log_actor_user_id_fkey FOREIGN KEY (actor_user_id) REFERENCES public.users(user_id)
 );
 CREATE TABLE public.terminal_configurations (
@@ -410,10 +412,10 @@ CREATE TABLE public.terminal_permissions (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT terminal_permissions_pkey PRIMARY KEY (permission_id),
-  CONSTRAINT terminal_permissions_granted_by_fkey FOREIGN KEY (granted_by) REFERENCES public.users(user_id),
   CONSTRAINT terminal_permissions_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
+  CONSTRAINT terminal_permissions_terminal_id_fkey FOREIGN KEY (terminal_id) REFERENCES public.terminals(terminal_id),
   CONSTRAINT terminal_permissions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
-  CONSTRAINT terminal_permissions_terminal_id_fkey FOREIGN KEY (terminal_id) REFERENCES public.terminals(terminal_id)
+  CONSTRAINT terminal_permissions_granted_by_fkey FOREIGN KEY (granted_by) REFERENCES public.users(user_id)
 );
 CREATE TABLE public.terminal_sessions (
   session_id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -431,9 +433,9 @@ CREATE TABLE public.terminal_sessions (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT terminal_sessions_pkey PRIMARY KEY (session_id),
-  CONSTRAINT terminal_sessions_terminal_id_fkey FOREIGN KEY (terminal_id) REFERENCES public.terminals(terminal_id),
+  CONSTRAINT terminal_sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
   CONSTRAINT terminal_sessions_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
-  CONSTRAINT terminal_sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
+  CONSTRAINT terminal_sessions_terminal_id_fkey FOREIGN KEY (terminal_id) REFERENCES public.terminals(terminal_id)
 );
 CREATE TABLE public.terminal_transaction_events (
   event_id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -446,9 +448,9 @@ CREATE TABLE public.terminal_transaction_events (
   webhook_sent boolean DEFAULT false,
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT terminal_transaction_events_pkey PRIMARY KEY (event_id),
-  CONSTRAINT terminal_transaction_events_terminal_id_fkey FOREIGN KEY (terminal_id) REFERENCES public.terminals(terminal_id),
+  CONSTRAINT terminal_transaction_events_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
   CONSTRAINT terminal_transaction_events_transaction_id_fkey FOREIGN KEY (transaction_id) REFERENCES public.transactions(transaction_id),
-  CONSTRAINT terminal_transaction_events_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id)
+  CONSTRAINT terminal_transaction_events_terminal_id_fkey FOREIGN KEY (terminal_id) REFERENCES public.terminals(terminal_id)
 );
 CREATE TABLE public.terminals (
   terminal_id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -470,8 +472,8 @@ CREATE TABLE public.terminals (
   last_seen timestamp with time zone,
   paired_at timestamp with time zone,
   CONSTRAINT terminals_pkey PRIMARY KEY (terminal_id),
-  CONSTRAINT terminals_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
-  CONSTRAINT terminals_location_id_fkey FOREIGN KEY (location_id) REFERENCES public.locations(location_id)
+  CONSTRAINT terminals_location_id_fkey FOREIGN KEY (location_id) REFERENCES public.locations(location_id),
+  CONSTRAINT terminals_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id)
 );
 CREATE TABLE public.transactions (
   transaction_id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -511,10 +513,10 @@ CREATE TABLE public.transactions (
   receiver_address character varying,
   chain_id integer NOT NULL,
   CONSTRAINT transactions_pkey PRIMARY KEY (transaction_id),
-  CONSTRAINT transactions_processed_by_user_id_fkey FOREIGN KEY (processed_by_user_id) REFERENCES public.users(user_id),
-  CONSTRAINT transactions_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
   CONSTRAINT transactions_location_id_fkey FOREIGN KEY (location_id) REFERENCES public.locations(location_id),
   CONSTRAINT transactions_terminal_id_fkey FOREIGN KEY (terminal_id) REFERENCES public.terminals(terminal_id),
+  CONSTRAINT transactions_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
+  CONSTRAINT transactions_processed_by_user_id_fkey FOREIGN KEY (processed_by_user_id) REFERENCES public.users(user_id),
   CONSTRAINT transactions_staff_user_id_fkey FOREIGN KEY (staff_user_id) REFERENCES public.users(user_id),
   CONSTRAINT transactions_terminal_session_id_fkey FOREIGN KEY (terminal_session_id) REFERENCES public.terminal_sessions(session_id)
 );
@@ -565,8 +567,8 @@ CREATE TABLE public.users (
   updated_at timestamp with time zone DEFAULT now(),
   auth_user_id uuid UNIQUE,
   CONSTRAINT users_pkey PRIMARY KEY (user_id),
-  CONSTRAINT users_auth_user_id_fkey FOREIGN KEY (auth_user_id) REFERENCES auth.users(id),
-  CONSTRAINT users_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id)
+  CONSTRAINT users_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
+  CONSTRAINT users_auth_user_id_fkey FOREIGN KEY (auth_user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.virtual_terminal_passwords (
   password_id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -601,8 +603,8 @@ CREATE TABLE public.virtual_terminal_settings_audit (
   user_agent text,
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT virtual_terminal_settings_audit_pkey PRIMARY KEY (audit_id),
-  CONSTRAINT virtual_terminal_settings_audit_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
-  CONSTRAINT virtual_terminal_settings_audit_changed_by_fkey FOREIGN KEY (changed_by) REFERENCES public.users(user_id)
+  CONSTRAINT virtual_terminal_settings_audit_changed_by_fkey FOREIGN KEY (changed_by) REFERENCES public.users(user_id),
+  CONSTRAINT virtual_terminal_settings_audit_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id)
 );
 CREATE TABLE public.wallet_addresses (
   address_id uuid NOT NULL DEFAULT uuid_generate_v4(),
