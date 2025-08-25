@@ -34,7 +34,11 @@ const SupabaseSignIn: React.FC = () => {
       <div className="max-w-md w-full space-y-8">
         <div>
           <div className="mx-auto h-12 w-auto flex items-center justify-center">
-            <div className="text-2xl font-bold text-indigo-600">Okuru Dashboard</div>
+            <img
+              className="h-12 w-auto"
+              src="/logo192.png"
+              alt="Okuru"
+            />
           </div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
             Sign in to your account
