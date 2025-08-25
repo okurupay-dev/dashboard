@@ -54,11 +54,11 @@ const AcceptInvitation: React.FC = () => {
           email,
           name,
           role,
-          merchant_id,
+          merchant_id_uuid,
           expires_at,
           status,
           approval_status,
-          merchant:merchants(name)
+          merchant:merchants!pending_users_merchant_id_uuid_fkey(name)
         `)
         .eq('invitation_token', invitationToken)
         .single();
@@ -76,14 +76,13 @@ const AcceptInvitation: React.FC = () => {
         return;
       }
 
-      // Check various status combinations that might be valid
-      const validStatuses = ['invited', 'pending', 'approved'];
-      const isValidStatus = validStatuses.includes(data.status) || 
-                           (data.approval_status && data.approval_status === 'approved');
+      // Check status based on your schema: status='pending_invite' and approval_status='approved'
+      const isValidStatus = data.approval_status === 'approved' && 
+                           (data.status === 'pending_invite' || data.status === 'invited');
 
       if (!isValidStatus) {
         console.log('❌ Invalid status:', { status: data.status, approval_status: data.approval_status });
-        setError(`Invitation status is ${data.status}. Please contact your administrator.`);
+        setError(`Invitation not ready. Status: ${data.status}, Approval: ${data.approval_status}`);
         return;
       }
 
@@ -96,6 +95,7 @@ const AcceptInvitation: React.FC = () => {
       console.log('✅ Invitation validated successfully');
       setInvitation({
         ...data,
+        merchant_id: data.merchant_id_uuid, // Use the UUID field
         merchant_name: (data.merchant as any)?.name || 'Unknown Merchant'
       });
     } catch (err) {
@@ -150,7 +150,7 @@ const AcceptInvitation: React.FC = () => {
           merchant_id: invitation.merchant_id,
           name: invitation.name,
           email: invitation.email,
-          role: invitation.role,
+          role: invitation.role === 'merchant_admin' ? 'merchant' : 'staff', // Map to schema roles
           status: 'active',
           approved: true
         });
