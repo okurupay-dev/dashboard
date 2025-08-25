@@ -47,6 +47,7 @@ const AcceptInvitation: React.FC = () => {
       
       console.log('🔍 All pending users with this token:', allData);
       
+      // First, get the pending user data - include both merchant ID fields
       const { data, error } = await supabase
         .from('pending_users')
         .select(`
@@ -54,18 +55,40 @@ const AcceptInvitation: React.FC = () => {
           email,
           name,
           role,
+          merchant_id,
           merchant_id_uuid,
           expires_at,
           status,
-          approval_status,
-          merchants!pending_users_merchant_id_uuid_fkey(
-            name
-          )
+          approval_status
         `)
         .eq('invitation_token', invitationToken)
         .single();
 
-      console.log('🔍 Query result:', { data, error });
+      console.log('🔍 Pending user data:', { data, error });
+      console.log('🔍 merchant_id_uuid value:', data?.merchant_id_uuid);
+      console.log('🔍 merchant_id value:', (data as any)?.merchant_id);
+
+      // Check both possible merchant ID fields
+      const merchantId = data?.merchant_id_uuid || (data as any)?.merchant_id;
+      console.log('🔍 Using merchant ID:', merchantId);
+
+      if (merchantId) {
+        // Separately fetch merchant data
+        const { data: merchantData, error: merchantError } = await supabase
+          .from('merchants')
+          .select('name, id')
+          .eq('id', merchantId)
+          .single();
+        
+        console.log('🏪 Merchant query result:', { merchantData, merchantError });
+        
+        // Add merchant data to the result
+        if (merchantData) {
+          (data as any).merchants = merchantData;
+        }
+      } else {
+        console.log('❌ No merchant ID found in pending user data');
+      }
 
       if (error) {
         console.error('❌ Database error:', error);
