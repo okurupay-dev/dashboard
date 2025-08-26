@@ -126,69 +126,51 @@ const AcceptInvitation: React.FC = () => {
     setError(null);
 
     try {
-      console.log('🔐 Creating user account - this will be the FIRST and ONLY login');
-      
-      // 1. Create user in Supabase Auth (this is when they actually "login" for the first time)
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: invitation.email,
-        password: password,
-        options: {
-          data: {
-            role: invitation.role,
-            name: invitation.name,
-            merchant_id: invitation.merchant_id
-          }
-        }
-      });
+      console.log('🔍 Starting invitation acceptance for:', invitation.email);
+      console.log('🔑 Password length:', password.length);
 
-      if (authError) {
-        throw authError;
-      }
-
-      // 2. Create user record in users table
-      const { error: userError } = await supabase
-        .from('users')
-        .insert({
-          auth_user_id: authData.user?.id,
-          merchant_id: invitation.merchant_id,
-          name: invitation.name,
+      // Call the server-side API endpoint that uses service role key
+      const response = await fetch('/api/accept-invitation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           email: invitation.email,
-          role: invitation.role,
-          status: 'active',
-          approved: true
-        });
-
-      if (userError) {
-        throw userError;
-      }
-
-      // 3. Delete from pending users table (they're now active)
-      const { error: deleteError } = await supabase
-        .from('pending_users')
-        .delete()
-        .eq('id', invitation.id);
-
-      if (deleteError) {
-        console.error('Error removing pending user:', deleteError);
-      } else {
-        console.log('✅ Moved user from pending to active');
-      }
-
-      // 4. Sign in the user
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: invitation.email,
-        password: password
+          password: password,
+          invitationToken: invitation.id
+        })
       });
 
-      if (signInError) {
-        throw signInError;
+      console.log('📡 API response status:', response.status);
+      const result = await response.json();
+      console.log('📋 API response body:', result);
+
+      if (!response.ok) {
+        console.error('❌ API request failed:', result);
+        throw new Error(result.error || 'Failed to accept invitation');
       }
 
-      // Redirect to merchant dashboard for all invited users
-      window.location.href = 'https://dashboard.okurupay.com';
+      console.log('✅ Invitation acceptance completed successfully');
+      
+      // Check if user was created successfully
+      if (result.user) {
+        console.log('👤 User created:', result.user.email);
+        console.log('🔐 Auth user ID:', result.user.id);
+      }
+      
+      if (result.session) {
+        console.log('🎫 Session created:', !!result.session.access_token);
+      }
 
+      console.log('🚀 Redirecting to merchant dashboard...');
+
+      // Redirect to merchant dashboard
+      window.location.href = 'https://dashboard.okurupay.com';
     } catch (err: any) {
-      setError(err.message || 'Failed to accept invitation');
+      console.error('❌ Invitation acceptance failed:', err);
+      console.error('❌ Error details:', err.stack);
+      setError(err.message || 'Failed to accept invitation. Please try again.');
       setCreating(false);
     }
   };
