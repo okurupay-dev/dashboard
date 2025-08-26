@@ -139,6 +139,7 @@ const AcceptInvitation: React.FC = () => {
 
     try {
       console.log('🔍 Starting invitation acceptance for:', invitation.email);
+      console.log('🔑 Password length:', password.length);
 
       // Call the server-side API endpoint that uses service role key
       const response = await fetch('/api/accept-invitation', {
@@ -153,19 +154,34 @@ const AcceptInvitation: React.FC = () => {
         })
       });
 
+      console.log('📡 API response status:', response.status);
       const result = await response.json();
+      console.log('📋 API response body:', result);
 
       if (!response.ok) {
+        console.error('❌ API request failed:', result);
         throw new Error(result.error || 'Failed to accept invitation');
       }
 
       console.log('✅ Invitation acceptance completed successfully');
+      
+      // Check if user was created successfully
+      if (result.user) {
+        console.log('👤 User created:', result.user.email);
+        console.log('🔐 Auth user ID:', result.user.id);
+      }
+      
+      if (result.session) {
+        console.log('🎫 Session created:', !!result.session.access_token);
+      }
+
       console.log('🚀 Redirecting to merchant dashboard...');
 
       // Redirect to merchant dashboard
       window.location.href = 'https://dashboard.okurupay.com';
     } catch (err: any) {
       console.error('❌ Invitation acceptance failed:', err);
+      console.error('❌ Error details:', err.stack);
       setError(err.message || 'Failed to accept invitation. Please try again.');
       setCreating(false);
     }
