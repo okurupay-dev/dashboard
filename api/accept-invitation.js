@@ -36,7 +36,28 @@ export default async function handler(req, res) {
     
     if (existingUser) {
       console.log('User already exists, deleting first:', existingUser.id)
-      await supabaseAdmin.auth.admin.deleteUser(existingUser.id)
+      const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(existingUser.id)
+      if (deleteError) {
+        console.error('Error deleting existing user:', deleteError)
+      }
+      // Wait a moment for deletion to propagate
+      await new Promise(resolve => setTimeout(resolve, 1000))
+    }
+
+    // Also check and clean up any existing records in users table
+    const { data: existingUserRecords } = await supabaseAdmin
+      .from('users')
+      .select('user_id, auth_user_id')
+      .eq('email', invitation.email)
+    
+    if (existingUserRecords && existingUserRecords.length > 0) {
+      console.log('Cleaning up existing user records:', existingUserRecords.length)
+      for (const record of existingUserRecords) {
+        await supabaseAdmin
+          .from('users')
+          .delete()
+          .eq('user_id', record.user_id)
+      }
     }
 
     // 2. Create auth user with service role (bypasses RLS)
@@ -54,11 +75,42 @@ export default async function handler(req, res) {
 
     if (authError) {
       console.error('Auth user creation error:', authError)
-      return res.status(400).json({ 
-        error: authError.message,
-        code: authError.code,
-        details: authError
-      })
+      
+      // If it's still a duplicate email error, try a different approach
+      if (authError.message.includes('already been registered')) {
+        console.log('Attempting to handle persistent duplicate email error')
+        
+        // Try using signUp instead of createUser
+        const { data: signUpData, error: signUpError } = await supabaseAdmin.auth.signUp({
+          email: invitation.email,
+          password: password,
+          options: {
+            data: {
+              role: invitation.role,
+              merchant_id: merchantId,
+              invitation_accepted: true,
+              first_time_password: true
+            }
+          }
+        })
+        
+        if (signUpError) {
+          return res.status(400).json({ 
+            error: `Both createUser and signUp failed: ${authError.message} | ${signUpError.message}`,
+            originalError: authError.message,
+            signUpError: signUpError.message
+          })
+        }
+        
+        // Use signUp data instead
+        authData = signUpData
+      } else {
+        return res.status(400).json({ 
+          error: authError.message,
+          code: authError.code,
+          details: authError
+        })
+      }
     }
 
     // 3. Create user record in users table (bypasses RLS)
