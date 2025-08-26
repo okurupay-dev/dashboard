@@ -194,7 +194,7 @@ const Taxes: React.FC = () => {
                   <div className="flex items-center space-x-2">
                     <Switch
                       checked={taxSettings.auto_calculate}
-                      onCheckedChange={(checked) => 
+                      onCheckedChange={(checked: boolean) => 
                         setTaxSettings(prev => ({ ...prev, auto_calculate: checked }))
                       }
                     />
