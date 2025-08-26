@@ -18,7 +18,7 @@ export interface User {
   merchant_id: string
   name: string
   email: string
-  role: 'admin' | 'merchant' | 'staff' | 'okuru_admin'
+  role: 'admin' | 'merchant' | 'merchant_admin' | 'staff' | 'okuru_admin'
   employee_id?: string
   pin_hash?: string
   status: 'active' | 'inactive'
