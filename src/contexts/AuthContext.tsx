@@ -145,6 +145,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     const initializeAuth = async () => {
       try {
+        console.log('🔍 Getting initial session...')
         const { data: { session }, error } = await supabase.auth.getSession()
         
         if (error) {
@@ -153,12 +154,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return
         }
         
-        console.log('📋 Initial session:', !!session?.user)
+        console.log('📋 Initial session:', !!session?.user, session?.user?.email)
         
         if (session?.user) {
+          console.log('👤 Found existing session, processing...')
           // Use the same logic as auth state change
           await handleAuthStateChange('SIGNED_IN', session)
         } else {
+          console.log('🚪 No existing session found')
           setUser(null)
           setUserData(null)
           setMerchantData(null)
