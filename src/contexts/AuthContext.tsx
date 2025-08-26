@@ -219,20 +219,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         return { error: null }
       } catch (timeoutError) {
+        authTimedOut = true
         console.warn('⚠️ Auth timeout, using fallback authentication')
         
         // Fallback: Verify user exists in database and create session manually
         try {
+          console.log('⚠️ Auth timeout, using fallback authentication')
           console.log('🔍 Fallback: Checking user in database...')
+          console.log('📧 Looking for email:', email)
           
-          const { data: userData, error: dbError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('email', email)
-            .single()
-          
-          console.log('🔍 Database query result:', { userData, dbError })
-          
+          try {
+            const { data: userData, error: dbError } = await supabase
+              .from('users')
+              .select('*')
+              .eq('email', email)
+              .single()
+            
+            console.log('🔍 Database query result:', { userData, dbError })
+            console.log('📊 Query details:', { 
+              hasData: !!userData, 
+              errorCode: dbError?.code,
+              errorMessage: dbError?.message 
+            })
+        
           if (dbError || !userData) {
             console.error('❌ User not found in database:', dbError)
             return { error: { message: 'Invalid credentials' } }
