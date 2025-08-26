@@ -5,7 +5,7 @@ import { walletConnectConfig, supportedWallets } from '../../lib/wallet/walletCo
 import { web3WalletProvider, Web3WalletConnection } from '../../lib/wallet/web3WalletProvider';
 import { useAuth } from '../../contexts/AuthContext';
 // Removed clerk import
-import { supabase } from '../../lib/supabase/client';
+import { supabase } from '../../lib/supabase';
 
 interface WalletConnectWidgetProps {
   onWalletConnected: (walletInfo: ConnectedWalletInfo) => void;

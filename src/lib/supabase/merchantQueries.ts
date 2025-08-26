@@ -1,5 +1,5 @@
 // Merchant-specific database queries with proper merchant_id filtering
-import { supabase } from './client';
+import { supabase } from '../supabase';
 
 // Helper to get merchant_id from current session JWT
 const getMerchantIdFromSession = async (): Promise<string | null> => {

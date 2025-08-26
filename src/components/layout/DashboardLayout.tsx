@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useWalletStatus } from '../../hooks/useWalletStatus';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase/client';
+import { supabase } from '../../lib/supabase';
 import logo from '../../assets/images/logo.svg';
 
 // Check if we're in development mode

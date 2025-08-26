@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
-import { supabase } from '../../lib/supabase/client';
+import { supabase } from '../../lib/supabase';
 
 // Interface for cryptocurrency distribution items
 interface CryptoCurrency {

@@ -1,5 +1,5 @@
 // Invitation service for handling merchant user invitations
-import { supabase } from './client';
+import { supabase } from '../supabase';
 
 export interface InvitationData {
   id: string;

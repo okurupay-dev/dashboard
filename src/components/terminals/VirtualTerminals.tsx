@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useForm } from 'react-hook-form';
-import { supabase } from '../../lib/supabase/client';
+import { supabase } from '../../lib/supabase';
 
 // Types for Virtual Terminal Management
 interface VirtualTerminalPassword {

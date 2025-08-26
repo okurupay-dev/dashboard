@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase/client';
+import { supabase } from '../../lib/supabase';
 import { UserPlus, Key, Edit, Trash2, Shield, Users, X } from 'lucide-react';
 
 interface StaffMember {

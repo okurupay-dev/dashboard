@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 // Removed clerk import
 import { transactionService, userSyncService } from '../../lib/supabase/services';
-import { supabase } from '../../lib/supabase/client';
+import { supabase } from '../../lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';

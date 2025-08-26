@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase/client';
+import { supabase } from '../lib/supabase';
 import { useAuthContext } from '../lib/api/dataService';
 
 export interface WalletStatus {

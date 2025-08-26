@@ -5,7 +5,7 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { PermissionGate } from '../common/PermissionGate';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
-import { supabase } from '../../lib/supabase/client';
+import { supabase } from '../../lib/supabase';
 
 interface StaffMember {
   user_id: string;

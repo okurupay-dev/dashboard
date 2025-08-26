@@ -6,7 +6,7 @@ import { Wallet, Shield, CheckCircle, AlertTriangle, Copy, Check, Loader2, Alert
 import { useAuth } from '../../contexts/AuthContext';
 import { usePermissions } from '../../hooks/usePermissions';
 import { PermissionGate, RoleGate } from '../common/PermissionGate';
-import { supabase } from '../../lib/supabase/client';
+import { supabase } from '../../lib/supabase';
 import { WalletConnectWidget } from './WalletConnectWidget';
 
 // Supported networks configuration

@@ -1,4 +1,4 @@
-import { supabase } from '../supabase/client';
+import { supabase } from '../supabase';
 import { Terminal, TerminalDetails, TerminalStats, Location } from '../../components/terminals/types';
 
 export interface DatabaseTerminal {
