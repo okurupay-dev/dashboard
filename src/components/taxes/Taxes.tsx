@@ -2,7 +2,31 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { Switch } from './Switch';
+// Simple inline switch component to avoid import issues
+const Switch: React.FC<{
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  disabled?: boolean;
+}> = ({ checked, onCheckedChange, disabled = false }) => {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={() => !disabled && onCheckedChange(!checked)}
+      className={`inline-flex h-6 w-11 items-center rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+        checked ? 'bg-blue-600' : 'bg-gray-200'
+      }`}
+    >
+      <span
+        className={`block h-5 w-5 rounded-full bg-white shadow-lg transition-transform ${
+          checked ? 'translate-x-5' : 'translate-x-0'
+        }`}
+      />
+    </button>
+  );
+};
 import { Calculator, DollarSign, TrendingUp, Settings, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
