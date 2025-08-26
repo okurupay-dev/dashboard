@@ -202,35 +202,140 @@ const Products: React.FC = () => {
       const lines = text.split('\n');
       const headers = lines[0].split(',').map(h => h.trim());
       
-      // Expected headers: name, sku, price, cost, category, stock_quantity, description
-      const requiredHeaders = ['name', 'sku', 'price'];
+      // Square CSV format requirements
+      const requiredHeaders = ['item name', 'variation name', 'description', 'sku'];
       const hasRequiredHeaders = requiredHeaders.every(header => 
         headers.some(h => h.toLowerCase().includes(header.toLowerCase()))
       );
 
       if (!hasRequiredHeaders) {
-        alert('CSV must contain at least: name, sku, price columns');
+        alert('CSV must contain Square format columns: Item Name, Variation Name, Description, SKU');
         return;
       }
 
-      // Parse products from CSV
+      const validateCSV = (data: any[]) => {
+        // Square CSV format requirements
+        const requiredColumns = [
+          'item name',
+          'variation name', 
+          'description',
+          'sku'
+        ];
+        const errors: string[] = [];
+        
+        if (data.length === 0) {
+          errors.push('CSV file is empty');
+          return { isValid: false, errors };
+        }
+        
+        const headers = Object.keys(data[0]).map(h => h.toLowerCase());
+        const missingColumns = requiredColumns.filter(col => 
+          !headers.some(header => header.includes(col.toLowerCase()))
+        );
+        
+        if (missingColumns.length > 0) {
+          errors.push(`Missing required columns: ${missingColumns.join(', ')}`);
+        }
+        
+        // Check for tax column format (e.g., "Tax - Sales (7%)")
+        const hasTaxColumn = headers.some(header => 
+          header.includes('tax') && header.includes('(') && header.includes('%')
+        );
+        
+        if (!hasTaxColumn) {
+          errors.push('Tax column must include percentage in header format: "Tax - Sales (7%)"');
+        }
+        
+        // Check for location-enabled columns if multiple locations
+        const locationColumns = headers.filter(header => 
+          header.includes('enabled') && header.includes('location')
+        );
+        
+        // Validate each row
+        data.forEach((row, index) => {
+          const rowNum = index + 2; // +2 for header row and 1-based indexing
+          
+          if (!row['item name'] && !row['Item Name']) {
+            errors.push(`Row ${rowNum}: Item Name is required`);
+          }
+          
+          if (!row['sku'] && !row['SKU']) {
+            errors.push(`Row ${rowNum}: SKU is required`);
+          }
+          
+          // Check for price if not a variation
+          const hasPrice = row['price'] || row['Price'] || row['Base Price'];
+          if (!hasPrice && (!row['variation name'] && !row['Variation Name'])) {
+            errors.push(`Row ${rowNum}: Price is required for main items`);
+          }
+        });
+        
+        return { isValid: errors.length === 0, errors };
+      };
+
+      const data = lines.slice(1).map(line => {
+        const values = line.split(',').map(v => v.trim());
+        const obj: any = {};
+        headers.forEach((header, index) => {
+          obj[header] = values[index];
+        });
+        return obj;
+      });
+
+      const { isValid, errors } = validateCSV(data);
+
+      if (!isValid) {
+        alert(`Invalid CSV format: ${errors.join('\n')}`);
+        return;
+      }
+
+      // Parse products from Square CSV format
       const newProducts: Partial<Product>[] = [];
-      for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map(v => v.trim());
-        if (values.length >= 3) {
+      
+      data.forEach((row, index) => {
+        if (Object.values(row).some(val => val && val.toString().trim())) {
+          // Extract tax rate from tax column header (e.g., "Tax - Sales (7%)" -> 7)
+          const taxHeader = Object.keys(row).find(key => 
+            key.toLowerCase().includes('tax') && key.includes('(') && key.includes('%')
+          );
+          const taxRate = taxHeader ? 
+            parseFloat(taxHeader.match(/\((\d+(?:\.\d+)?)\%\)/)?.[1] || '0') : 0;
+
           const product: Partial<Product> = {
             merchant_id: userData.merchant_id,
-            name: values[0] || `Product ${i}`,
-            sku: values[1] || `SKU-${Date.now()}-${i}`,
-            price: parseFloat(values[2]) || 0,
-            cost: parseFloat(values[3]) || 0,
-            category: values[4] || 'Uncategorized',
-            stock_quantity: parseInt(values[5]) || 0,
-            description: values[6] || '',
+            item_name: row['Item Name'] || row['item name'] || '',
+            variation_name: row['Variation Name'] || row['variation name'] || null,
+            description: row['Description'] || row['description'] || '',
+            sku: row['SKU'] || row['sku'] || `SKU-${Date.now()}-${index}`,
+            price: parseFloat(row['Price'] || row['price'] || row['Base Price'] || '0'),
+            cost: parseFloat(row['Cost'] || row['cost'] || '0'),
+            category: row['Category'] || row['category'] || 'Uncategorized',
+            barcode: row['Barcode'] || row['barcode'] || '',
+            tax_name: taxHeader || 'Default Tax',
+            tax_rate: taxRate,
+            is_variation: !!(row['Variation Name'] || row['variation name']),
             is_active: true,
+            import_source: 'csv',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           };
+          
+          // Handle location-based inventory if enabled columns exist
+          const locationEnabledColumns = Object.keys(row).filter(key => 
+            key.toLowerCase().includes('enabled') && key.toLowerCase().includes('location')
+          );
+          
+          if (locationEnabledColumns.length > 0) {
+            product.metadata = {
+              ...product.metadata,
+              location_inventory: locationEnabledColumns.reduce((acc, col) => {
+                const locationName = col.match(/enabled\s+(.+)/i)?.[1] || 'Unknown Location';
+                acc[locationName] = row[col] === 'Y' || row[col] === 'Yes' || row[col] === 'true';
+                return acc;
+              }, {} as Record<string, boolean>)
+            };
+          }
+          
           newProducts.push(product);
         }
       }
