@@ -6,8 +6,8 @@ import {
   Package, 
   Upload, 
   Download, 
-  Plus, 
   Search, 
+  Plus, 
   Filter, 
   Edit, 
   Trash2, 
@@ -16,7 +16,9 @@ import {
   Zap,
   AlertCircle,
   CheckCircle,
-  Loader2
+  Loader2,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
@@ -58,6 +60,24 @@ const Products: React.FC = () => {
   const [showImportModal, setShowImportModal] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
+  const [showOptionalFields, setShowOptionalFields] = useState(false);
+  const [newProduct, setNewProduct] = useState({
+    item_name: '',
+    variation_name: '',
+    description: '',
+    sku: '',
+    price: '',
+    cost: '',
+    category: '',
+    barcode: '',
+    weight: '',
+    tax_name: '',
+    tax_rate: '',
+    is_active: true,
+    is_taxable: true,
+    track_inventory: true,
+    allow_backorders: false
+  });
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -191,6 +211,61 @@ const Products: React.FC = () => {
   };
 
   // Process CSV import
+  const handleAddProduct = async () => {
+    if (!userData?.merchant_id) return;
+    
+    try {
+      // Validate required fields
+      if (!newProduct.item_name || !newProduct.sku || !newProduct.price) {
+        alert('Please fill in all required fields: Item Name, SKU, and Price');
+        return;
+      }
+
+      const productToAdd = {
+        ...newProduct,
+        product_id: `manual-${Date.now()}`,
+        merchant_id: userData.merchant_id,
+        price: parseFloat(newProduct.price) || 0,
+        cost: parseFloat(newProduct.cost) || 0,
+        weight: parseFloat(newProduct.weight) || 0,
+        tax_rate: parseFloat(newProduct.tax_rate) || 0,
+        is_variation: !!newProduct.variation_name,
+        import_source: 'manual',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      // Add to local state (in production, would save to database)
+      setProducts(prev => [...prev, productToAdd as Product]);
+      
+      // Reset form and close modal
+      setNewProduct({
+        item_name: '',
+        variation_name: '',
+        description: '',
+        sku: '',
+        price: '',
+        cost: '',
+        category: '',
+        barcode: '',
+        weight: '',
+        tax_name: '',
+        tax_rate: '',
+        is_active: true,
+        is_taxable: true,
+        track_inventory: true,
+        allow_backorders: false
+      });
+      setShowAddModal(false);
+      setShowOptionalFields(false);
+      
+      console.log('✅ Product added successfully');
+    } catch (error) {
+      console.error('❌ Error adding product:', error);
+      alert('Failed to add product. Please try again.');
+    }
+  };
+
   const handleImportCsv = async () => {
     if (!csvFile || !userData?.merchant_id) return;
 
@@ -701,6 +776,323 @@ const Products: React.FC = () => {
                       Import
                     </>
                   )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Product Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold">Add New Product</h2>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setShowAddModal(false);
+                  setShowOptionalFields(false);
+                  setNewProduct({
+                    item_name: '',
+                    variation_name: '',
+                    description: '',
+                    sku: '',
+                    price: '',
+                    cost: '',
+                    category: '',
+                    barcode: '',
+                    weight: '',
+                    tax_name: '',
+                    tax_rate: '',
+                    is_active: true,
+                    is_taxable: true,
+                    track_inventory: true,
+                    allow_backorders: false
+                  });
+                }}
+              >
+                ×
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Required Fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Item Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newProduct.item_name}
+                    onChange={(e) => setNewProduct(prev => ({ ...prev, item_name: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter product name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    SKU <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newProduct.sku}
+                    onChange={(e) => setNewProduct(prev => ({ ...prev, sku: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter SKU"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Price <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={newProduct.price}
+                    onChange={(e) => setNewProduct(prev => ({ ...prev, price: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="0.00"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Category
+                  </label>
+                  <select
+                    value={newProduct.category}
+                    onChange={(e) => setNewProduct(prev => ({ ...prev, category: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select category</option>
+                    {categories.map((category) => (
+                      <option key={category} value={category}>
+                        {category}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={newProduct.description}
+                  onChange={(e) => setNewProduct(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={3}
+                  placeholder="Enter product description"
+                />
+              </div>
+
+              {/* Optional Fields Toggle */}
+              <div className="border-t pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowOptionalFields(!showOptionalFields)}
+                  className="w-full flex items-center justify-center"
+                >
+                  {showOptionalFields ? (
+                    <>
+                      <ChevronUp className="h-4 w-4 mr-2" />
+                      Hide Optional Fields
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="h-4 w-4 mr-2" />
+                      Show Optional Fields
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* Optional Fields */}
+              {showOptionalFields && (
+                <div className="space-y-4 border-t pt-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Variation Name
+                      </label>
+                      <input
+                        type="text"
+                        value={newProduct.variation_name}
+                        onChange={(e) => setNewProduct(prev => ({ ...prev, variation_name: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g., Size Large, Color Red"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Cost
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={newProduct.cost}
+                        onChange={(e) => setNewProduct(prev => ({ ...prev, cost: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="0.00"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Barcode
+                      </label>
+                      <input
+                        type="text"
+                        value={newProduct.barcode}
+                        onChange={(e) => setNewProduct(prev => ({ ...prev, barcode: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter barcode"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Weight (lbs)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={newProduct.weight}
+                        onChange={(e) => setNewProduct(prev => ({ ...prev, weight: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="0.00"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Tax Name
+                      </label>
+                      <input
+                        type="text"
+                        value={newProduct.tax_name}
+                        onChange={(e) => setNewProduct(prev => ({ ...prev, tax_name: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g., Sales Tax"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Tax Rate (%)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={newProduct.tax_rate}
+                        onChange={(e) => setNewProduct(prev => ({ ...prev, tax_rate: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Checkboxes */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="is_active"
+                        checked={newProduct.is_active}
+                        onChange={(e) => setNewProduct(prev => ({ ...prev, is_active: e.target.checked }))}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="is_active" className="ml-2 block text-sm text-gray-700">
+                        Active Product
+                      </label>
+                    </div>
+
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="is_taxable"
+                        checked={newProduct.is_taxable}
+                        onChange={(e) => setNewProduct(prev => ({ ...prev, is_taxable: e.target.checked }))}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="is_taxable" className="ml-2 block text-sm text-gray-700">
+                        Taxable
+                      </label>
+                    </div>
+
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="track_inventory"
+                        checked={newProduct.track_inventory}
+                        onChange={(e) => setNewProduct(prev => ({ ...prev, track_inventory: e.target.checked }))}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="track_inventory" className="ml-2 block text-sm text-gray-700">
+                        Track Inventory
+                      </label>
+                    </div>
+
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="allow_backorders"
+                        checked={newProduct.allow_backorders}
+                        onChange={(e) => setNewProduct(prev => ({ ...prev, allow_backorders: e.target.checked }))}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="allow_backorders" className="ml-2 block text-sm text-gray-700">
+                        Allow Backorders
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex justify-end space-x-2 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setShowOptionalFields(false);
+                    setNewProduct({
+                      item_name: '',
+                      variation_name: '',
+                      description: '',
+                      sku: '',
+                      price: '',
+                      cost: '',
+                      category: '',
+                      barcode: '',
+                      weight: '',
+                      tax_name: '',
+                      tax_rate: '',
+                      is_active: true,
+                      is_taxable: true,
+                      track_inventory: true,
+                      allow_backorders: false
+                    });
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleAddProduct}
+                  className="bg-blue-600 hover:bg-blue-700"
+                  disabled={!newProduct.item_name || !newProduct.sku || !newProduct.price}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Product
                 </Button>
               </div>
             </div>
