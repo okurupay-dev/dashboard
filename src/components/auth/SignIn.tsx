@@ -1,24 +1,36 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
+import { useAuth } from '../../contexts/AuthContext';
 import logo from '../../assets/images/logo.svg';
 
 const SignIn: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const { signIn } = useAuth();
+  const navigate = useNavigate();
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError('');
     
-    // Authentication logic would go here
-    // For now, just simulate a delay
-    setTimeout(() => {
+    console.log('🔐 SignIn component: Starting sign in process');
+    
+    const result = await signIn(email, password);
+    
+    if (result.error) {
+      console.error('❌ SignIn component: Sign in failed:', result.error);
+      setError(result.error.message || 'Sign in failed');
       setIsLoading(false);
-      // Redirect would happen here after successful authentication
+    } else {
+      console.log('✅ SignIn component: Sign in successful, redirecting...');
+      // Force page reload to ensure auth state updates
       window.location.href = '/';
-    }, 1500);
+    }
   };
 
   return (
@@ -58,6 +70,12 @@ const SignIn: React.FC = () => {
               className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
             />
           </div>
+
+          {error && (
+            <div className="text-red-600 text-sm text-center">
+              {error}
+            </div>
+          )}
 
           <div>
             <Button
