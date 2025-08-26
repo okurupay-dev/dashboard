@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
+import { Calculator, DollarSign, TrendingUp, Settings, ChevronDown, ChevronUp } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 import { supabase, TaxSettings as TaxSettingsType, Transaction } from '../../lib/supabase';
+
 // Simple inline switch component to avoid import issues
 const Switch: React.FC<{
   checked: boolean;
@@ -28,8 +31,6 @@ const Switch: React.FC<{
     </button>
   );
 };
-import { Calculator, DollarSign, TrendingUp, Settings, ChevronDown, ChevronUp } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
 
 interface TransactionData {
   total_revenue: number;
