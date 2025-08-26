@@ -81,67 +81,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     console.log('🚀 AuthContext initializing...')
     
-    const getSessionWithTimeout = async (timeoutMs = 10000) => {
-      return new Promise(async (resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error(`getSession timeout after ${timeoutMs / 1000} seconds`))
-        }, timeoutMs)
-
-        try {
-          const { data, error } = await supabase.auth.getSession()
-          clearTimeout(timeout)
-          resolve({ data, error })
-        } catch (error) {
-          clearTimeout(timeout)
-          reject(error)
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (error) {
+          console.error('❌ Error getting session:', error)
+          setLoading(false)
+          return
         }
-      })
-    }
-
-    getSessionWithTimeout()
-      .then((result: any) => {
-        const { data: { session } } = result
+        
         console.log('📋 Initial session:', !!session?.user)
         setUser(session?.user ?? null)
         
         if (session?.user) {
           console.log('👤 User found, fetching user data...')
-          console.log('📊 Fetching user data...')
-          fetchUserData(session.user?.id).then(userData => {
-            console.log('✅ User data fetched:', !!userData)
-            setUserData(userData)
+          const userData = await fetchUserData(session.user.id)
+          console.log('✅ User data fetched:', !!userData)
+          setUserData(userData)
+          
+          if (userData) {
+            console.log('🎭 User role from database:', userData.role)
             
-            if (userData) {
-              console.log('🎭 User role from database:', userData.role)
-              
-              // Check role from database, not user_metadata
-              if (userData.role === 'okuru_admin') {
-                console.log('🔄 Redirecting okuru admin...')
-                window.location.href = '/admin-dashboard'
-                return
-              }
+            // Check role from database, not user_metadata
+            if (userData.role === 'okuru_admin') {
+              console.log('🔄 Redirecting okuru admin...')
+              window.location.href = '/admin-dashboard'
+              return
             }
-            
-            if (userData?.merchant_id) {
-              console.log('🏪 Fetching merchant data...')
-              fetchMerchantData(userData.merchant_id).then(merchantData => {
-                console.log('✅ Merchant data fetched:', !!merchantData)
-                setMerchantData(merchantData)
-              })
-            }
-          }).catch(error => {
-            console.error('❌ Error fetching user data:', error)
-          })
+          }
+          
+          if (userData?.merchant_id) {
+            console.log('🏪 Fetching merchant data...')
+            const merchantData = await fetchMerchantData(userData.merchant_id)
+            console.log('✅ Merchant data fetched:', !!merchantData)
+            setMerchantData(merchantData)
+          }
         }
         
         console.log('✅ AuthContext initialization complete')
         setLoading(false)
-      })
-      .catch(error => {
-        console.error('❌ Error getting session:', error)
-        console.log('⚠️ Setting loading to false due to error')
+      } catch (error) {
+        console.error('❌ Error in auth initialization:', error)
         setLoading(false)
-      })
+      }
+    }
+
+    initializeAuth()
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -183,19 +169,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signIn = async (email: string, password: string) => {
     try {
       console.log('🔐 Attempting sign in for:', email)
+      console.log('🔗 Supabase URL:', process.env.REACT_APP_SUPABASE_URL)
       
-      // Add timeout to prevent hanging
-      const authPromise = supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
-      
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Sign in timeout')), 10000)
-      )
-      
-      console.log('⏳ Waiting for Supabase auth response...')
-      const { data, error } = await Promise.race([authPromise, timeoutPromise]) as any
       
       console.log('📡 Supabase auth response received')
       
