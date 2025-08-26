@@ -24,7 +24,7 @@ export const useAuth = () => {
   return context
 }
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }): JSX.Element => {
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [userData, setUserData] = useState<User | null>(null)
   const [merchantData, setMerchantData] = useState<Merchant | null>(null)
@@ -170,6 +170,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [])
 
   const signIn = async (email: string, password: string) => {
+    let authTimedOut = false
+    
     try {
       console.log('🔐 Attempting sign in for:', email)
       console.log('🔗 Supabase URL:', process.env.REACT_APP_SUPABASE_URL)
@@ -221,64 +223,59 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch (timeoutError) {
         authTimedOut = true
         console.warn('⚠️ Auth timeout, using fallback authentication')
+      }
+      
+      // Fallback authentication if timeout occurred
+      if (authTimedOut) {
+        console.log('🔍 Fallback: Checking user in database...')
+        console.log('📧 Looking for email:', email)
         
-        // Fallback: Verify user exists in database and create session manually
-        try {
-          console.log('⚠️ Auth timeout, using fallback authentication')
-          console.log('🔍 Fallback: Checking user in database...')
-          console.log('📧 Looking for email:', email)
-          
-          try {
-            const { data: userData, error: dbError } = await supabase
-              .from('users')
-              .select('*')
-              .eq('email', email)
-              .single()
-            
-            console.log('🔍 Database query result:', { userData, dbError })
-            console.log('📊 Query details:', { 
-              hasData: !!userData, 
-              errorCode: dbError?.code,
-              errorMessage: dbError?.message 
-            })
+        const { data: userData, error: dbError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', email)
+          .single()
         
-          if (dbError || !userData) {
-            console.error('❌ User not found in database:', dbError)
-            return { error: { message: 'Invalid credentials' } }
-          }
-          
-          console.log('✅ Fallback: User found in database, creating manual session')
-          console.log('👤 User data:', userData)
-          console.log('✅ User approved status:', userData.approved)
-          
-          // Set user manually (bypassing Supabase auth)
-          const mockUser = {
-            id: userData.auth_user_id || userData.id,
-            email: userData.email,
-            user_metadata: {
-              role: userData.role,
-              merchant_id: userData.merchant_id
-            }
-          }
-          
-          console.log('🔧 Setting mock user:', mockUser)
-          setUser(mockUser as any)
-          setUserData(userData)
-          
-          if (userData.merchant_id) {
-            console.log('🏪 Loading merchant data...')
-            const merchantData = await fetchMerchantData(userData.merchant_id)
-            console.log('✅ Merchant data loaded:', merchantData)
-            setMerchantData(merchantData)
-          }
-          
-          console.log('✅ Fallback authentication complete')
-          console.log('🔒 Final auth state - isAuthenticated:', !!mockUser, 'isApproved:', userData.approved === true)
-          return { error: null }
-        } catch (fallbackError) {
-          console.error('❌ Fallback authentication failed:', fallbackError)
-          return { error: { message: 'Authentication failed' } }
+        console.log('🔍 Database query result:', { userData, dbError })
+        console.log('📊 Query details:', { 
+          hasData: !!userData, 
+          errorCode: dbError?.code,
+          errorMessage: dbError?.message 
+        })
+    
+        if (dbError || !userData) {
+          console.error('❌ User not found in database:', dbError)
+          return { error: { message: 'Invalid credentials' } }
         }
+        
+        console.log('✅ Fallback: User found in database, creating manual session')
+        console.log('👤 User data:', userData)
+        console.log('✅ User approved status:', userData.approved)
+        
+        // Set user manually (bypassing Supabase auth)
+        const mockUser = {
+          id: userData.auth_user_id || userData.id,
+          email: userData.email,
+          user_metadata: {
+            role: userData.role,
+            merchant_id: userData.merchant_id
+          }
+        }
+        
+        console.log('🔧 Setting mock user:', mockUser)
+        setUser(mockUser as any)
+        setUserData(userData)
+        
+        if (userData.merchant_id) {
+          console.log('🏪 Loading merchant data...')
+          const merchantData = await fetchMerchantData(userData.merchant_id)
+          console.log('✅ Merchant data loaded:', merchantData)
+          setMerchantData(merchantData)
+        }
+        
+        console.log('✅ Fallback authentication complete')
+        console.log('🔒 Final auth state - isAuthenticated:', !!mockUser, 'isApproved:', userData.approved === true)
+        return { error: null }
       }
     } catch (error) {
       console.error('❌ Sign in failed with exception:', error)
