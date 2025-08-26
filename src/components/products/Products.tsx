@@ -57,6 +57,9 @@ const Products: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showAddModal, setShowAddModal] = useState(false);
+  
+  // Debug: Add console log to track modal state
+  console.log('🔍 showAddModal state:', showAddModal);
   const [showImportModal, setShowImportModal] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
@@ -521,7 +524,10 @@ const Products: React.FC = () => {
             </div>
           </div>
           <Button 
-            onClick={() => setShowAddModal(true)}
+            onClick={() => {
+              console.log('🔥 Add Product button clicked');
+              setShowAddModal(true);
+            }}
             className="bg-blue-600 hover:bg-blue-700"
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -584,7 +590,10 @@ const Products: React.FC = () => {
                 }
               </p>
               {!searchTerm && selectedCategory === 'all' && (
-                <Button onClick={() => setShowAddModal(true)}>
+                <Button onClick={() => {
+                  console.log('🔥 Add Product button (empty state) clicked');
+                  setShowAddModal(true);
+                }}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Product
                 </Button>
@@ -785,6 +794,7 @@ const Products: React.FC = () => {
 
       {/* Add Product Modal */}
       {showAddModal && (
+        console.log('🎯 Rendering Add Product Modal'),
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
