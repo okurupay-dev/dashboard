@@ -63,21 +63,18 @@ const AcceptInvitation: React.FC = () => {
       if (accessToken && inviteType === 'invite') {
         console.log('⚠️ User was auto-authenticated by Supabase, but we need password creation');
         // Sign out the auto-authenticated user so they can create a proper password
-        await supabase.auth.signOut();
-        console.log('🚪 Signed out auto-authenticated user');
+        try {
+          await supabase.auth.signOut();
+          console.log('🚪 Signed out auto-authenticated user');
+          // Wait a moment for sign out to complete
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (signOutError) {
+          console.error('❌ Error signing out:', signOutError);
+        }
       }
 
       console.log('🔍 Fetching invitation with token:', invitationToken);
       console.log('🔍 Token length:', invitationToken.length);
-      
-      // First, let's see what's in the pending_users table
-      const { data: allPending, error: allError } = await supabase
-        .from('pending_users')
-        .select('id, email, invitation_token, status, approval_status')
-        .limit(10);
-      
-      console.log('📊 All pending users:', allPending);
-      console.log('📊 All pending users error:', allError);
       
       const { data, error } = await supabase
         .from('pending_users')
@@ -97,15 +94,6 @@ const AcceptInvitation: React.FC = () => {
         .single();
 
       console.log('📋 Database query result:', { data, error });
-      console.log('🔍 Looking for token:', invitationToken);
-      
-      if (allPending) {
-        const matchingTokens = allPending.filter(p => p.invitation_token === invitationToken);
-        console.log('🎯 Matching tokens found:', matchingTokens.length);
-        if (matchingTokens.length > 0) {
-          console.log('✅ Found matching invitation:', matchingTokens[0]);
-        }
-      }
 
       if (error) {
         console.error('❌ Database error:', error);
