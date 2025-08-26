@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase/client';
 import { Eye, EyeOff } from 'lucide-react';
 
@@ -9,15 +9,14 @@ interface InvitationData {
   name: string;
   role: string;
   merchant_id: string;
-  expires_at: string;
-  status: string;
-  approval_status: string;
   merchant_name: string;
-  merchants?: { name: string };
+  expires_at: string;
+  merchant?: {
+    name: string;
+  };
 }
 
 const AcceptInvitation: React.FC = () => {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
   
@@ -30,51 +29,36 @@ const AcceptInvitation: React.FC = () => {
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
-    if (token) {
-      validateInvitation(token as string);
-    } else {
-      setError('No invitation token provided');
-      setLoading(false);
-    }
+    const initializeInvitation = async () => {
+      // Clear URL hash parameters that might interfere
+      console.log('🧹 Clearing URL hash parameters');
+      if (window.location.hash) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+
+      // Check if user is already authenticated and sign them out immediately
+      // This prevents any session from being counted as a "login" before password creation
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        console.log('⚠️ User was auto-authenticated by Supabase invitation, signing out immediately');
+        console.log('🔒 This prevents counting as login before password creation');
+        await supabase.auth.signOut();
+        console.log('🚪 Signed out - user must create password to actually login');
+      }
+
+      if (token) {
+        console.log('🔍 Fetching invitation with token:', token);
+        console.log('🔍 Token length:', token.length);
+        validateInvitation(token as string);
+      }
+    };
+
+    initializeInvitation();
   }, [token]);
 
   const validateInvitation = async (invitationToken: string) => {
     try {
       console.log('🔍 Validating invitation token:', invitationToken);
-      
-      // Check for Supabase parameters in URL and clear them
-      const urlParams = new URLSearchParams(window.location.hash.substring(1));
-      const accessToken = urlParams.get('access_token');
-      const inviteType = urlParams.get('type');
-      const supabaseError = urlParams.get('error');
-      const errorCode = urlParams.get('error_code');
-      const errorDescription = urlParams.get('error_description');
-
-      // Clear URL hash parameters to avoid confusion
-      if (window.location.hash) {
-        console.log('🧹 Clearing URL hash parameters');
-        window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
-      }
-
-      if (supabaseError) {
-        console.warn('⚠️ Supabase error in URL:', { supabaseError, errorCode, errorDescription });
-      }
-
-      if (accessToken && inviteType === 'invite') {
-        console.log('⚠️ User was auto-authenticated by Supabase, but we need password creation');
-        // Sign out the auto-authenticated user so they can create a proper password
-        try {
-          await supabase.auth.signOut();
-          console.log('🚪 Signed out auto-authenticated user');
-          // Wait a moment for sign out to complete
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        } catch (signOutError) {
-          console.error('❌ Error signing out:', signOutError);
-        }
-      }
-
-      console.log('🔍 Fetching invitation with token:', invitationToken);
-      console.log('🔍 Token length:', invitationToken.length);
       
       const { data, error } = await supabase
         .from('pending_users')
@@ -87,38 +71,26 @@ const AcceptInvitation: React.FC = () => {
           expires_at,
           status,
           approval_status,
-          merchants!inner(name)
+          merchant:merchants(name)
         `)
         .eq('invitation_token', invitationToken)
         .in('status', ['pending', 'invited', 'pending_invite'])
         .single();
 
-      console.log('📋 Database query result:', { data, error });
+      console.log('📋 Database query result:', data);
+      console.log('❌ Database error:', error);
 
-      if (error) {
-        console.error('❌ Database error:', error);
+      if (error || !data) {
         setError('Invalid or expired invitation link');
         return;
       }
 
-      if (!data) {
-        setError('Invitation not found');
-        return;
-      }
-
       // Check if invitation has expired
-      const expiresAt = new Date(data.expires_at);
-      const now = new Date();
-      
-      console.log('⏰ Invitation expires at:', expiresAt);
-      console.log('🕐 Current time:', now);
-      
-      if (expiresAt < now) {
+      if (new Date(data.expires_at) < new Date()) {
         setError('This invitation has expired');
         return;
       }
 
-      console.log('✅ Valid invitation found:', data);
       setInvitation({
         id: data.id,
         email: data.email,
@@ -126,14 +98,10 @@ const AcceptInvitation: React.FC = () => {
         role: data.role,
         merchant_id: data.merchant_id,
         expires_at: data.expires_at,
-        status: data.status,
-        approval_status: data.approval_status,
-        merchant_name: (data.merchants as any)?.name || 'Unknown Merchant',
-        merchants: { name: (data.merchants as any)?.name || 'Unknown Merchant' }
+        merchant_name: (data.merchant as any)?.name || 'Unknown Merchant'
       });
     } catch (err) {
-      console.error('❌ Exception during invitation fetch:', err);
-      setError('Failed to load invitation');
+      setError('Failed to validate invitation');
     } finally {
       setLoading(false);
     }
@@ -155,54 +123,72 @@ const AcceptInvitation: React.FC = () => {
     }
 
     setCreating(true);
-    setError('');
+    setError(null);
 
     try {
-      console.log('🔍 Starting invitation acceptance for:', invitation.email);
-      console.log('🔑 Password length:', password.length);
-
-      // Call the server-side API endpoint that uses service role key
-      const response = await fetch('/api/accept-invitation', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: invitation.email,
-          password: password,
-          invitationToken: invitation.id
-        })
+      console.log('🔐 Creating user account - this will be the FIRST and ONLY login');
+      
+      // 1. Create user in Supabase Auth (this is when they actually "login" for the first time)
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: invitation.email,
+        password: password,
+        options: {
+          data: {
+            role: invitation.role,
+            name: invitation.name,
+            merchant_id: invitation.merchant_id
+          }
+        }
       });
 
-      console.log('📡 API response status:', response.status);
-      const result = await response.json();
-      console.log('📋 API response body:', result);
-
-      if (!response.ok) {
-        console.error('❌ API request failed:', result);
-        throw new Error(result.error || 'Failed to accept invitation');
+      if (authError) {
+        throw authError;
       }
 
-      console.log('✅ Invitation acceptance completed successfully');
-      
-      // Check if user was created successfully
-      if (result.user) {
-        console.log('👤 User created:', result.user.email);
-        console.log('🔐 Auth user ID:', result.user.id);
-      }
-      
-      if (result.session) {
-        console.log('🎫 Session created:', !!result.session.access_token);
+      // 2. Create user record in users table
+      const { error: userError } = await supabase
+        .from('users')
+        .insert({
+          auth_user_id: authData.user?.id,
+          merchant_id: invitation.merchant_id,
+          name: invitation.name,
+          email: invitation.email,
+          role: invitation.role,
+          status: 'active',
+          approved: true
+        });
+
+      if (userError) {
+        throw userError;
       }
 
-      console.log('🚀 Redirecting to merchant dashboard...');
+      // 3. Delete from pending users table (they're now active)
+      const { error: deleteError } = await supabase
+        .from('pending_users')
+        .delete()
+        .eq('id', invitation.id);
 
-      // Redirect to merchant dashboard
+      if (deleteError) {
+        console.error('Error removing pending user:', deleteError);
+      } else {
+        console.log('✅ Moved user from pending to active');
+      }
+
+      // 4. Sign in the user
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: invitation.email,
+        password: password
+      });
+
+      if (signInError) {
+        throw signInError;
+      }
+
+      // Redirect to merchant dashboard for all invited users
       window.location.href = 'https://dashboard.okurupay.com';
+
     } catch (err: any) {
-      console.error('❌ Invitation acceptance failed:', err);
-      console.error('❌ Error details:', err.stack);
-      setError(err.message || 'Failed to accept invitation. Please try again.');
+      setError(err.message || 'Failed to accept invitation');
       setCreating(false);
     }
   };
@@ -223,7 +209,7 @@ const AcceptInvitation: React.FC = () => {
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Invalid Invitation</h2>
             <p className="text-gray-600 mb-6">{error}</p>
             <button
-              onClick={() => navigate('/signin')}
+              onClick={() => window.location.href = '/sign-in'}
               className="w-full bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-700"
             >
               Go to Sign In
