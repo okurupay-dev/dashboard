@@ -93,7 +93,7 @@ const AcceptInvitation: React.FC = () => {
           merchants!inner(name)
         `)
         .eq('invitation_token', invitationToken)
-        .in('status', ['pending', 'invited'])
+        .in('status', ['pending', 'invited', 'pending_invite'])
         .single();
 
       console.log('📋 Database query result:', { data, error });
