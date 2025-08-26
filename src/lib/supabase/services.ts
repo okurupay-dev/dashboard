@@ -1,4 +1,5 @@
-import { supabase, validateMerchantAccess, validateAdminAccess, handleSupabaseError } from './client';
+import { supabase } from '../supabase';
+import { validateMerchantAccess, validateAdminAccess, handleSupabaseError } from './client';
 import type { Database } from './client';
 
 // Generate a proper UUID v4
@@ -382,12 +383,12 @@ export const dashboardService = {
       if (txError) throw txError;
 
       // Calculate stats
-      const totalRevenue = transactions?.reduce((sum, tx) => 
+      const totalRevenue = transactions?.reduce((sum: number, tx: any) => 
         tx.status === 'completed' ? sum + tx.amount_fiat : sum, 0) || 0;
       
-      const pendingTransactions = transactions?.filter(tx => tx.status === 'pending').length || 0;
+      const pendingTransactions = transactions?.filter((tx: any) => tx.status === 'pending').length || 0;
       
-      const automationsTriggered = transactions?.filter(tx => tx.automation_triggered).length || 0;
+      const automationsTriggered = transactions?.filter((tx: any) => tx.automation_triggered).length || 0;
 
       // Get active terminals count
       const { count: activeTerminals, error: terminalError } = await supabase
@@ -426,7 +427,7 @@ export const dashboardService = {
       if (error) throw error;
 
       // Aggregate by currency
-      const portfolio = transactions?.reduce((acc, tx) => {
+      const portfolio = transactions?.reduce((acc: any, tx: any) => {
         const currency = tx.crypto_currency;
         if (!acc[currency]) {
           acc[currency] = {
@@ -728,7 +729,7 @@ export const virtualTerminalService = {
       });
 
       // Get pairing key from virtual terminal
-      const virtualTerminal = data?.terminals?.find(t => t.device_type === 'virtual');
+      const virtualTerminal = data?.terminals?.find((t: any) => t.device_type === 'virtual');
       const pairingKey = virtualTerminal?.pairing_code || '';
       const pairingKeyActive = virtualTerminal?.status === 'active';
       const pairingKeyLastUsed = virtualTerminal?.last_heartbeat || null;
