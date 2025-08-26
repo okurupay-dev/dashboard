@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 
 // Use service role key to bypass RLS
 const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.REACT_APP_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY // This bypasses RLS
 )
 
