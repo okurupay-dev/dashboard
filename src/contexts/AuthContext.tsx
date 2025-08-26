@@ -195,7 +195,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       )
       
       console.log('⏳ Waiting for Supabase auth response...')
-      const { data, error } = await Promise.race([authPromise, timeoutPromise])
+      const { data, error } = await Promise.race([authPromise, timeoutPromise]) as any
       
       console.log('📡 Supabase auth response received')
       
