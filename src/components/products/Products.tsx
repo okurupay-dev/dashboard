@@ -313,13 +313,33 @@ const Products: React.FC = () => {
           <p className="text-gray-600">Manage your inventory and sync with POS systems</p>
         </div>
         <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            onClick={() => setShowImportModal(true)}
-          >
-            <Upload className="h-4 w-4 mr-2" />
-            Import Products
-          </Button>
+          <div className="relative">
+            <select
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === 'csv') {
+                  setShowImportModal(true);
+                } else if (value.startsWith('pos-')) {
+                  const posType = value.replace('pos-', '');
+                  alert(`${posType.charAt(0).toUpperCase() + posType.slice(1)} integration coming soon!`);
+                }
+                e.target.value = ''; // Reset selection
+              }}
+              className="appearance-none bg-white border border-gray-300 rounded-md px-4 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-gray-50"
+            >
+              <option value="">Import Products</option>
+              <option value="csv">📄 Upload CSV File</option>
+              <option disabled>──────────────</option>
+              <option value="pos-square">🟦 Square POS</option>
+              <option value="pos-shopify">🟢 Shopify</option>
+              <option value="pos-clover">🍀 Clover</option>
+              <option value="pos-toast">🍞 Toast POS</option>
+              <option value="pos-lightspeed">⚡ Lightspeed</option>
+            </select>
+            <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+              <Upload className="h-4 w-4 text-gray-400" />
+            </div>
+          </div>
           <Button 
             onClick={() => setShowAddModal(true)}
             className="bg-blue-600 hover:bg-blue-700"
