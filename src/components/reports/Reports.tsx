@@ -130,8 +130,8 @@ const Reports: React.FC = () => {
             totalTransactions: completed.length,
             totalTax: completed.reduce((sum, t) => sum + (t.amount_fiat || 0) * 0.085, 0), // Assuming 8.5% tax
             totalRefunds: refunded.reduce((sum, t) => sum + (t.amount_fiat || 0), 0),
-            topProducts: [], // Would need products table join
-            recentActivity: transactions.slice(0, 5)
+            topProducts: [] as any[], // Would need products table join
+            recentActivity: transactions.slice(0, 5) as any[]
           });
         }
       } catch (error) {
