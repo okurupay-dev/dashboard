@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { User as SupabaseUser } from '@supabase/supabase-js'
 import { supabase, User, Merchant } from '../lib/supabase'
 
@@ -196,9 +196,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       setLoading(false)
     }, [])
-    )
 
-    return () => subscription.unsubscribe()
+    const subscription = supabase.auth.onAuthStateChange(handleAuthStateChange)
+
+    return () => subscription.data.subscription.unsubscribe()
   }, [])
 
   const signIn = async (email: string, password: string) => {
