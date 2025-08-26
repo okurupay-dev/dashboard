@@ -171,145 +171,50 @@ const AcceptInvitation: React.FC = () => {
       return;
     }
 
-    setCreating(true);
-    setError(null);
-
-    try {
-      console.log('🔍 Starting invitation acceptance for:', invitation.email);
-
-      // Check if user already exists in auth
-      const { data: existingUser } = await supabase.auth.getUser();
-      if (existingUser.user) {
-        console.log('🔄 User already authenticated, signing out first');
-        await supabase.auth.signOut();
+    const handleAcceptInvitation = async (password: string) => {
+      if (!invitation) {
+        setError('No invitation data available');
+        return;
       }
 
-      // Check if auth user already exists with this email
-      const { data: signInAttempt } = await supabase.auth.signInWithPassword({
-        email: invitation.email,
-        password: password
-      });
+      setCreating(true);
+      setError('');
 
-      let authUserId: string;
+      try {
+        console.log('🔍 Starting invitation acceptance for:', invitation.email);
 
-      if (signInAttempt.user) {
-        // User already exists in auth, just sign them in
-        console.log('✅ Existing auth user signed in:', signInAttempt.user.id);
-        authUserId = signInAttempt.user.id;
-      } else {
-        // Create new auth user
-        console.log('🔍 Creating new auth user...');
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email: invitation.email,
-          password: password,
-          options: {
-            data: {
-              role: invitation.role, // This is what AuthContext checks for
-              first_time_password: true,
-              invitation_accepted: true,
-              merchant_id: invitation.merchant_id
-            }
-          }
+        // Call the server-side API endpoint that uses service role key
+        const response = await fetch('/api/accept-invitation', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: invitation.email,
+            password: password,
+            invitationToken: invitation.id
+          })
         });
 
-        if (authError) {
-          console.error('❌ Auth signup error:', authError);
-          if (authError.message.includes('already registered')) {
-            // Try to sign in instead
-            const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-              email: invitation.email,
-              password: password
-            });
-            
-            if (signInError) {
-              setError('This email is already registered. Please contact your administrator or try a different password.');
-              return;
-            }
-            authUserId = signInData.user!.id;
-            
-            // Update user metadata to include role for existing users
-            const { error: updateError } = await supabase.auth.updateUser({
-              data: {
-                role: invitation.role,
-                first_time_password: true,
-                invitation_accepted: true,
-                merchant_id: invitation.merchant_id
-              }
-            });
-            
-            if (updateError) {
-              console.error('⚠️ Warning: Could not update user metadata:', updateError);
-            }
-          } else {
-            throw authError;
-          }
-        } else {
-          if (!authData.user?.id) {
-            throw new Error('No user ID returned from signup');
-          }
-          authUserId = authData.user.id;
-          console.log('✅ Auth user created:', authUserId);
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to accept invitation');
         }
+
+        console.log('✅ Invitation acceptance completed successfully');
+        console.log('🚀 Redirecting to merchant dashboard...');
+
+        // Redirect to merchant dashboard
+        window.location.href = 'https://dashboard.okurupay.com';
+      } catch (err: any) {
+        console.error('❌ Invitation acceptance failed:', err);
+        setError(err.message || 'Failed to accept invitation. Please try again.');
+        setCreating(false);
       }
+    };
 
-      // Check if user record already exists in users table
-      const { data: existingUserRecord } = await supabase
-        .from('users')
-        .select('user_id')
-        .eq('auth_user_id', authUserId)
-        .single();
-
-      if (!existingUserRecord) {
-        // Create user record in users table
-        console.log('🔍 Creating user record...');
-        const { error: userError } = await supabase
-          .from('users')
-          .insert({
-            auth_user_id: authUserId,
-            merchant_id: invitation.merchant_id,
-            name: invitation.name,
-            email: invitation.email,
-            role: invitation.role === 'merchant_admin' ? 'merchant' : 'staff',
-            status: 'active',
-            approved: true
-          });
-
-        if (userError && !userError.message.includes('duplicate')) {
-          console.error('❌ User insert error:', userError);
-          throw userError;
-        }
-        console.log('✅ User record created');
-      } else {
-        console.log('✅ User record already exists');
-      }
-
-      // Update pending user status
-      const { error: updateError } = await supabase
-        .from('pending_users')
-        .update({ 
-          status: 'accepted',
-          approval_status: 'completed',
-          accepted_at: new Date().toISOString(),
-          auth_user_id: authUserId
-        })
-        .eq('id', invitation.id);
-
-      if (updateError) {
-        console.error('⚠️ Warning: Could not update pending user status:', updateError);
-        // Don't fail the entire process for this
-      }
-
-      console.log('✅ Invitation acceptance completed successfully');
-      console.log('🚀 Redirecting to merchant dashboard...');
-
-      // Redirect to merchant dashboard
-      window.location.href = 'https://dashboard.okurupay.com';
-
-    } catch (err: any) {
-      console.error('❌ Invitation acceptance failed:', err);
-      setError(err.message || 'Failed to accept invitation. Please try again.');
-      setCreating(false);
-    }
+    handleAcceptInvitation(password);
   };
 
   if (loading) {
