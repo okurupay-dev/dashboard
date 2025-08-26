@@ -154,50 +154,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initializeAuth()
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('🔄 Auth state change:', event, 'Session exists:', !!session)
-        setUser(session?.user ?? null)
+    const handleAuthStateChange = useCallback(async (event: any, session: any) => {
+      console.log('🔄 Auth state change:', event, 'Session exists:', !!session)
+      
+      if (event === 'SIGNED_IN' && session?.user) {
+        console.log('👤 User signed in, checking role from user_metadata')
+        setUser(session.user)
         
-        if (session?.user) {
-          console.log('👤 Fetching user data for auth state change...')
-          const userData = await fetchUserData(session.user.id)
-          setUserData(userData)
-          
-          if (!userData) {
-            console.log('⚠️ No user data found - account needs onboarding')
-            setMerchantData(null)
-            setLoading(false)
-            return
-          }
-          
-          console.log('🔍 User role from database:', userData.role)
-          
-          // Handle different user roles
-          if (userData.role === 'okuru_admin') {
-            console.log('🚀 Redirecting okuru_admin to admin dashboard')
-            window.location.href = '/admin-dashboard'
-            return
-          }
-          
-          if (['admin', 'merchant', 'merchant_admin', 'staff'].includes(userData.role)) {
-            console.log('✅ Authorized role for merchant dashboard:', userData.role)
-            if (userData.merchant_id) {
-              const merchantData = await fetchMerchantData(userData.merchant_id)
-              setMerchantData(merchantData)
-            }
-          } else {
-            console.log('⚠️ Unauthorized role for merchant dashboard:', userData.role)
-            setMerchantData(null)
-          }
-        } else {
-          console.log('🚪 No session - clearing user data')
-          setUserData(null)
-          setMerchantData(null)
+        // Get role from user_metadata like admin dashboard
+        const userRole = session.user.user_metadata?.role
+        console.log('🎭 User role from metadata:', userRole)
+        
+        // Create userData object from session metadata
+        const userData = {
+          user_id: session.user.id,
+          auth_user_id: session.user.id,
+          email: session.user.email,
+          role: userRole,
+          name: session.user.user_metadata?.name || session.user.email,
+          merchant_id: session.user.user_metadata?.merchant_id,
+          status: 'active' as const,
+          approved: true,
+          created_at: session.user.created_at,
+          updated_at: session.user.updated_at
         }
         
-        setLoading(false)
+        console.log('📊 User data from metadata:', userData)
+        setUserData(userData)
+        
+        if (userData?.merchant_id) {
+          const merchantData = await fetchMerchantData(userData.merchant_id)
+          console.log('🏪 Merchant data:', merchantData)
+          setMerchantData(merchantData)
+        }
+      } else if (event === 'SIGNED_OUT') {
+        console.log('👋 User signed out')
+        setUser(null)
+        setUserData(null)
+        setMerchantData(null)
       }
+      
+      setLoading(false)
+    }, [])
     )
 
     return () => subscription.unsubscribe()
