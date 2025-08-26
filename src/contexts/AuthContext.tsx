@@ -120,9 +120,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUserData(userData)
       
       if (userData?.merchant_id) {
+        console.log('🏪 Fetching merchant data for:', userData.merchant_id)
         const merchantData = await fetchMerchantData(userData.merchant_id)
         console.log('🏪 Merchant data:', merchantData)
         setMerchantData(merchantData)
+      } else {
+        console.log('⚠️ No merchant_id in user metadata')
+        setMerchantData(null)
       }
     } else if (event === 'SIGNED_OUT') {
       console.log('👋 User signed out')
@@ -131,6 +135,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setMerchantData(null)
     }
     
+    console.log('🔄 Setting loading to false')
     setLoading(false)
   }, [])
 
