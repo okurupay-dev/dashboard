@@ -28,7 +28,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   // If user is not authenticated, redirect to sign-in
   if (!isAuthenticated) {
-    return <Navigate to="/signin" replace />
+    return <Navigate to="/sign-in" replace />
   }
 
   // If user is authenticated but not approved, show pending message

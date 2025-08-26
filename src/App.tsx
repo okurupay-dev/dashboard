@@ -21,6 +21,7 @@ function App() {
       <Router>
         <Routes>
           {/* Public routes */}
+          <Route path="/sign-in" element={<SupabaseSignIn />} />
           <Route path="/signin" element={<SupabaseSignIn />} />
           <Route path="/accept-invitation" element={<AcceptInvitation />} />
           
@@ -42,7 +43,7 @@ function App() {
           
           {/* Redirect unauthenticated users */}
           <Route path="*" element={
-            <Navigate to="/signin" replace />
+            <Navigate to="/sign-in" replace />
           } />
         </Routes>
       </Router>
