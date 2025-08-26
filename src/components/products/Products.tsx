@@ -26,16 +26,26 @@ import { supabase } from '../../lib/supabase';
 interface Product {
   product_id: string;
   merchant_id: string;
-  name: string;
+  item_name: string;
+  variation_name?: string;
+  name?: string; // Keep for backward compatibility
   description?: string;
   sku: string;
-  barcode?: string;
   price: number;
   cost?: number;
   category?: string;
-  stock_quantity: number;
-  low_stock_threshold?: number;
+  barcode?: string;
+  weight?: number;
+  tax_name?: string;
+  tax_rate?: number;
+  stock_quantity?: number;
   is_active: boolean;
+  is_taxable?: boolean;
+  track_inventory?: boolean;
+  allow_backorders?: boolean;
+  is_variation?: boolean;
+  import_source?: string;
+  metadata?: any;
   created_at: string;
   updated_at: string;
 }
@@ -224,14 +234,16 @@ const Products: React.FC = () => {
         return;
       }
 
-      const productToAdd = {
+      const productToAdd: Product = {
         ...newProduct,
         product_id: `manual-${Date.now()}`,
         merchant_id: userData.merchant_id,
+        name: newProduct.item_name, // For backward compatibility
         price: parseFloat(newProduct.price) || 0,
         cost: parseFloat(newProduct.cost) || 0,
         weight: parseFloat(newProduct.weight) || 0,
         tax_rate: parseFloat(newProduct.tax_rate) || 0,
+        stock_quantity: 0,
         is_variation: !!newProduct.variation_name,
         import_source: 'manual',
         created_at: new Date().toISOString(),
@@ -239,7 +251,7 @@ const Products: React.FC = () => {
       };
 
       // Add to local state (in production, would save to database)
-      setProducts(prev => [...prev, productToAdd as Product]);
+      setProducts(prev => [...prev, productToAdd]);
       
       // Reset form and close modal
       setNewProduct({
@@ -379,10 +391,12 @@ const Products: React.FC = () => {
           const taxRate = taxHeader ? 
             parseFloat(taxHeader.match(/\((\d+(?:\.\d+)?)\%\)/)?.[1] || '0') : 0;
 
-          const product: Partial<Product> = {
+          const product: Product = {
+            product_id: `csv-${Date.now()}-${index}`,
             merchant_id: userData.merchant_id,
             item_name: row['Item Name'] || row['item name'] || '',
-            variation_name: row['Variation Name'] || row['variation name'] || null,
+            name: row['Item Name'] || row['item name'] || '', // For backward compatibility
+            variation_name: row['Variation Name'] || row['variation name'] || undefined,
             description: row['Description'] || row['description'] || '',
             sku: row['SKU'] || row['sku'] || `SKU-${Date.now()}-${index}`,
             price: parseFloat(row['Price'] || row['price'] || row['Base Price'] || '0'),
@@ -391,8 +405,12 @@ const Products: React.FC = () => {
             barcode: row['Barcode'] || row['barcode'] || '',
             tax_name: taxHeader || 'Default Tax',
             tax_rate: taxRate,
+            stock_quantity: 0,
             is_variation: !!(row['Variation Name'] || row['variation name']),
             is_active: true,
+            is_taxable: true,
+            track_inventory: true,
+            allow_backorders: false,
             import_source: 'csv',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
@@ -442,7 +460,8 @@ const Products: React.FC = () => {
 
   // Filter products
   const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const displayName = product.item_name || product.name || '';
+    const matchesSearch = displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (product.category?.toLowerCase().includes(searchTerm.toLowerCase()) || false);
     
@@ -794,7 +813,6 @@ const Products: React.FC = () => {
 
       {/* Add Product Modal */}
       {showAddModal && (
-        console.log('🎯 Rendering Add Product Modal'),
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
