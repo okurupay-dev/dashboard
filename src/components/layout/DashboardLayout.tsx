@@ -151,6 +151,15 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
               <span className="ml-1">Analytics</span>
             </div>
           </Link>
+          {/* 7.1 Taxes Sub-page */}
+          <Link to="/taxes">
+            <div className={`sidebar-item flex items-center p-4 pl-12 rounded-lg transition-all duration-200 ${currentPath === '/taxes' ? 'bg-blue-50 text-blue-700 font-medium shadow-sm' : 'hover:bg-gray-50 text-gray-600'}`}>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+              <span className="text-sm">Taxes</span>
+            </div>
+          </Link>
           {/* 8. Settings */}
           <Link to="/settings">
             <div className={`sidebar-item flex items-center p-4 rounded-lg transition-all duration-200 ${currentPath === '/settings' ? 'bg-blue-50 text-blue-700 font-medium shadow-sm' : 'hover:bg-gray-50 text-gray-700'}`}>
@@ -192,6 +201,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
               {currentPath === '/dashboard' ? 'Dashboard' : ''}
               {currentPath === '/transactions' ? 'Transactions' : ''}
               {currentPath === '/analytics' ? 'Analytics' : ''}
+              {currentPath === '/taxes' ? 'Taxes' : ''}
               {currentPath === '/products' ? 'Products' : ''}
               {currentPath === '/settings' ? 'Settings' : ''}
               {currentPath === '/terminals' ? 'Terminals' : ''}
