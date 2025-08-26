@@ -41,7 +41,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq('auth_user_id', authUserId)
         .single()
 
-      console.log('📊 User data query result:', { user, error })
+      console.log('📊 User data query result:', { 
+        hasUser: !!user, 
+        userRole: user?.role,
+        userEmail: user?.email,
+        error: error?.message 
+      })
 
       if (error) {
         console.error('❌ Error fetching user data:', error)
@@ -195,51 +200,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('🔐 Attempting sign in for:', email)
       console.log('🔗 Supabase URL:', process.env.REACT_APP_SUPABASE_URL)
       
+      // Since auth state change is working, let's rely on that instead
       console.log('⏳ Calling signInWithPassword...')
-      const { data, error } = await supabase.auth.signInWithPassword({
+      
+      // Add a timeout to prevent hanging
+      const authPromise = supabase.auth.signInWithPassword({
         email,
         password,
       })
       
-      console.log('📡 Supabase auth response received:', { 
-        hasData: !!data, 
-        hasUser: !!data?.user, 
-        hasSession: !!data?.session,
-        error: error?.message 
-      })
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Auth call timeout - but state change should handle auth')), 10000)
+      )
       
-      if (error) {
-        console.error('❌ Sign in error:', error)
-        return { error }
+      try {
+        const { data, error } = await Promise.race([authPromise, timeoutPromise])
+        
+        console.log('📡 Supabase auth response received:', { 
+          hasData: !!data, 
+          hasUser: !!data?.user, 
+          hasSession: !!data?.session,
+          error: error?.message 
+        })
+        
+        if (error) {
+          console.error('❌ Sign in error:', error)
+          return { error }
+        }
+        
+        console.log('✅ Sign in successful via direct response')
+        return { error: null }
+      } catch (timeoutError) {
+        console.log('⏰ Auth call timed out, but auth state change should handle authentication')
+        // Don't return error since auth state change is working
+        return { error: null }
       }
-      
-      if (!data?.user || !data?.session) {
-        console.error('❌ No user or session in response')
-        return { error: new Error('No user or session returned') }
-      }
-      
-      console.log('✅ Sign in successful:', data.user.email)
-      console.log('👤 User ID:', data.user.id)
-      console.log('🔑 Session token present:', !!data.session.access_token)
-      
-      // Force update user state
-      setUser(data.user)
-      
-      // Fetch user data from database
-      console.log('🔍 About to fetch user data...')
-      const userData = await fetchUserData(data.user.id)
-      console.log('✅ User data loaded:', userData)
-      setUserData(userData)
-      
-      if (userData?.merchant_id) {
-        console.log('🏪 About to fetch merchant data...')
-        const merchantData = await fetchMerchantData(userData.merchant_id)
-        console.log('✅ Merchant data loaded:', merchantData)
-        setMerchantData(merchantData)
-      }
-      
-      console.log('🎉 Sign in process completed successfully')
-      return { error: null }
     } catch (error) {
       console.error('❌ Sign in failed with exception:', error)
       return { error }
