@@ -101,8 +101,8 @@ const AcceptInvitation: React.FC = () => {
       console.log('✅ Valid invitation found:', data);
       setInvitation({
         ...data,
-        merchant_name: data.merchants?.name || 'Unknown Merchant'
-      });
+        merchant_name: (data.merchants as any)?.name || 'Unknown Merchant'
+      } as InvitationData);
     } catch (err) {
       console.error('❌ Exception during invitation fetch:', err);
       setError('Failed to load invitation');
