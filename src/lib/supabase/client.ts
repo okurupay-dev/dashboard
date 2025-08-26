@@ -1,30 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
+// Import the single Supabase client instance
+import { supabase } from '../supabase';
 import { useAuth } from '../../contexts/AuthContext';
-// Removed clerk import
-
-// Supabase configuration with error handling
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
-const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
-
-// Validate environment variables
-if (!supabaseUrl) {
-  console.error('REACT_APP_SUPABASE_URL is not set in environment variables');
-}
-if (!supabaseAnonKey) {
-  console.error('REACT_APP_SUPABASE_ANON_KEY is not set in environment variables');
-}
-
-console.log('🔧 Supabase client config:', {
-  url: supabaseUrl,
-  hasAnonKey: !!supabaseAnonKey,
-  anonKeyLength: supabaseAnonKey?.length
-});
-
-// Create Supabase client with fallback for development
-export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder-key'
-);
 
 // Database types for TypeScript safety
 export interface Database {

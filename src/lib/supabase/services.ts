@@ -1,6 +1,5 @@
 import { supabase, validateMerchantAccess, validateAdminAccess, handleSupabaseError } from './client';
 import type { Database } from './client';
-import { createClient } from '@supabase/supabase-js';
 
 // Generate a proper UUID v4
 const generateUUID = () => {
