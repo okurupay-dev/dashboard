@@ -171,45 +171,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('🔐 Attempting sign in for:', email)
       console.log('🔗 Supabase URL:', process.env.REACT_APP_SUPABASE_URL)
       
-      // Add timeout to prevent hanging
-      const authPromise = supabase.auth.signInWithPassword({
+      console.log('⏳ Calling signInWithPassword...')
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
       
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Authentication timeout')), 15000)
-      )
-      
-      console.log('⏳ Waiting for auth response...')
-      const { data, error } = await Promise.race([authPromise, timeoutPromise])
-      
-      console.log('📡 Supabase auth response received')
+      console.log('📡 Supabase auth response received:', { 
+        hasData: !!data, 
+        hasUser: !!data?.user, 
+        hasSession: !!data?.session,
+        error: error?.message 
+      })
       
       if (error) {
         console.error('❌ Sign in error:', error)
         return { error }
       }
       
-      console.log('✅ Sign in successful:', data.user?.email)
-      console.log('👤 User ID:', data.user?.id)
+      if (!data?.user || !data?.session) {
+        console.error('❌ No user or session in response')
+        return { error: new Error('No user or session returned') }
+      }
+      
+      console.log('✅ Sign in successful:', data.user.email)
+      console.log('👤 User ID:', data.user.id)
+      console.log('🔑 Session token present:', !!data.session.access_token)
       
       // Force update user state
       setUser(data.user)
       
       // Fetch user data from database
-      if (data.user?.id) {
-        console.log('🔍 About to fetch user data...')
-        const userData = await fetchUserData(data.user.id)
-        console.log('✅ User data loaded:', userData)
-        setUserData(userData)
-        
-        if (userData?.merchant_id) {
-          console.log('🏪 About to fetch merchant data...')
-          const merchantData = await fetchMerchantData(userData.merchant_id)
-          console.log('✅ Merchant data loaded:', merchantData)
-          setMerchantData(merchantData)
-        }
+      console.log('🔍 About to fetch user data...')
+      const userData = await fetchUserData(data.user.id)
+      console.log('✅ User data loaded:', userData)
+      setUserData(userData)
+      
+      if (userData?.merchant_id) {
+        console.log('🏪 About to fetch merchant data...')
+        const merchantData = await fetchMerchantData(userData.merchant_id)
+        console.log('✅ Merchant data loaded:', merchantData)
+        setMerchantData(merchantData)
       }
       
       console.log('🎉 Sign in process completed successfully')
