@@ -223,11 +223,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // Fallback: Verify user exists in database and create session manually
         try {
+          console.log('🔍 Fallback: Checking user in database...')
+          
           const { data: userData, error: dbError } = await supabase
             .from('users')
             .select('*')
             .eq('email', email)
             .single()
+          
+          console.log('🔍 Database query result:', { userData, dbError })
           
           if (dbError || !userData) {
             console.error('❌ User not found in database:', dbError)
@@ -235,10 +239,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           
           console.log('✅ Fallback: User found in database, creating manual session')
+          console.log('👤 User data:', userData)
           
           // Set user manually (bypassing Supabase auth)
           const mockUser = {
-            id: userData.auth_user_id,
+            id: userData.auth_user_id || userData.id,
             email: userData.email,
             user_metadata: {
               role: userData.role,
@@ -246,14 +251,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           }
           
+          console.log('🔧 Setting mock user:', mockUser)
           setUser(mockUser as any)
           setUserData(userData)
           
           if (userData.merchant_id) {
+            console.log('🏪 Loading merchant data...')
             const merchantData = await fetchMerchantData(userData.merchant_id)
+            console.log('✅ Merchant data loaded:', merchantData)
             setMerchantData(merchantData)
           }
           
+          console.log('✅ Fallback authentication complete')
           return { error: null }
         } catch (fallbackError) {
           console.error('❌ Fallback authentication failed:', fallbackError)
