@@ -24,7 +24,7 @@ export const useAuth = () => {
   return context
 }
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }): JSX.Element => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [userData, setUserData] = useState<User | null>(null)
   const [merchantData, setMerchantData] = useState<Merchant | null>(null)
@@ -277,6 +277,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('🔒 Final auth state - isAuthenticated:', !!mockUser, 'isApproved:', userData.approved === true)
         return { error: null }
       }
+      
+      return { error: { message: 'Authentication failed' } }
     } catch (error) {
       console.error('❌ Sign in failed with exception:', error)
       return { error }
