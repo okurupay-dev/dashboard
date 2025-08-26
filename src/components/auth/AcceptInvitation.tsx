@@ -30,6 +30,19 @@ const AcceptInvitation: React.FC = () => {
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
+    // Check if user is already authenticated via URL hash parameters
+    const urlParams = new URLSearchParams(window.location.hash.substring(1));
+    const accessToken = urlParams.get('access_token');
+    const inviteType = urlParams.get('type');
+    
+    if (accessToken && inviteType === 'invite') {
+      console.log('🎫 User already authenticated via invite link, redirecting to dashboard');
+      // Clear the hash and redirect to dashboard
+      window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+      window.location.href = 'https://dashboard.okurupay.com';
+      return;
+    }
+    
     if (token) {
       validateInvitation(token as string);
     } else {
