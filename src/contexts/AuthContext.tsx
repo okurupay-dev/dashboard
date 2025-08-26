@@ -76,52 +76,61 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     console.log('🚀 AuthContext initializing...')
     
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('📋 Initial session:', !!session?.user)
-      setUser(session?.user ?? null)
-      
-      if (session?.user) {
-        console.log('👤 User found, checking role...')
-        // Check user role and redirect super_admin to admin dashboard
-        const userRole = session.user.user_metadata?.role
-        console.log('🎭 User role:', userRole)
+    // Get initial session with timeout
+    const sessionPromise = supabase.auth.getSession()
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('getSession timeout after 5 seconds')), 5000)
+    )
+    
+    Promise.race([sessionPromise, timeoutPromise])
+      .then((result: any) => {
+        const { data: { session } } = result
+        console.log('📋 Initial session:', !!session?.user)
+        setUser(session?.user ?? null)
         
-        if (userRole === 'super_admin') {
-          console.log('🔄 Redirecting super admin...')
-          window.location.href = '/admin-dashboard'
-          return
-        }
-        
-        // Only allow merchant_admin and staff roles in merchant dashboard
-        if (!['merchant_admin', 'staff'].includes(userRole)) {
-          console.error('❌ Unauthorized role for merchant dashboard:', userRole)
-          supabase.auth.signOut()
-          return
-        }
-
-        console.log('📊 Fetching user data...')
-        fetchUserData(session.user?.id).then(userData => {
-          console.log('✅ User data fetched:', !!userData)
-          setUserData(userData)
-          if (userData?.merchant_id) {
-            console.log('🏪 Fetching merchant data...')
-            fetchMerchantData(userData.merchant_id).then(merchantData => {
-              console.log('✅ Merchant data fetched:', !!merchantData)
-              setMerchantData(merchantData)
-            })
+        if (session?.user) {
+          console.log('👤 User found, checking role...')
+          // Check user role and redirect super_admin to admin dashboard
+          const userRole = session.user.user_metadata?.role
+          console.log('🎭 User role:', userRole)
+          
+          if (userRole === 'super_admin') {
+            console.log('🔄 Redirecting super admin...')
+            window.location.href = '/admin-dashboard'
+            return
           }
-        }).catch(error => {
-          console.error('❌ Error fetching user data:', error)
-        })
-      }
-      
-      console.log('✅ AuthContext initialization complete')
-      setLoading(false)
-    }).catch(error => {
-      console.error('❌ Error getting session:', error)
-      setLoading(false)
-    })
+          
+          // Only allow merchant_admin and staff roles in merchant dashboard
+          if (!['merchant_admin', 'staff'].includes(userRole)) {
+            console.error('❌ Unauthorized role for merchant dashboard:', userRole)
+            supabase.auth.signOut()
+            return
+          }
+
+          console.log('📊 Fetching user data...')
+          fetchUserData(session.user?.id).then(userData => {
+            console.log('✅ User data fetched:', !!userData)
+            setUserData(userData)
+            if (userData?.merchant_id) {
+              console.log('🏪 Fetching merchant data...')
+              fetchMerchantData(userData.merchant_id).then(merchantData => {
+                console.log('✅ Merchant data fetched:', !!merchantData)
+                setMerchantData(merchantData)
+              })
+            }
+          }).catch(error => {
+            console.error('❌ Error fetching user data:', error)
+          })
+        }
+        
+        console.log('✅ AuthContext initialization complete')
+        setLoading(false)
+      })
+      .catch(error => {
+        console.error('❌ Error getting session:', error)
+        console.log('⚠️ Setting loading to false due to error')
+        setLoading(false)
+      })
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
