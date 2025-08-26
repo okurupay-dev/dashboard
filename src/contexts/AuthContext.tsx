@@ -229,23 +229,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (authTimedOut) {
         console.log('🔍 Fallback: Checking user in database...')
         console.log('📧 Looking for email:', email)
+        console.log('🔗 Database URL:', process.env.REACT_APP_SUPABASE_URL)
         
-        const { data: userData, error: dbError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('email', email)
-          .single()
-        
-        console.log('🔍 Database query result:', { userData, dbError })
-        console.log('📊 Query details:', { 
-          hasData: !!userData, 
-          errorCode: dbError?.code,
-          errorMessage: dbError?.message 
-        })
+        try {
+          console.log('🔍 Executing database query...')
+          const { data: userData, error: dbError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', email)
+            .single()
+          
+          console.log('🔍 Database query completed')
+          console.log('🔍 Database query result:', { userData, dbError })
+          console.log('📊 Query details:', { 
+            hasData: !!userData, 
+            errorCode: dbError?.code,
+            errorMessage: dbError?.message 
+          })
+          
+          // Also try to check if user exists in auth.users table
+          console.log('🔍 Checking auth.users table...')
+          const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers()
+          console.log('👥 Auth users found:', authUsers?.users?.length || 0)
+          const authUser = authUsers?.users?.find(u => u.email === email)
+          console.log('🔍 Auth user for email:', authUser ? 'Found' : 'Not found')
+          if (authUser) {
+            console.log('👤 Auth user details:', { id: authUser.id, email: authUser.email, confirmed: authUser.email_confirmed_at })
+          }
     
-        if (dbError || !userData) {
-          console.error('❌ User not found in database:', dbError)
-          return { error: { message: 'Invalid credentials' } }
+          if (dbError || !userData) {
+            console.error('❌ User not found in database:', dbError)
+            return { error: { message: 'Invalid credentials' } }
+          }
+        } catch (fallbackError) {
+          console.error('❌ Fallback database query failed:', fallbackError)
+          return { error: { message: 'Database connection failed' } }
         }
         
         console.log('✅ Fallback: User found in database, creating manual session')
