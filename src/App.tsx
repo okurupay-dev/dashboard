@@ -10,6 +10,7 @@ import Terminals from './components/terminals/Terminals';
 import VirtualTerminals from './components/terminals/VirtualTerminals';
 import Staff from './components/staff/Staff';
 import Wallets from './components/wallets/Wallets';
+import Products from './components/products/Products';
 import SupabaseSignIn from './components/auth/SupabaseSignIn';
 import AcceptInvitation from './components/auth/AcceptInvitation';
 import ResetPassword from './components/auth/ResetPassword';
@@ -38,6 +39,7 @@ function App() {
             <Route path="terminals" element={<Terminals />} />
             <Route path="terminals/virtual" element={<VirtualTerminals />} />
             <Route path="analytics" element={<Analytics />} />
+            <Route path="products" element={<Products />} />
             <Route path="settings" element={<Settings />} />
             <Route path="staff" element={<Staff />} />
             <Route path="wallets" element={<Wallets />} />
