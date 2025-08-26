@@ -145,7 +145,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('🔗 Supabase URL:', process.env.REACT_APP_SUPABASE_URL)
       
       // Add timeout to prevent hanging
-      const timeoutPromise = new Promise((_, reject) => 
+      const timeoutPromise = new Promise<never>((_, reject) => 
         setTimeout(() => reject(new Error('Sign in timeout after 10 seconds')), 10000)
       )
       
@@ -156,7 +156,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       console.log('⏳ Starting sign in request...')
       
-      const { data, error } = await Promise.race([signInPromise, timeoutPromise])
+      const result = await Promise.race([signInPromise, timeoutPromise])
+      const { data, error } = result
       
       console.log('📡 Sign in response received')
       
