@@ -42,6 +42,11 @@ const AcceptInvitation: React.FC = () => {
     try {
       console.log('🔍 Validating invitation token:', invitationToken);
       
+      // Check for Supabase error parameters in URL
+      const urlParams = new URLSearchParams(window.location.hash.substring(1));
+      const supabaseError = urlParams.get('error');
+      const errorCode = urlParams.get('error_code');
+      const errorDescription = urlParams.get('error_description');
 
       if (supabaseError) {
         console.warn('⚠️ Supabase error in URL:', { supabaseError, errorCode, errorDescription });
@@ -49,86 +54,58 @@ const AcceptInvitation: React.FC = () => {
         window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
       }
 
-      try {
-        console.log('🔍 Fetching invitation with token:', token);
-        
-        const { data, error } = await supabase
-          .from('pending_users')
-          .select(`
-            id,
-            email,
-            name,
-            role,
-            merchant_id,
-            expires_at,
-            status,
-            approval_status,
-            merchants!inner(name)
-          `)
-          .eq('invitation_token', token)
-          .eq('status', 'pending')
-          .single();
-          console.error('❌ Merchant query failed:', merchantError);
-          // Set a fallback merchant name with the ID for debugging
-          (data as any).merchants = { name: `Merchant (${merchantId.slice(0, 8)}...)` };
-        }
-      } else {
-        console.log('❌ No merchant ID found in pending user data');
-      }
+      console.log('🔍 Fetching invitation with token:', invitationToken);
+      
+      const { data, error } = await supabase
+        .from('pending_users')
+        .select(`
+          id,
+          email,
+          name,
+          role,
+          merchant_id,
+          expires_at,
+          status,
+          approval_status,
+          merchants!inner(name)
+        `)
+        .eq('invitation_token', invitationToken)
+        .eq('status', 'pending')
+        .single();
+
+      console.log('📋 Database query result:', { data, error });
 
       if (error) {
         console.error('❌ Database error:', error);
-        setError(`Database error: ${error.message}`);
-        return;
-      }
-
-      if (!data) {
         setError('Invalid or expired invitation link');
         return;
       }
 
-      // Check status - allow approved invitations that haven't been used yet
-      const isValidStatus = data.approval_status === 'approved' && 
-                           (data.status === 'pending_invite' || data.status === 'invited') &&
-                           data.approval_status !== 'completed'; // Prevent reuse
-
-      if (!isValidStatus) {
-        console.log('❌ Invalid status:', { status: data.status, approval_status: data.approval_status });
-        if (data.approval_status === 'completed') {
-          setError('This invitation has already been used.');
-        } else {
-          setError(`Invitation not ready. Status: ${data.status}, Approval: ${data.approval_status}`);
-        }
+      if (!data) {
+        setError('Invitation not found');
         return;
       }
 
       // Check if invitation has expired
-      if (new Date(data.expires_at) < new Date()) {
+      const expiresAt = new Date(data.expires_at);
+      const now = new Date();
+      
+      console.log('⏰ Invitation expires at:', expiresAt);
+      console.log('🕐 Current time:', now);
+      
+      if (expiresAt < now) {
         setError('This invitation has expired');
         return;
       }
 
-      console.log('✅ Invitation validated successfully');
-      console.log('🏪 Merchant data:', (data as any).merchants);
-      
-      // Use merchant name from the separate query if available
-      let merchantName = 'Unknown Merchant';
-      if ((data as any).merchants?.name) {
-        merchantName = (data as any).merchants.name;
-      }
-      
-      const invitationData: InvitationData = {
+      console.log('✅ Valid invitation found:', data);
+      setInvitation({
         ...data,
-        merchant_id: merchantId || data.merchant_id_uuid || data.merchant_id, // Use whichever merchant ID was found
-        merchant_name: merchantName,
-        merchants: (data as any).merchants
-      };
-      
-      console.log('🏪 Final invitation data:', invitationData);
-      setInvitation(invitationData);
+        merchant_name: data.merchants?.name || 'Unknown Merchant'
+      });
     } catch (err) {
-      console.error('❌ Unexpected error:', err);
-      setError(`Failed to validate invitation: ${err}`);
+      console.error('❌ Exception during invitation fetch:', err);
+      setError('Failed to load invitation');
     } finally {
       setLoading(false);
     }
@@ -149,50 +126,41 @@ const AcceptInvitation: React.FC = () => {
       return;
     }
 
-    const handleAcceptInvitation = async (password: string) => {
-      if (!invitation) {
-        setError('No invitation data available');
-        return;
+    setCreating(true);
+    setError('');
+
+    try {
+      console.log('🔍 Starting invitation acceptance for:', invitation.email);
+
+      // Call the server-side API endpoint that uses service role key
+      const response = await fetch('/api/accept-invitation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: invitation.email,
+          password: password,
+          invitationToken: invitation.id
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to accept invitation');
       }
 
-      setCreating(true);
-      setError('');
+      console.log('✅ Invitation acceptance completed successfully');
+      console.log('🚀 Redirecting to merchant dashboard...');
 
-      try {
-        console.log('🔍 Starting invitation acceptance for:', invitation.email);
-
-        // Call the server-side API endpoint that uses service role key
-        const response = await fetch('/api/accept-invitation', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: invitation.email,
-            password: password,
-            invitationToken: invitation.id
-          })
-        });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-          throw new Error(result.error || 'Failed to accept invitation');
-        }
-
-        console.log('✅ Invitation acceptance completed successfully');
-        console.log('🚀 Redirecting to merchant dashboard...');
-
-        // Redirect to merchant dashboard
-        window.location.href = 'https://dashboard.okurupay.com';
-      } catch (err: any) {
-        console.error('❌ Invitation acceptance failed:', err);
-        setError(err.message || 'Failed to accept invitation. Please try again.');
-        setCreating(false);
-      }
-    };
-
-    handleAcceptInvitation(password);
+      // Redirect to merchant dashboard
+      window.location.href = 'https://dashboard.okurupay.com';
+    } catch (err: any) {
+      console.error('❌ Invitation acceptance failed:', err);
+      setError(err.message || 'Failed to accept invitation. Please try again.');
+      setCreating(false);
+    }
   };
 
   if (loading) {
