@@ -66,3 +66,32 @@ export interface Transaction {
   created_at: string
   updated_at: string
 }
+
+export interface TaxSettings {
+  tax_id: string
+  merchant_id: string
+  tax_name: string
+  tax_rate: number
+  is_enabled: boolean
+  auto_calculate: boolean
+  applies_to_products: boolean
+  applies_to_services: boolean
+  tax_jurisdiction?: string
+  tax_registration_number?: string
+  created_at: string
+  updated_at: string
+  created_by?: string
+}
+
+export interface TaxCalculation {
+  calculation_id: string
+  transaction_id?: string
+  invoice_id?: string
+  merchant_id: string
+  tax_setting_id: string
+  base_amount: number
+  tax_amount: number
+  tax_rate: number
+  calculation_method: 'percentage' | 'fixed' | 'compound'
+  created_at: string
+}

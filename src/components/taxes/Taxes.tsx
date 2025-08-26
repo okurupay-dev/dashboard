@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
+import { supabase, TaxSettings as TaxSettingsType, Transaction } from '../../lib/supabase';
 // Simple inline switch component to avoid import issues
 const Switch: React.FC<{
   checked: boolean;
@@ -30,17 +31,6 @@ const Switch: React.FC<{
 import { Calculator, DollarSign, TrendingUp, Settings, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
-interface TaxSettings {
-  tax_id: string;
-  merchant_id: string;
-  tax_rate: number;
-  tax_name: string;
-  is_enabled: boolean;
-  auto_calculate: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
 interface TransactionData {
   total_revenue: number;
   total_tax_collected: number;
@@ -52,26 +42,79 @@ const Taxes: React.FC = () => {
   const { userData, merchantData } = useAuth();
   const [taxEnabled, setTaxEnabled] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [taxSettings, setTaxSettings] = useState<TaxSettings>({
+  const [loading, setLoading] = useState(true);
+  const [taxSettings, setTaxSettings] = useState<TaxSettingsType>({
     tax_id: '',
     merchant_id: merchantData?.merchant_id || '',
     tax_rate: 8.5,
     tax_name: 'Sales Tax',
     is_enabled: false,
     auto_calculate: true,
+    applies_to_products: true,
+    applies_to_services: true,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   });
 
   const [transactionData, setTransactionData] = useState<TransactionData>({
-    total_revenue: 12450.75,
-    total_tax_collected: 1058.31,
-    tax_liability: 1058.31,
-    transaction_count: 156
+    total_revenue: 0,
+    total_tax_collected: 0,
+    tax_liability: 0,
+    transaction_count: 0
   });
 
   const [newTaxRate, setNewTaxRate] = useState(taxSettings.tax_rate.toString());
   const [newTaxName, setNewTaxName] = useState(taxSettings.tax_name);
+
+  // Fetch tax settings and transaction data on component mount
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!merchantData?.merchant_id) return;
+      
+      setLoading(true);
+      try {
+        // Fetch tax settings
+        const { data: taxData, error: taxError } = await supabase
+          .from('tax_settings')
+          .select('*')
+          .eq('merchant_id', merchantData.merchant_id)
+          .single();
+
+        if (taxData && !taxError) {
+          setTaxSettings(taxData);
+          setNewTaxRate((taxData.tax_rate * 100).toString()); // Convert to percentage
+          setNewTaxName(taxData.tax_name);
+        }
+
+        // Fetch transaction data for revenue calculations
+        const { data: transactions, error: transError } = await supabase
+          .from('transactions')
+          .select('amount_fiat, fee, tip, status')
+          .eq('merchant_id', merchantData.merchant_id)
+          .eq('status', 'completed');
+
+        if (transactions && !transError) {
+          const totalRevenue = transactions.reduce((sum, tx) => sum + (tx.amount_fiat || 0), 0);
+          const transactionCount = transactions.length;
+          const taxRate = taxData?.tax_rate || 0;
+          const totalTaxCollected = totalRevenue * taxRate;
+          
+          setTransactionData({
+            total_revenue: totalRevenue,
+            total_tax_collected: totalTaxCollected,
+            tax_liability: totalTaxCollected,
+            transaction_count: transactionCount
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching tax data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [merchantData?.merchant_id]);
 
   useEffect(() => {
     setTaxEnabled(taxSettings.is_enabled);
@@ -93,33 +136,70 @@ const Taxes: React.FC = () => {
     }
   };
 
-  const handleSaveTaxSettings = () => {
-    const updatedSettings = {
-      ...taxSettings,
-      tax_rate: parseFloat(newTaxRate) || 0,
-      tax_name: newTaxName,
-      updated_at: new Date().toISOString()
-    };
+  const handleSaveTaxSettings = async () => {
+    if (!merchantData?.merchant_id) return;
     
-    setTaxSettings(updatedSettings);
-    
-    // Recalculate tax liability based on new rate
-    const newTaxLiability = (transactionData.total_revenue * updatedSettings.tax_rate) / 100;
-    setTransactionData(prev => ({
-      ...prev,
-      tax_liability: newTaxLiability,
-      total_tax_collected: newTaxLiability
-    }));
-    
-    alert('Tax settings saved successfully!');
+    try {
+      const taxRateDecimal = parseFloat(newTaxRate) / 100; // Convert percentage to decimal
+      const updatedSettings = {
+        ...taxSettings,
+        tax_rate: taxRateDecimal,
+        tax_name: newTaxName,
+        updated_at: new Date().toISOString()
+      };
+      
+      // Save to database
+      const { error } = await supabase
+        .from('tax_settings')
+        .upsert({
+          merchant_id: merchantData.merchant_id,
+          tax_name: newTaxName,
+          tax_rate: taxRateDecimal,
+          is_enabled: taxSettings.is_enabled,
+          auto_calculate: taxSettings.auto_calculate,
+          applies_to_products: taxSettings.applies_to_products,
+          applies_to_services: taxSettings.applies_to_services,
+          updated_at: new Date().toISOString(),
+          created_by: userData?.user_id
+        });
+
+      if (error) {
+        console.error('Error saving tax settings:', error);
+        alert('Failed to save tax settings. Please try again.');
+        return;
+      }
+      
+      setTaxSettings(updatedSettings);
+      
+      // Recalculate tax liability based on new rate
+      const newTaxLiability = transactionData.total_revenue * taxRateDecimal;
+      setTransactionData(prev => ({
+        ...prev,
+        tax_liability: newTaxLiability,
+        total_tax_collected: newTaxLiability
+      }));
+      
+      alert('Tax settings saved successfully!');
+    } catch (error) {
+      console.error('Error saving tax settings:', error);
+      alert('Failed to save tax settings. Please try again.');
+    }
   };
 
   const calculateTaxAmount = (amount: number) => {
-    return (amount * taxSettings.tax_rate) / 100;
+    return amount * taxSettings.tax_rate;
   };
 
   if (!userData || !merchantData) {
     return <div>Loading...</div>;
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg text-gray-600">Loading tax data...</div>
+      </div>
+    );
   }
 
   return (
