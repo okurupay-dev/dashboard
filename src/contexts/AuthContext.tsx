@@ -105,28 +105,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null)
         
         if (session?.user) {
-          console.log('👤 User found, checking role...')
-          // Check user role and redirect super_admin to admin dashboard
-          const userRole = session.user.user_metadata?.role
-          console.log('🎭 User role:', userRole)
-          
-          if (userRole === 'super_admin') {
-            console.log('🔄 Redirecting super admin...')
-            window.location.href = '/admin-dashboard'
-            return
-          }
-          
-          // Only allow merchant_admin and staff roles in merchant dashboard
-          if (!['merchant_admin', 'staff'].includes(userRole)) {
-            console.error('❌ Unauthorized role for merchant dashboard:', userRole)
-            supabase.auth.signOut()
-            return
-          }
-
+          console.log('👤 User found, fetching user data...')
           console.log('📊 Fetching user data...')
           fetchUserData(session.user?.id).then(userData => {
             console.log('✅ User data fetched:', !!userData)
             setUserData(userData)
+            
+            if (userData) {
+              console.log('🎭 User role from database:', userData.role)
+              
+              // Check role from database, not user_metadata
+              if (userData.role === 'okuru_admin') {
+                console.log('🔄 Redirecting okuru admin...')
+                window.location.href = '/admin-dashboard'
+                return
+              }
+            }
+            
             if (userData?.merchant_id) {
               console.log('🏪 Fetching merchant data...')
               fetchMerchantData(userData.merchant_id).then(merchantData => {
