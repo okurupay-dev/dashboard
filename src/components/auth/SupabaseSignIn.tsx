@@ -36,11 +36,8 @@ const SupabaseSignIn: React.FC = () => {
         console.error('❌ SupabaseSignIn: Sign in error:', error)
         setError(error.message || 'Sign in failed')
       } else {
-        console.log('✅ Sign in successful')
-        console.log('🔄 Forcing page refresh to update auth state...')
-      
-        // Force page refresh to ensure auth state is properly updated
-        window.location.reload()
+        console.log('✅ Sign in successful - letting auth state change handle navigation')
+        // Don't force reload - let the auth state change and redirect logic handle it
       }
     } catch (err) {
       console.error('❌ SupabaseSignIn: Exception during sign in:', err)
