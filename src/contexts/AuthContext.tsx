@@ -171,10 +171,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('🔐 Attempting sign in for:', email)
       console.log('🔗 Supabase URL:', process.env.REACT_APP_SUPABASE_URL)
       
-      const { data, error } = await supabase.auth.signInWithPassword({
+      // Add timeout to prevent hanging
+      const authPromise = supabase.auth.signInWithPassword({
         email,
         password,
       })
+      
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Authentication timeout')), 15000)
+      )
+      
+      console.log('⏳ Waiting for auth response...')
+      const { data, error } = await Promise.race([authPromise, timeoutPromise])
       
       console.log('📡 Supabase auth response received')
       
