@@ -30,19 +30,6 @@ const AcceptInvitation: React.FC = () => {
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
-    // Check if user is already authenticated via URL hash parameters
-    const urlParams = new URLSearchParams(window.location.hash.substring(1));
-    const accessToken = urlParams.get('access_token');
-    const inviteType = urlParams.get('type');
-    
-    if (accessToken && inviteType === 'invite') {
-      console.log('🎫 User already authenticated via invite link, redirecting to dashboard');
-      // Clear the hash and redirect to dashboard
-      window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
-      window.location.href = 'https://dashboard.okurupay.com';
-      return;
-    }
-    
     if (token) {
       validateInvitation(token as string);
     } else {
@@ -55,16 +42,29 @@ const AcceptInvitation: React.FC = () => {
     try {
       console.log('🔍 Validating invitation token:', invitationToken);
       
-      // Check for Supabase error parameters in URL
+      // Check for Supabase parameters in URL and clear them
       const urlParams = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = urlParams.get('access_token');
+      const inviteType = urlParams.get('type');
       const supabaseError = urlParams.get('error');
       const errorCode = urlParams.get('error_code');
       const errorDescription = urlParams.get('error_description');
 
+      // Clear URL hash parameters to avoid confusion
+      if (window.location.hash) {
+        console.log('🧹 Clearing URL hash parameters');
+        window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+      }
+
       if (supabaseError) {
         console.warn('⚠️ Supabase error in URL:', { supabaseError, errorCode, errorDescription });
-        // Clear the error from URL but continue with invitation processing
-        window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+      }
+
+      if (accessToken && inviteType === 'invite') {
+        console.log('⚠️ User was auto-authenticated by Supabase, but we need password creation');
+        // Sign out the auto-authenticated user so they can create a proper password
+        await supabase.auth.signOut();
+        console.log('🚪 Signed out auto-authenticated user');
       }
 
       console.log('🔍 Fetching invitation with token:', invitationToken);
