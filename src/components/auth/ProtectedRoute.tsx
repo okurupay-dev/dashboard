@@ -9,11 +9,14 @@ interface ProtectedRouteProps {
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { isAuthenticated, isApproved, loading } = useAuth()
 
+  console.log('🔒 ProtectedRoute check:', { isAuthenticated, isApproved, loading })
+
   // Check if we're in development mode
   const isDevelopment = process.env.NODE_ENV === 'development'
   
   // In development mode, bypass all authentication
   if (isDevelopment) {
+    console.log('🚧 Development mode - bypassing auth')
     return <>{children}</>
   }
 
