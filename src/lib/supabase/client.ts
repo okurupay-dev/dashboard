@@ -14,6 +14,12 @@ if (!supabaseAnonKey) {
   console.error('REACT_APP_SUPABASE_ANON_KEY is not set in environment variables');
 }
 
+console.log('🔧 Supabase client config:', {
+  url: supabaseUrl,
+  hasAnonKey: !!supabaseAnonKey,
+  anonKeyLength: supabaseAnonKey?.length
+});
+
 // Create Supabase client with fallback for development
 export const supabase = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',

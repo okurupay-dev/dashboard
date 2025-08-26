@@ -145,14 +145,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('🔗 Supabase URL:', process.env.REACT_APP_SUPABASE_URL)
       console.log('🔑 Supabase Anon Key exists:', !!process.env.REACT_APP_SUPABASE_ANON_KEY)
       
-      // Test basic Supabase connection first
-      console.log('🧪 Testing Supabase connection...')
-      try {
-        const { data: testData, error: testError } = await supabase.from('merchants').select('count').limit(1)
-        console.log('🧪 Connection test result:', { testData, testError })
-      } catch (testErr) {
-        console.error('🧪 Connection test failed:', testErr)
-      }
+      // Skip connection test and try auth directly
+      console.log('🧪 Skipping connection test, trying auth directly...')
       
       console.log('⏳ Starting sign in request...')
       
