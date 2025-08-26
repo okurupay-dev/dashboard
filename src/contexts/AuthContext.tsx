@@ -90,6 +90,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }
 
+  // Auth state change handler
+  const handleAuthStateChange = useCallback(async (event: any, session: any) => {
+    console.log('🔄 Auth state change:', event, 'Session exists:', !!session)
+    
+    if (event === 'SIGNED_IN' && session?.user) {
+      console.log('👤 User signed in, checking role from user_metadata')
+      setUser(session.user)
+      
+      // Get role from user_metadata like admin dashboard
+      const userRole = session.user.user_metadata?.role
+      console.log('🎭 User role from metadata:', userRole)
+      
+      // Create userData object from session metadata
+      const userData = {
+        user_id: session.user.id,
+        auth_user_id: session.user.id,
+        email: session.user.email,
+        role: userRole,
+        name: session.user.user_metadata?.name || session.user.email,
+        merchant_id: session.user.user_metadata?.merchant_id,
+        status: 'active' as const,
+        approved: true,
+        created_at: session.user.created_at,
+        updated_at: session.user.updated_at
+      }
+      
+      console.log('📊 User data from metadata:', userData)
+      setUserData(userData)
+      
+      if (userData?.merchant_id) {
+        const merchantData = await fetchMerchantData(userData.merchant_id)
+        console.log('🏪 Merchant data:', merchantData)
+        setMerchantData(merchantData)
+      }
+    } else if (event === 'SIGNED_OUT') {
+      console.log('👋 User signed out')
+      setUser(null)
+      setUserData(null)
+      setMerchantData(null)
+    }
+    
+    setLoading(false)
+  }, [])
+
   // Initialize auth state
   useEffect(() => {
     console.log('🚀 AuthContext initializing...')
@@ -105,46 +149,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         
         console.log('📋 Initial session:', !!session?.user)
-        setUser(session?.user ?? null)
         
         if (session?.user) {
-          console.log('👤 User found, fetching user data...')
-          const userData = await fetchUserData(session.user.id)
-          console.log('✅ User data fetched:', !!userData)
-          setUserData(userData)
-          
-          if (!userData) {
-            console.log('⚠️ No user data found - account needs onboarding')
-            setMerchantData(null)
-            setLoading(false)
-            return
-          }
-          
-          console.log('🔍 User role from database:', userData.role)
-          
-          // Handle different user roles
-          if (userData.role === 'okuru_admin') {
-            console.log('🚀 Redirecting okuru_admin to admin dashboard')
-            window.location.href = '/admin-dashboard'
-            return
-          }
-          
-          if (['admin', 'merchant', 'merchant_admin', 'staff'].includes(userData.role)) {
-            console.log('✅ Authorized role for merchant dashboard:', userData.role)
-            if (userData.merchant_id) {
-              console.log('🏪 Fetching merchant data...')
-              const merchantData = await fetchMerchantData(userData.merchant_id)
-              console.log('✅ Merchant data fetched:', !!merchantData)
-              setMerchantData(merchantData)
-            }
-          } else {
-            console.log('⚠️ Unauthorized role for merchant dashboard:', userData.role)
-            setMerchantData(null)
-          }
+          // Use the same logic as auth state change
+          await handleAuthStateChange('SIGNED_IN', session)
+        } else {
+          setUser(null)
+          setUserData(null)
+          setMerchantData(null)
+          setLoading(false)
         }
-        
-        console.log('✅ AuthContext initialization complete')
-        setLoading(false)
       } catch (error) {
         console.error('❌ Error in auth initialization:', error)
         setLoading(false)
@@ -153,54 +167,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     initializeAuth()
 
-    // Listen for auth changes
-    const handleAuthStateChange = useCallback(async (event: any, session: any) => {
-      console.log('🔄 Auth state change:', event, 'Session exists:', !!session)
-      
-      if (event === 'SIGNED_IN' && session?.user) {
-        console.log('👤 User signed in, checking role from user_metadata')
-        setUser(session.user)
-        
-        // Get role from user_metadata like admin dashboard
-        const userRole = session.user.user_metadata?.role
-        console.log('🎭 User role from metadata:', userRole)
-        
-        // Create userData object from session metadata
-        const userData = {
-          user_id: session.user.id,
-          auth_user_id: session.user.id,
-          email: session.user.email,
-          role: userRole,
-          name: session.user.user_metadata?.name || session.user.email,
-          merchant_id: session.user.user_metadata?.merchant_id,
-          status: 'active' as const,
-          approved: true,
-          created_at: session.user.created_at,
-          updated_at: session.user.updated_at
-        }
-        
-        console.log('📊 User data from metadata:', userData)
-        setUserData(userData)
-        
-        if (userData?.merchant_id) {
-          const merchantData = await fetchMerchantData(userData.merchant_id)
-          console.log('🏪 Merchant data:', merchantData)
-          setMerchantData(merchantData)
-        }
-      } else if (event === 'SIGNED_OUT') {
-        console.log('👋 User signed out')
-        setUser(null)
-        setUserData(null)
-        setMerchantData(null)
-      }
-      
-      setLoading(false)
-    }, [])
-
     const subscription = supabase.auth.onAuthStateChange(handleAuthStateChange)
 
     return () => subscription.data.subscription.unsubscribe()
-  }, [])
+  }, [handleAuthStateChange])
 
   const signIn = async (email: string, password: string) => {
     try {
