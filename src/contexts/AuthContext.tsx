@@ -100,22 +100,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('✅ User data fetched:', !!userData)
           setUserData(userData)
           
-          if (userData) {
-            console.log('🎭 User role from database:', userData.role)
-            
-            // Check role from database, not user_metadata
-            if (userData.role === 'okuru_admin') {
-              console.log('🔄 Redirecting okuru admin...')
-              window.location.href = '/admin-dashboard'
-              return
-            }
+          if (!userData) {
+            console.log('⚠️ No user data found - account needs onboarding')
+            setMerchantData(null)
+            setLoading(false)
+            return
           }
           
-          if (userData?.merchant_id) {
-            console.log('🏪 Fetching merchant data...')
-            const merchantData = await fetchMerchantData(userData.merchant_id)
-            console.log('✅ Merchant data fetched:', !!merchantData)
-            setMerchantData(merchantData)
+          console.log('🔍 User role from database:', userData.role)
+          
+          // Handle different user roles
+          if (userData.role === 'okuru_admin') {
+            console.log('🚀 Redirecting okuru_admin to admin dashboard')
+            window.location.href = '/admin-dashboard'
+            return
+          }
+          
+          if (['admin', 'merchant', 'staff'].includes(userData.role)) {
+            console.log('✅ Authorized role for merchant dashboard:', userData.role)
+            if (userData.merchant_id) {
+              console.log('🏪 Fetching merchant data...')
+              const merchantData = await fetchMerchantData(userData.merchant_id)
+              console.log('✅ Merchant data fetched:', !!merchantData)
+              setMerchantData(merchantData)
+            }
+          } else {
+            console.log('⚠️ Unauthorized role for merchant dashboard:', userData.role)
+            setMerchantData(null)
           }
         }
         
@@ -132,29 +143,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('🔄 Auth state change:', event, 'Session exists:', !!session)
         setUser(session?.user ?? null)
         
         if (session?.user) {
-          // Check user role on auth state change
-          const userRole = session.user.user_metadata?.role
-          if (userRole === 'super_admin') {
+          console.log('👤 Fetching user data for auth state change...')
+          const userData = await fetchUserData(session.user.id)
+          setUserData(userData)
+          
+          if (!userData) {
+            console.log('⚠️ No user data found - account needs onboarding')
+            setMerchantData(null)
+            setLoading(false)
+            return
+          }
+          
+          console.log('🔍 User role from database:', userData.role)
+          
+          // Handle different user roles
+          if (userData.role === 'okuru_admin') {
+            console.log('🚀 Redirecting okuru_admin to admin dashboard')
             window.location.href = '/admin-dashboard'
             return
           }
           
-          if (!['merchant_admin', 'staff'].includes(userRole)) {
-            console.error('Unauthorized role for merchant dashboard:', userRole)
-            supabase.auth.signOut()
-            return
-          }
-
-          const userData = await fetchUserData(session.user?.id)
-          setUserData(userData)
-          if (userData?.merchant_id) {
-            const merchantData = await fetchMerchantData(userData.merchant_id)
-            setMerchantData(merchantData)
+          if (['admin', 'merchant', 'staff'].includes(userData.role)) {
+            console.log('✅ Authorized role for merchant dashboard:', userData.role)
+            if (userData.merchant_id) {
+              const merchantData = await fetchMerchantData(userData.merchant_id)
+              setMerchantData(merchantData)
+            }
+          } else {
+            console.log('⚠️ Unauthorized role for merchant dashboard:', userData.role)
+            setMerchantData(null)
           }
         } else {
+          console.log('🚪 No session - clearing user data')
           setUserData(null)
           setMerchantData(null)
         }
