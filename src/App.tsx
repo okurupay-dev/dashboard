@@ -5,6 +5,7 @@ import DashboardLayout from './components/layout/DashboardLayout';
 import Dashboard from './components/dashboard/Dashboard';
 import Transactions from './components/transactions/Transactions';
 import Analytics from './components/analytics/Analytics';
+import Reports from './components/reports/Reports';
 import Taxes from './components/taxes/Taxes';
 import Settings from './components/settings/Settings';
 import Terminals from './components/terminals/Terminals';
@@ -40,6 +41,7 @@ function App() {
             <Route path="terminals" element={<Terminals />} />
             <Route path="terminals/virtual" element={<VirtualTerminals />} />
             <Route path="analytics" element={<Analytics />} />
+            <Route path="reports" element={<Reports />} />
             <Route path="taxes" element={<Taxes />} />
             <Route path="products" element={<Products />} />
             <Route path="settings" element={<Settings />} />
