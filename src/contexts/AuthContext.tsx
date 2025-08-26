@@ -33,20 +33,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Fetch user data from database
   const fetchUserData = async (authUserId: string) => {
     try {
+      console.log('🔍 Fetching user data for auth_user_id:', authUserId)
+      
       const { data: user, error } = await supabase
         .from('users')
         .select('*')
         .eq('auth_user_id', authUserId)
         .single()
 
+      console.log('📊 User data query result:', { user, error })
+
       if (error) {
-        console.error('Error fetching user data:', error)
+        console.error('❌ Error fetching user data:', error)
         return null
       }
 
-      return user as User
+      console.log('✅ User data found:', user)
+      return user
     } catch (error) {
-      console.error('Error in fetchUserData:', error)
+      console.error('❌ Error in fetchUserData:', error)
       return null
     }
   }
