@@ -76,13 +76,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     console.log('🚀 AuthContext initializing...')
     
-    // Get initial session with timeout
-    const sessionPromise = supabase.auth.getSession()
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('getSession timeout after 5 seconds')), 5000)
-    )
-    
-    Promise.race([sessionPromise, timeoutPromise])
+    const getSessionWithTimeout = async (timeoutMs = 10000) => {
+      return new Promise(async (resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error(`getSession timeout after ${timeoutMs / 1000} seconds`))
+        }, timeoutMs)
+
+        try {
+          const { data, error } = await supabase.auth.getSession()
+          clearTimeout(timeout)
+          resolve({ data, error })
+        } catch (error) {
+          clearTimeout(timeout)
+          reject(error)
+        }
+      })
+    }
+
+    getSessionWithTimeout()
       .then((result: any) => {
         const { data: { session } } = result
         console.log('📋 Initial session:', !!session?.user)
@@ -170,133 +181,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [])
 
   const signIn = async (email: string, password: string) => {
-    let authTimedOut = false
-    
     try {
       console.log('🔐 Attempting sign in for:', email)
-      console.log('🔗 Supabase URL:', process.env.REACT_APP_SUPABASE_URL)
-      console.log('🔑 Supabase Anon Key exists:', !!process.env.REACT_APP_SUPABASE_ANON_KEY)
       
-      console.log('⏳ Starting sign in request...')
-      
-      // Add timeout to prevent hanging
-      const authPromise = supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
       
-      const timeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error('Authentication timeout - using fallback')), 3000)
-      )
-      
-      try {
-        const { data, error } = await Promise.race([authPromise, timeoutPromise])
-        
-        console.log('📡 Sign in response received')
-        
-        if (error) {
-          console.error('❌ Sign in error:', error)
-          return { error }
-        }
-        
-        console.log('✅ Sign in successful:', data.user?.email)
-        console.log('✅ Session data:', data.session)
-        console.log('✅ User metadata:', data.user?.user_metadata)
-        
-        // Force update user state
-        setUser(data.user)
-        
-        // Fetch user data from database
-        if (data.user?.id) {
-          const userData = await fetchUserData(data.user.id)
-          console.log('✅ User data loaded:', userData)
-          setUserData(userData)
-          
-          if (userData?.merchant_id) {
-            const merchantData = await fetchMerchantData(userData.merchant_id)
-            console.log('✅ Merchant data loaded:', merchantData)
-            setMerchantData(merchantData)
-          }
-        }
-        
-        return { error: null }
-      } catch (timeoutError) {
-        authTimedOut = true
-        console.warn('⚠️ Auth timeout, using fallback authentication')
+      if (error) {
+        console.error('❌ Sign in error:', error)
+        return { error }
       }
       
-      // Fallback authentication if timeout occurred
-      if (authTimedOut) {
-        console.log('🔍 Fallback: Checking user in database...')
-        console.log('📧 Looking for email:', email)
-        console.log('🔗 Database URL:', process.env.REACT_APP_SUPABASE_URL)
-        
-        try {
-          console.log('🔍 Executing database query...')
-          const { data: userData, error: dbError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('email', email)
-            .single()
-          
-          console.log('🔍 Database query completed')
-          console.log('🔍 Database query result:', { userData, dbError })
-          console.log('📊 Query details:', { 
-            hasData: !!userData, 
-            errorCode: dbError?.code,
-            errorMessage: dbError?.message 
-          })
-          
-          // Also try to check if user exists in auth.users table
-          console.log('🔍 Checking auth.users table...')
-          const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers()
-          console.log('👥 Auth users found:', authUsers?.users?.length || 0)
-          const authUser = authUsers?.users?.find(u => u.email === email)
-          console.log('🔍 Auth user for email:', authUser ? 'Found' : 'Not found')
-          if (authUser) {
-            console.log('👤 Auth user details:', { id: authUser.id, email: authUser.email, confirmed: authUser.email_confirmed_at })
-          }
-    
-          if (dbError || !userData) {
-            console.error('❌ User not found in database:', dbError)
-            return { error: { message: 'Invalid credentials' } }
-          }
-        } catch (fallbackError) {
-          console.error('❌ Fallback database query failed:', fallbackError)
-          return { error: { message: 'Database connection failed' } }
-        }
-        
-        console.log('✅ Fallback: User found in database, creating manual session')
-        console.log('👤 User data:', userData)
-        console.log('✅ User approved status:', userData?.approved)
-        
-        // Set user manually (bypassing Supabase auth)
-        const mockUser = {
-          id: userData?.auth_user_id || userData?.user_id,
-          email: userData?.email,
-          user_metadata: {
-            role: userData?.role,
-            merchant_id: userData?.merchant_id
-          }
-        }
-        
-        console.log('🔧 Setting mock user:', mockUser)
-        setUser(mockUser as any)
+      console.log('✅ Sign in successful:', data.user?.email)
+      
+      // Force update user state
+      setUser(data.user)
+      
+      // Fetch user data from database
+      if (data.user?.id) {
+        const userData = await fetchUserData(data.user.id)
+        console.log('✅ User data loaded:', userData)
         setUserData(userData)
         
         if (userData?.merchant_id) {
-          console.log('🏪 Loading merchant data...')
           const merchantData = await fetchMerchantData(userData.merchant_id)
           console.log('✅ Merchant data loaded:', merchantData)
           setMerchantData(merchantData)
         }
-        
-        console.log('✅ Fallback authentication complete')
-        console.log('🔒 Final auth state - isAuthenticated:', !!mockUser, 'isApproved:', userData?.approved === true)
-        return { error: null }
       }
       
-      return { error: { message: 'Authentication failed' } }
+      return { error: null }
     } catch (error) {
       console.error('❌ Sign in failed with exception:', error)
       return { error }
