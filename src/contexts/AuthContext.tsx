@@ -272,7 +272,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // Set user manually (bypassing Supabase auth)
         const mockUser = {
-          id: userData?.auth_user_id || userData?.id,
+          id: userData?.auth_user_id || userData?.user_id,
           email: userData?.email,
           user_metadata: {
             role: userData?.role,
