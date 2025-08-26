@@ -30,6 +30,15 @@ export default async function handler(req, res) {
     // Use merchant_id_uuid if available, otherwise merchant_id
     const merchantId = invitation.merchant_id_uuid || invitation.merchant_id
 
+    // Check if user already exists first
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers()
+    const existingUser = existingUsers.users.find(user => user.email === invitation.email)
+    
+    if (existingUser) {
+      console.log('User already exists, deleting first:', existingUser.id)
+      await supabaseAdmin.auth.admin.deleteUser(existingUser.id)
+    }
+
     // 2. Create auth user with service role (bypasses RLS)
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: invitation.email,
@@ -44,7 +53,12 @@ export default async function handler(req, res) {
     })
 
     if (authError) {
-      return res.status(400).json({ error: authError.message })
+      console.error('Auth user creation error:', authError)
+      return res.status(400).json({ 
+        error: authError.message,
+        code: authError.code,
+        details: authError
+      })
     }
 
     // 3. Create user record in users table (bypasses RLS)
