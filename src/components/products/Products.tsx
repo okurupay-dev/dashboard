@@ -39,6 +39,7 @@ interface Product {
   tax_name?: string;
   tax_rate?: number;
   stock_quantity?: number;
+  low_stock_threshold?: number;
   is_active: boolean;
   is_taxable?: boolean;
   track_inventory?: boolean;
@@ -244,6 +245,7 @@ const Products: React.FC = () => {
         weight: parseFloat(newProduct.weight) || 0,
         tax_rate: parseFloat(newProduct.tax_rate) || 0,
         stock_quantity: 0,
+        low_stock_threshold: 5,
         is_variation: !!newProduct.variation_name,
         import_source: 'manual',
         created_at: new Date().toISOString(),
@@ -406,6 +408,7 @@ const Products: React.FC = () => {
             tax_name: taxHeader || 'Default Tax',
             tax_rate: taxRate,
             stock_quantity: 0,
+            low_stock_threshold: 5,
             is_variation: !!(row['Variation Name'] || row['variation name']),
             is_active: true,
             is_taxable: true,
@@ -434,7 +437,7 @@ const Products: React.FC = () => {
           
           newProducts.push(product);
         }
-      }
+      });
 
       console.log(`📦 Importing ${newProducts.length} products from CSV`);
       
@@ -675,10 +678,10 @@ const Products: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <span className="text-sm text-gray-900 mr-2">
-                            {product.stock_quantity}
+                            {product.stock_quantity || 0}
                           </span>
                           {product.low_stock_threshold && 
-                           product.stock_quantity <= product.low_stock_threshold && (
+                           (product.stock_quantity || 0) <= product.low_stock_threshold && (
                             <AlertCircle className="h-4 w-4 text-red-500" />
                           )}
                         </div>
