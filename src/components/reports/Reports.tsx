@@ -66,8 +66,8 @@ const Reports: React.FC = () => {
     totalTransactions: 0,
     totalTax: 0,
     totalRefunds: 0,
-    topProducts: [],
-    recentActivity: []
+    topProducts: [] as any[],
+    recentActivity: [] as any[]
   });
 
   // Builder state
@@ -227,7 +227,7 @@ const Reports: React.FC = () => {
       </div>
 
       {/* Main Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6" defaultValue="overview">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="builder">Builder</TabsTrigger>
@@ -471,8 +471,8 @@ const Reports: React.FC = () => {
                             {builderConfig.columns.map(column => (
                               <td key={column} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                 {column === 'created_at' || column === 'updated_at' 
-                                  ? new Date(row[column]).toLocaleDateString()
-                                  : row[column] || '-'
+                                  ? new Date((row as any)[column]).toLocaleDateString()
+                                  : (row as any)[column] || '-'
                                 }
                               </td>
                             ))}
