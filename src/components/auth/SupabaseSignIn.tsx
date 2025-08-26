@@ -8,8 +8,11 @@ const SupabaseSignIn: React.FC = () => {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
+  const [resetLoading, setResetLoading] = useState(false)
+  const [resetMessage, setResetMessage] = useState<string | null>(null)
   
-  const { signIn, isAuthenticated, isApproved } = useAuth()
+  const { signIn, resetPassword, isAuthenticated, isApproved } = useAuth()
 
   // Redirect if already authenticated and approved
   if (isAuthenticated && isApproved) {
@@ -45,6 +48,33 @@ const SupabaseSignIn: React.FC = () => {
     }
     
     setLoading(false)
+  }
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!email) {
+      setError('Please enter your email address first')
+      return
+    }
+
+    setResetLoading(true)
+    setError(null)
+    setResetMessage(null)
+
+    try {
+      const { error } = await resetPassword(email)
+      
+      if (error) {
+        setError(error.message || 'Failed to send reset email')
+      } else {
+        setResetMessage('Password reset email sent! Check your inbox.')
+        setShowForgotPassword(false)
+      }
+    } catch (err) {
+      setError('An unexpected error occurred')
+    }
+    
+    setResetLoading(false)
   }
 
   return (
@@ -108,6 +138,12 @@ const SupabaseSignIn: React.FC = () => {
             </div>
           )}
 
+          {resetMessage && (
+            <div className="rounded-md bg-green-50 p-4">
+              <div className="text-sm text-green-700">{resetMessage}</div>
+            </div>
+          )}
+
           <div>
             <button
               type="submit"
@@ -116,6 +152,35 @@ const SupabaseSignIn: React.FC = () => {
             >
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
+          </div>
+
+          <div className="text-center">
+            {!showForgotPassword ? (
+              <button
+                type="button"
+                onClick={() => setShowForgotPassword(true)}
+                className="text-sm text-indigo-600 hover:text-indigo-500"
+              >
+                Forgot your password?
+              </button>
+            ) : (
+              <div className="space-y-3">
+                <button
+                  onClick={handleForgotPassword}
+                  disabled={resetLoading}
+                  className="w-full flex justify-center py-2 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {resetLoading ? 'Sending...' : 'Send reset email'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPassword(false)}
+                  className="text-sm text-gray-600 hover:text-gray-500"
+                >
+                  Back to sign in
+                </button>
+              </div>
+            )}
           </div>
         </form>
       </div>

@@ -241,6 +241,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }
 
+  const resetPassword = async (email: string) => {
+    try {
+      console.log('🔄 Attempting password reset for:', email)
+      
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`
+      })
+      
+      if (error) {
+        console.error('❌ Password reset error:', error)
+        return { error }
+      }
+      
+      console.log('✅ Password reset email sent')
+      return { error: null }
+    } catch (error) {
+      console.error('❌ Password reset failed:', error)
+      return { error }
+    }
+  }
+
   const signUp = async (email: string, password: string, userDataInput: Partial<User>) => {
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -292,8 +313,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signIn,
     signUp,
     signOut,
+    resetPassword,
     isAuthenticated: !!user,
-    isApproved: userData?.approved === true,
+    isApproved: userData?.role === 'merchant' || userData?.role === 'merchant_admin',
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
