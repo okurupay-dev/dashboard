@@ -21,10 +21,23 @@ const SupabaseSignIn: React.FC = () => {
     setLoading(true)
     setError(null)
 
-    const { error } = await signIn(email, password)
+    console.log('🚀 SupabaseSignIn: Form submitted')
+    console.log('📧 Email:', email)
     
-    if (error) {
-      setError(error.message)
+    try {
+      const { error } = await signIn(email, password)
+      
+      console.log('🔄 SupabaseSignIn: signIn completed')
+      
+      if (error) {
+        console.error('❌ SupabaseSignIn: Sign in error:', error)
+        setError(error.message || 'Sign in failed')
+      } else {
+        console.log('✅ SupabaseSignIn: Sign in successful')
+      }
+    } catch (err) {
+      console.error('❌ SupabaseSignIn: Exception during sign in:', err)
+      setError('An unexpected error occurred')
     }
     
     setLoading(false)
