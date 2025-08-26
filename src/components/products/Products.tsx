@@ -536,13 +536,13 @@ const Products: React.FC = () => {
               className="appearance-none bg-white border border-gray-300 rounded-md px-4 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-gray-50"
             >
               <option value="">Import Products</option>
-              <option value="csv">📄 Upload CSV File</option>
+              <option value="csv">Upload CSV File</option>
               <option disabled>──────────────</option>
-              <option value="pos-square">🟦 Square POS</option>
-              <option value="pos-shopify">🟢 Shopify</option>
-              <option value="pos-clover">🍀 Clover</option>
-              <option value="pos-toast">🍞 Toast POS</option>
-              <option value="pos-lightspeed">⚡ Lightspeed</option>
+              <option value="pos-square">Square POS</option>
+              <option value="pos-shopify">Shopify</option>
+              <option value="pos-clover">Clover</option>
+              <option value="pos-toast">Toast POS</option>
+              <option value="pos-lightspeed">Lightspeed</option>
             </select>
             <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
               <Upload className="h-4 w-4 text-gray-400" />
