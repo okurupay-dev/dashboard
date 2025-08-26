@@ -240,6 +240,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           console.log('✅ Fallback: User found in database, creating manual session')
           console.log('👤 User data:', userData)
+          console.log('✅ User approved status:', userData.approved)
           
           // Set user manually (bypassing Supabase auth)
           const mockUser = {
@@ -252,7 +253,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           
           console.log('🔧 Setting mock user:', mockUser)
-          console.log('✅ User approved status:', userData.approved)
           setUser(mockUser as any)
           setUserData(userData)
           
@@ -264,6 +264,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           
           console.log('✅ Fallback authentication complete')
+          console.log('🔒 Final auth state - isAuthenticated:', !!mockUser, 'isApproved:', userData.approved === true)
           return { error: null }
         } catch (fallbackError) {
           console.error('❌ Fallback authentication failed:', fallbackError)
