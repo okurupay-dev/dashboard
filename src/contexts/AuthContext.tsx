@@ -215,7 +215,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       )
       
       try {
-        const { data, error } = await Promise.race([authPromise, timeoutPromise])
+        const { data, error } = await Promise.race([authPromise, timeoutPromise]) as any
         
         console.log('📡 Supabase auth response received:', { 
           hasData: !!data, 
@@ -316,7 +316,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signOut,
     resetPassword,
     isAuthenticated: !!user,
-    isApproved: userData?.role === 'merchant' || userData?.role === 'merchant_admin',
+    isApproved: userData?.role === 'merchant' || userData?.role === 'merchant_admin' || userData?.role === 'admin' || userData?.role === 'staff' || userData?.role === 'okuru_admin',
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
