@@ -6,8 +6,8 @@ const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY!
 // Create a single instance to avoid multiple client warnings
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    persistSession: true,
-    autoRefreshToken: true,
+    persistSession: false,
+    autoRefreshToken: false,
   }
 })
 

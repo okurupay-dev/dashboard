@@ -11,14 +11,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   console.log('🔒 ProtectedRoute check:', { isAuthenticated, isApproved, loading })
 
-  // Check if we're in development mode
-  const isDevelopment = process.env.NODE_ENV === 'development'
-  
-  // In development mode, bypass all authentication
-  if (isDevelopment) {
-    console.log('🚧 Development mode - bypassing auth')
-    return <>{children}</>
-  }
+  // Remove development mode bypass - always enforce authentication
 
   // Show loading while authentication is being checked
   if (loading) {
