@@ -198,6 +198,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         
         console.log('✅ Sign in successful:', data.user?.email)
+        console.log('✅ Session data:', data.session)
+        console.log('✅ User metadata:', data.user?.user_metadata)
+        
+        // Force update user state
+        setUser(data.user)
+        
+        // Fetch user data from database
+        if (data.user?.id) {
+          const userData = await fetchUserData(data.user.id)
+          console.log('✅ User data loaded:', userData)
+          setUserData(userData)
+          
+          if (userData?.merchant_id) {
+            const merchantData = await fetchMerchantData(userData.merchant_id)
+            console.log('✅ Merchant data loaded:', merchantData)
+            setMerchantData(merchantData)
+          }
+        }
+        
         return { error: null }
       } catch (timeoutError) {
         console.warn('⚠️ Auth timeout, using fallback authentication')

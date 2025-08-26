@@ -33,7 +33,11 @@ const SupabaseSignIn: React.FC = () => {
         console.error('❌ SupabaseSignIn: Sign in error:', error)
         setError(error.message || 'Sign in failed')
       } else {
-        console.log('✅ SupabaseSignIn: Sign in successful')
+        console.log('✅ SupabaseSignIn: Sign in successful - should redirect now')
+        // Force a small delay to ensure state updates
+        setTimeout(() => {
+          window.location.href = '/'
+        }, 100)
       }
     } catch (err) {
       console.error('❌ SupabaseSignIn: Exception during sign in:', err)
