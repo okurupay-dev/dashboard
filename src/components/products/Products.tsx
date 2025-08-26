@@ -350,39 +350,6 @@ const Products: React.FC = () => {
         </div>
       </div>
 
-      {/* POS Integrations */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Zap className="h-5 w-5 mr-2" />
-            POS Integrations
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {posIntegrations.map((integration) => (
-              <div key={integration.id} className="border rounded-lg p-4 hover:bg-gray-50">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-medium">{integration.name}</h3>
-                  {getStatusBadge(integration.status)}
-                </div>
-                <p className="text-sm text-gray-600 mb-3">
-                  {integration.product_count || 0} products
-                </p>
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  className="w-full"
-                  onClick={() => alert(`${integration.name} integration coming soon!`)}
-                >
-                  <ExternalLink className="h-3 w-3 mr-1" />
-                  Connect
-                </Button>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Filters */}
       <Card>
