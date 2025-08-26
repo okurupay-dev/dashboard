@@ -27,13 +27,16 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid or expired invitation' })
     }
 
+    // Use merchant_id_uuid if available, otherwise merchant_id
+    const merchantId = invitation.merchant_id_uuid || invitation.merchant_id
+
     // 2. Create auth user with service role (bypasses RLS)
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: invitation.email,
       password: password,
       user_metadata: {
         role: invitation.role,
-        merchant_id: invitation.merchant_id,
+        merchant_id: merchantId,
         invitation_accepted: true,
         first_time_password: true
       },
@@ -49,7 +52,7 @@ export default async function handler(req, res) {
       .from('users')
       .insert({
         auth_user_id: authData.user.id,
-        merchant_id: invitation.merchant_id,
+        merchant_id: merchantId,
         name: invitation.name,
         email: invitation.email,
         role: invitation.role === 'merchant_admin' ? 'merchant' : 'staff',
@@ -89,6 +92,10 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('Invitation acceptance error:', error)
-    return res.status(500).json({ error: 'Internal server error' })
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    })
   }
 }
