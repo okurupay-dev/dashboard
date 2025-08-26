@@ -252,6 +252,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           
           console.log('🔧 Setting mock user:', mockUser)
+          console.log('✅ User approved status:', userData.approved)
           setUser(mockUser as any)
           setUserData(userData)
           
@@ -327,7 +328,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signUp,
     signOut,
     isAuthenticated: !!user,
-    isApproved: userData?.approved ?? false,
+    isApproved: userData?.approved === true,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
