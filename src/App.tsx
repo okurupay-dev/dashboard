@@ -12,6 +12,7 @@ import Staff from './components/staff/Staff';
 import Wallets from './components/wallets/Wallets';
 import SupabaseSignIn from './components/auth/SupabaseSignIn';
 import AcceptInvitation from './components/auth/AcceptInvitation';
+import ResetPassword from './components/auth/ResetPassword';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 
@@ -24,6 +25,7 @@ function App() {
           <Route path="/sign-in" element={<SupabaseSignIn />} />
           <Route path="/signin" element={<SupabaseSignIn />} />
           <Route path="/accept-invitation" element={<AcceptInvitation />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           
           {/* Protected routes */}
           <Route path="/" element={
