@@ -268,15 +268,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         console.log('✅ Fallback: User found in database, creating manual session')
         console.log('👤 User data:', userData)
-        console.log('✅ User approved status:', userData.approved)
+        console.log('✅ User approved status:', userData?.approved)
         
         // Set user manually (bypassing Supabase auth)
         const mockUser = {
-          id: userData.auth_user_id || userData.id,
-          email: userData.email,
+          id: userData?.auth_user_id || userData?.id,
+          email: userData?.email,
           user_metadata: {
-            role: userData.role,
-            merchant_id: userData.merchant_id
+            role: userData?.role,
+            merchant_id: userData?.merchant_id
           }
         }
         
@@ -284,7 +284,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(mockUser as any)
         setUserData(userData)
         
-        if (userData.merchant_id) {
+        if (userData?.merchant_id) {
           console.log('🏪 Loading merchant data...')
           const merchantData = await fetchMerchantData(userData.merchant_id)
           console.log('✅ Merchant data loaded:', merchantData)
@@ -292,7 +292,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         
         console.log('✅ Fallback authentication complete')
-        console.log('🔒 Final auth state - isAuthenticated:', !!mockUser, 'isApproved:', userData.approved === true)
+        console.log('🔒 Final auth state - isAuthenticated:', !!mockUser, 'isApproved:', userData?.approved === true)
         return { error: null }
       }
       
