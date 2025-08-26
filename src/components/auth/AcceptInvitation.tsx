@@ -100,9 +100,17 @@ const AcceptInvitation: React.FC = () => {
 
       console.log('✅ Valid invitation found:', data);
       setInvitation({
-        ...data,
-        merchant_name: (data.merchants as any)?.name || 'Unknown Merchant'
-      } as InvitationData);
+        id: data.id,
+        email: data.email,
+        name: data.name,
+        role: data.role,
+        merchant_id: data.merchant_id,
+        expires_at: data.expires_at,
+        status: data.status,
+        approval_status: data.approval_status,
+        merchant_name: (data.merchants as any)?.name || 'Unknown Merchant',
+        merchants: { name: (data.merchants as any)?.name || 'Unknown Merchant' }
+      });
     } catch (err) {
       console.error('❌ Exception during invitation fetch:', err);
       setError('Failed to load invitation');
