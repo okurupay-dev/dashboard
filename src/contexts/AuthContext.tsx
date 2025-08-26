@@ -116,7 +116,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return
           }
           
-          if (['admin', 'merchant', 'staff'].includes(userData.role)) {
+          if (['admin', 'merchant', 'merchant_admin', 'staff'].includes(userData.role)) {
             console.log('✅ Authorized role for merchant dashboard:', userData.role)
             if (userData.merchant_id) {
               console.log('🏪 Fetching merchant data...')
@@ -167,7 +167,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return
           }
           
-          if (['admin', 'merchant', 'staff'].includes(userData.role)) {
+          if (['admin', 'merchant', 'merchant_admin', 'staff'].includes(userData.role)) {
             console.log('✅ Authorized role for merchant dashboard:', userData.role)
             if (userData.merchant_id) {
               const merchantData = await fetchMerchantData(userData.merchant_id)

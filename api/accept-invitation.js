@@ -121,7 +121,7 @@ export default async function handler(req, res) {
         merchant_id: merchantId,
         name: invitation.name,
         email: invitation.email,
-        role: invitation.role === 'merchant_admin' ? 'merchant' : 'staff',
+        role: invitation.role, // Keep the original role from pending_users
         status: 'active',
         approved: true
       })
