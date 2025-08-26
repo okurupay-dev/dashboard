@@ -139,7 +139,7 @@ const Staff: React.FC = () => {
       setMerchantId(currentUser.merchant_id);
 
       // Only admins and merchants can manage staff
-      if (!['admin', 'merchant', 'okuru_admin'].includes(currentUser.role)) {
+      if (!['admin', 'merchant', 'merchant_admin', 'okuru_admin'].includes(currentUser.role)) {
         setError(`Access denied. Your role (${currentUser.role}) does not have permission to manage staff.`);
         return;
       }
