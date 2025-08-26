@@ -42,54 +42,32 @@ const AcceptInvitation: React.FC = () => {
     try {
       console.log('🔍 Validating invitation token:', invitationToken);
       
-      // First, let's check what invitation exists with this token (any status)
-      const { data: allData, error: debugError } = await supabase
-        .from('pending_users')
-        .select('*')
-        .eq('invitation_token', invitationToken);
-      
-      console.log('🔍 All pending users with this token:', allData);
-      
-      // First, get the pending user data - include both merchant ID fields
-      const { data, error } = await supabase
-        .from('pending_users')
-        .select(`
-          id,
-          email,
-          name,
-          role,
-          merchant_id,
-          merchant_id_uuid,
-          expires_at,
-          status,
-          approval_status
-        `)
-        .eq('invitation_token', invitationToken)
-        .single();
 
-      console.log('🔍 Pending user data:', { data, error });
-      console.log('🔍 merchant_id_uuid value:', data?.merchant_id_uuid);
-      console.log('🔍 merchant_id value:', data?.merchant_id);
-      console.log('🔍 Full data object:', JSON.stringify(data, null, 2));
+      if (supabaseError) {
+        console.warn('⚠️ Supabase error in URL:', { supabaseError, errorCode, errorDescription });
+        // Clear the error from URL but continue with invitation processing
+        window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+      }
 
-      // Check both possible merchant ID fields
-      const merchantId = data?.merchant_id_uuid || data?.merchant_id;
-      console.log('🔍 Using merchant ID:', merchantId);
-
-      if (merchantId) {
-        // Separately fetch merchant data
-        const { data: merchantData, error: merchantError } = await supabase
-          .from('merchants')
-          .select('name, id')
-          .eq('id', merchantId)
+      try {
+        console.log('🔍 Fetching invitation with token:', token);
+        
+        const { data, error } = await supabase
+          .from('pending_users')
+          .select(`
+            id,
+            email,
+            name,
+            role,
+            merchant_id,
+            expires_at,
+            status,
+            approval_status,
+            merchants!inner(name)
+          `)
+          .eq('invitation_token', token)
+          .eq('status', 'pending')
           .single();
-        
-        console.log('🏪 Merchant query result:', { merchantData, merchantError });
-        
-        // Add merchant data to the result
-        if (merchantData) {
-          (data as any).merchants = merchantData;
-        } else if (merchantError) {
           console.error('❌ Merchant query failed:', merchantError);
           // Set a fallback merchant name with the ID for debugging
           (data as any).merchants = { name: `Merchant (${merchantId.slice(0, 8)}...)` };
