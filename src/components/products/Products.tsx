@@ -132,6 +132,7 @@ const Products: React.FC = () => {
     {
       product_id: '1',
       merchant_id: merchantData?.merchant_id || '',
+      item_name: 'Premium Coffee Blend',
       name: 'Premium Coffee Blend',
       description: 'Artisan roasted coffee beans from Colombia',
       sku: 'COFFEE-001',
@@ -148,6 +149,7 @@ const Products: React.FC = () => {
     {
       product_id: '2',
       merchant_id: merchantData?.merchant_id || '',
+      item_name: 'Organic Tea Selection',
       name: 'Organic Tea Selection',
       description: 'Assorted organic tea bags',
       sku: 'TEA-002',
@@ -163,6 +165,7 @@ const Products: React.FC = () => {
     {
       product_id: '3',
       merchant_id: merchantData?.merchant_id || '',
+      item_name: 'Chocolate Croissant',
       name: 'Chocolate Croissant',
       description: 'Fresh baked pastry with chocolate filling',
       sku: 'PASTRY-003',
