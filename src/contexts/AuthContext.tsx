@@ -69,33 +69,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }
 
-  // Fetch user data from database
-  const fetchUserData = async (authUserId: string): Promise<any> => {
-    try {
-      const { data: userData, error } = await supabase
-        .from('users')
-        .select(`
-          user_id,
-          name,
-          email,
-          role,
-          merchant_id
-        `)
-        .eq('auth_user_id', authUserId)
-        .single()
-
-      if (error) {
-        console.error('Error fetching user data:', error)
-        return null
-      }
-
-      return userData
-    } catch (error) {
-      console.error('Error in fetchUserData:', error)
-      return null
-    }
-  }
-
   // Fetch merchant data with timeout
   const fetchMerchantData = async (merchantId: string): Promise<Merchant | null> => {
     try {
