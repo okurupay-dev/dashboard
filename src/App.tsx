@@ -5,6 +5,9 @@ import DashboardLayout from './components/layout/DashboardLayout';
 import Dashboard from './components/dashboard/Dashboard';
 import Transactions from './components/transactions/Transactions';
 import Invoices from './components/invoices/Invoices';
+import InvoiceCreate from './components/invoices/InvoiceCreate';
+import InvoiceDetail from './components/invoices/InvoiceDetail';
+import PublicInvoice from './components/invoices/PublicInvoice';
 import Analytics from './components/analytics/Analytics';
 import Reports from './components/reports/Reports';
 import Taxes from './components/taxes/Taxes';
@@ -27,9 +30,9 @@ function App() {
         <Routes>
           {/* Public routes */}
           <Route path="/sign-in" element={<SupabaseSignIn />} />
-          <Route path="/signin" element={<SupabaseSignIn />} />
           <Route path="/accept-invitation" element={<AcceptInvitation />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/invoice/:publicId" element={<PublicInvoice />} />
           
           {/* Protected routes */}
           <Route path="/" element={
@@ -40,6 +43,8 @@ function App() {
             <Route index element={<Dashboard />} />
             <Route path="transactions" element={<Transactions />} />
             <Route path="invoices" element={<Invoices />} />
+            <Route path="invoices/new" element={<InvoiceCreate />} />
+            <Route path="invoices/:id" element={<InvoiceDetail />} />
             <Route path="terminals" element={<Terminals />} />
             <Route path="terminals/virtual" element={<VirtualTerminals />} />
             <Route path="analytics" element={<Analytics />} />

@@ -1,120 +1,73 @@
 import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
-import { Plus, FileText, Send, Eye, Download, Edit, Trash2 } from 'lucide-react';
+import { Plus, FileText, Send, Eye, Download, Edit, Trash2, Search, Filter, Copy, MoreHorizontal, Calendar } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase';
-
-interface Invoice {
-  id: string;
-  invoice_number: string;
-  customer_name: string;
-  customer_email: string;
-  amount: number;
-  status: 'draft' | 'sent' | 'paid' | 'overdue';
-  due_date: string;
-  created_at: string;
-  description?: string;
-}
+import { useInvoiceStore, InvoiceStatus } from '../../stores/invoiceStore';
 
 const Invoices: React.FC = () => {
-  const { userData, merchantData } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [formData, setFormData] = useState({
-    customer_name: '',
-    customer_email: '',
-    amount: '',
-    description: '',
-    due_date: ''
+  const navigate = useNavigate();
+  const { 
+    listInvoices, 
+    sendInvoice, 
+    cancelInvoice, 
+    copyPayLink 
+  } = useInvoiceStore();
+  
+  const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<InvoiceStatus | 'all'>('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Get filtered invoices
+  const invoices = listInvoices({
+    status: statusFilter === 'all' ? undefined : statusFilter,
+    search: searchTerm || undefined,
+    date_from: dateFrom || undefined,
+    date_to: dateTo || undefined
   });
 
-  const merchantId = merchantData?.merchant_id;
-
-  // Load invoices
-  const loadInvoices = async () => {
-    if (!merchantId) return;
-
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('invoices')
-        .select('*')
-        .eq('merchant_id', merchantId)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setInvoices(data || []);
-    } catch (error) {
-      console.error('Error loading invoices:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadInvoices();
-  }, [merchantId]);
-
-  // Create invoice
-  const handleCreateInvoice = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!merchantId || !userData) return;
-
-    try {
-      const invoiceNumber = `INV-${Date.now()}`;
-      const { error } = await supabase
-        .from('invoices')
-        .insert({
-          invoice_number: invoiceNumber,
-          customer_name: formData.customer_name,
-          customer_email: formData.customer_email,
-          amount: parseFloat(formData.amount),
-          description: formData.description,
-          due_date: formData.due_date,
-          status: 'draft',
-          merchant_id: merchantId,
-          created_by: userData.user_id
-        });
-
-      if (error) throw error;
-
-      setShowCreateModal(false);
-      setFormData({
-        customer_name: '',
-        customer_email: '',
-        amount: '',
-        description: '',
-        due_date: ''
-      });
-      loadInvoices();
-    } catch (error) {
-      console.error('Error creating invoice:', error);
-      alert('Failed to create invoice. Please try again.');
-    }
-  };
-
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: InvoiceStatus) => {
     switch (status) {
       case 'draft': return 'bg-gray-100 text-gray-800';
       case 'sent': return 'bg-blue-100 text-blue-800';
+      case 'viewed': return 'bg-purple-100 text-purple-800';
+      case 'pending_payment': return 'bg-yellow-100 text-yellow-800';
       case 'paid': return 'bg-green-100 text-green-800';
-      case 'overdue': return 'bg-red-100 text-red-800';
+      case 'expired': return 'bg-red-100 text-red-800';
+      case 'canceled': return 'bg-gray-100 text-gray-800';
+      case 'underpaid': return 'bg-orange-100 text-orange-800';
+      case 'overpaid': return 'bg-blue-100 text-blue-800';
+      case 'refunded': return 'bg-indigo-100 text-indigo-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading invoices...</p>
-        </div>
-      </div>
-    );
-  }
+  const handleSendInvoice = (id: string) => {
+    sendInvoice(id);
+    // Show toast notification (mock)
+    alert('Invoice sent successfully!');
+  };
+
+  const handleCancelInvoice = (id: string, invoice: any) => {
+    if (window.confirm(`Are you sure you want to cancel invoice ${invoice.invoice_number}?`)) {
+      cancelInvoice(id);
+      alert('Invoice canceled successfully!');
+    }
+  };
+
+  const handleCopyPayLink = (id: string) => {
+    const link = copyPayLink(id);
+    alert(`Pay link copied to clipboard: ${link}`);
+  };
+
+  const handleResendInvoice = (id: string) => {
+    // Mock resend action
+    alert('Invoice resent successfully!');
+  };
 
   return (
     <div className="space-y-6">
@@ -125,7 +78,7 @@ const Invoices: React.FC = () => {
           <p className="text-gray-600">Create and manage one-time invoices</p>
         </div>
         <Button 
-          onClick={() => setShowCreateModal(true)}
+          onClick={() => navigate('/invoices/new')}
           className="bg-blue-600 hover:bg-blue-700"
         >
           <Plus className="h-4 w-4 mr-2" />
@@ -133,33 +86,138 @@ const Invoices: React.FC = () => {
         </Button>
       </div>
 
+      {/* Filters and Search */}
+      <Card className="p-4">
+        <div className="flex flex-col lg:flex-row gap-4">
+          {/* Search */}
+          <div className="flex-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <input
+                type="text"
+                placeholder="Search invoices, customers, or emails..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          {/* Status Filter */}
+          <div className="w-full lg:w-48">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as InvoiceStatus | 'all')}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Statuses</option>
+              <option value="draft">Draft</option>
+              <option value="sent">Sent</option>
+              <option value="viewed">Viewed</option>
+              <option value="pending_payment">Pending Payment</option>
+              <option value="paid">Paid</option>
+              <option value="expired">Expired</option>
+              <option value="canceled">Canceled</option>
+              <option value="underpaid">Underpaid</option>
+              <option value="overpaid">Overpaid</option>
+              <option value="refunded">Refunded</option>
+            </select>
+          </div>
+
+          {/* Date Filters Toggle */}
+          <Button
+            variant="outline"
+            onClick={() => setShowFilters(!showFilters)}
+            className="w-full lg:w-auto"
+          >
+            <Calendar className="h-4 w-4 mr-2" />
+            Date Range
+          </Button>
+        </div>
+
+        {/* Date Range Filters */}
+        {showFilters && (
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="flex items-end">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setDateFrom('');
+                    setDateTo('');
+                  }}
+                  className="w-full sm:w-auto"
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {/* Results Summary */}
+      <div className="text-sm text-gray-600">
+        Showing {invoices.length} invoice{invoices.length !== 1 ? 's' : ''}
+        {statusFilter !== 'all' && ` with status "${statusFilter}"`}
+        {searchTerm && ` matching "${searchTerm}"`}
+      </div>
+
       {/* Invoices List */}
       {invoices.length === 0 ? (
         <Card className="p-8">
           <div className="text-center">
             <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No invoices yet</h3>
-            <p className="text-gray-600 mb-6">Create your first invoice to get started</p>
-            <Button 
-              onClick={() => setShowCreateModal(true)}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Create Invoice
-            </Button>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              {searchTerm || statusFilter !== 'all' ? 'No matching invoices' : 'No invoices yet'}
+            </h3>
+            <p className="text-gray-600 mb-6">
+              {searchTerm || statusFilter !== 'all' 
+                ? 'Try adjusting your search or filters' 
+                : 'Create your first invoice to get started'
+              }
+            </p>
+            {!searchTerm && statusFilter === 'all' && (
+              <Button 
+                onClick={() => navigate('/invoices/new')}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create Invoice
+              </Button>
+            )}
           </div>
         </Card>
       ) : (
-        <Card className="p-6">
+        <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead>
+              <thead className="bg-gray-50">
                 <tr className="border-b border-gray-200">
                   <th className="text-left py-3 px-4 font-medium text-gray-900">Invoice #</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-900">Customer</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-900">Amount</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900">Asset/Chain</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-900">Status</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Due Date</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900">Created</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
                 </tr>
               </thead>
@@ -167,34 +225,100 @@ const Invoices: React.FC = () => {
                 {invoices.map((invoice) => (
                   <tr key={invoice.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="py-3 px-4">
-                      <div className="font-medium text-gray-900">{invoice.invoice_number}</div>
+                      <Link 
+                        to={`/invoices/${invoice.id}`}
+                        className="font-medium text-blue-600 hover:text-blue-800"
+                      >
+                        {invoice.invoice_number}
+                      </Link>
                     </td>
                     <td className="py-3 px-4">
-                      <div className="font-medium text-gray-900">{invoice.customer_name}</div>
+                      <div className="font-medium text-gray-900">
+                        {invoice.customer_name || 'N/A'}
+                      </div>
                       <div className="text-sm text-gray-600">{invoice.customer_email}</div>
                     </td>
                     <td className="py-3 px-4">
-                      <span className="font-medium text-gray-900">${invoice.amount.toFixed(2)}</span>
+                      <div className="font-medium text-gray-900">
+                        {invoice.currency_mode === 'fiat' 
+                          ? `${invoice.fiat_currency} ${invoice.total_amount.toFixed(2)}`
+                          : `${invoice.amount_crypto?.toFixed(6)} ${invoice.crypto_asset}`
+                        }
+                      </div>
+                      {invoice.currency_mode === 'fiat' && invoice.amount_fiat && (
+                        <div className="text-sm text-gray-600">
+                          ${invoice.amount_fiat.toFixed(2)}
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-3 px-4">
+                      {invoice.currency_mode === 'crypto' ? (
+                        <div className="text-sm">
+                          <div className="font-medium">{invoice.crypto_asset}</div>
+                          <div className="text-gray-600">{invoice.chain}</div>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">Fiat</span>
+                      )}
                     </td>
                     <td className="py-3 px-4">
                       <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(invoice.status)}`}>
-                        {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
+                        {invoice.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-gray-600">
-                      {new Date(invoice.due_date).toLocaleDateString()}
+                    <td className="py-3 px-4 text-gray-600 text-sm">
+                      {new Date(invoice.created_at).toLocaleDateString()}
                     </td>
                     <td className="py-3 px-4">
-                      <div className="flex space-x-2">
-                        <Button size="sm" variant="outline">
-                          <Eye className="h-3 w-3" />
+                      <div className="flex items-center space-x-2">
+                        <Link to={`/invoices/${invoice.id}`}>
+                          <Button size="sm" variant="outline" title="View Details">
+                            <Eye className="h-3 w-3" />
+                          </Button>
+                        </Link>
+                        
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={() => handleCopyPayLink(invoice.id)}
+                          title="Copy Pay Link"
+                        >
+                          <Copy className="h-3 w-3" />
                         </Button>
-                        <Button size="sm" variant="outline">
-                          <Send className="h-3 w-3" />
-                        </Button>
-                        <Button size="sm" variant="outline">
-                          <Download className="h-3 w-3" />
-                        </Button>
+
+                        {invoice.status === 'draft' && (
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleSendInvoice(invoice.id)}
+                            title="Send Invoice"
+                          >
+                            <Send className="h-3 w-3" />
+                          </Button>
+                        )}
+
+                        {(invoice.status === 'sent' || invoice.status === 'viewed') && (
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleResendInvoice(invoice.id)}
+                            title="Resend Invoice"
+                          >
+                            <Send className="h-3 w-3" />
+                          </Button>
+                        )}
+
+                        {(invoice.status === 'draft' || invoice.status === 'sent') && (
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleCancelInvoice(invoice.id, invoice)}
+                            title="Cancel Invoice"
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -203,107 +327,6 @@ const Invoices: React.FC = () => {
             </table>
           </div>
         </Card>
-      )}
-
-      {/* Create Invoice Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">Create Invoice</h2>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowCreateModal(false)}
-              >
-                ×
-              </Button>
-            </div>
-
-            <form onSubmit={handleCreateInvoice} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Customer Name *
-                </label>
-                <input
-                  type="text"
-                  value={formData.customer_name}
-                  onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Customer Email *
-                </label>
-                <input
-                  type="email"
-                  value={formData.customer_email}
-                  onChange={(e) => setFormData({ ...formData, customer_email: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Amount *
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.amount}
-                  onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Description
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows={3}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Due Date *
-                </label>
-                <input
-                  type="date"
-                  value={formData.due_date}
-                  onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-
-              <div className="flex justify-end space-x-3 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowCreateModal(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  Create Invoice
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
       )}
     </div>
   );

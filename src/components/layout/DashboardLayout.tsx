@@ -45,7 +45,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   // Fetch user name and merchant info from database
   useEffect(() => {
     if (userData) {
-      setUserName(userData.name || 'User');
+      // Try different name fields that might be available
+      const displayName = userData.name || userData.email?.split('@')[0] || 'User';
+      setUserName(displayName);
     }
     if (merchantData) {
       setMerchantInfo({
