@@ -135,14 +135,21 @@ const Staff: React.FC = () => {
       }
       
       console.log('✅ Current user loaded:', currentUser);
+      console.log('🔍 User role:', currentUser.role);
+      console.log('🔍 Allowed roles:', ['admin', 'merchant', 'merchant_admin', 'okuru_admin']);
+      console.log('🔍 Role check result:', ['admin', 'merchant', 'merchant_admin', 'okuru_admin'].includes(currentUser.role));
+      
       setCurrentUserRole(currentUser.role);
       setMerchantId(currentUser.merchant_id);
 
       // Only admins and merchants can manage staff
       if (!['admin', 'merchant', 'merchant_admin', 'okuru_admin'].includes(currentUser.role)) {
+        console.error('❌ Access denied for role:', currentUser.role);
         setError(`Access denied. Your role (${currentUser.role}) does not have permission to manage staff.`);
         return;
       }
+      
+      console.log('✅ Access granted for role:', currentUser.role);
 
       // Load active staff members for this merchant
       console.log('🔍 Loading active staff members for merchant:', currentUser.merchant_id);
