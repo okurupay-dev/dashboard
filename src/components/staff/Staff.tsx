@@ -1389,7 +1389,7 @@ const Staff: React.FC = () => {
                 </Button>
               </div>
             </form>
-          </Card>
+          </div>
         </div>
       )}
     </div>
