@@ -1,14 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { useWalletStatus } from '../../hooks/useWalletStatus';
-import { Link, useLocation } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase';
-import logo from '../../assets/images/logo.svg';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { 
-  Home, Activity, DollarSign, CreditCard, Settings, 
-  Users, Package, BarChart3, FileText, Calculator,
-  Monitor, ChevronDown, ChevronRight, User, LogOut
+  BarChart3, 
+  CreditCard, 
+  Users, 
+  Settings, 
+  ChevronDown, 
+  ChevronRight,
+  User,
+  LogOut,
+  Smartphone,
+  FileText,
+  TrendingUp,
+  FileBarChart,
+  Calculator,
+  Package,
+  Wallet,
+  Home, Activity, DollarSign, Monitor
 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { useWalletStatus } from '../../hooks/useWalletStatus';
+import logo from '../../logo.svg';
 
 // Check if we're in development mode
 const isDevelopment = process.env.NODE_ENV === 'development';
@@ -26,13 +38,11 @@ interface DashboardLayoutProps {
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const { shouldShowIndicator } = useWalletStatus();
   const location = useLocation();
+  const navigate = useNavigate();
+  const { userData, merchantData, signOut } = useAuth();
+  const [userName, setUserName] = useState('');
+  const [merchantInfo, setMerchantInfo] = useState<MerchantInfo>({ name: '' });
   const currentPath = location.pathname;
-  const { signOut, userData, merchantData } = useAuth();
-  const [userName, setUserName] = useState<string>('Loading...');
-  const [merchantInfo, setMerchantInfo] = useState<MerchantInfo>({
-    name: 'Loading...',
-    logoUrl: logo
-  });
   const [expandedSections, setExpandedSections] = useState<{[key: string]: boolean}>({
     home: true,
     activity: false,
@@ -45,13 +55,12 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   // Fetch user name and merchant info from database
   useEffect(() => {
     if (userData) {
-      // Try different name fields that might be available
-      const displayName = userData.name || userData.email?.split('@')[0] || 'User';
-      setUserName(displayName);
+      // Use the 'name' field from the users table
+      setUserName(userData.name || '');
     }
     if (merchantData) {
       setMerchantInfo({
-        name: merchantData.name || 'Unknown Merchant',
+        name: merchantData.name || '',
         logoUrl: merchantData.logo_url || undefined
       });
     }
@@ -208,13 +217,17 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         
         {/* User Account Section */}
         <div className="border-t border-gray-200 pt-4 mt-4">
-          <div className="flex items-center p-3 rounded-lg bg-gray-50 mb-3">
+          <button
+            onClick={() => navigate('/settings')}
+            className="w-full flex items-center p-3 rounded-lg bg-gray-50 mb-3 hover:bg-gray-100 transition-all duration-200"
+          >
             <User className="h-8 w-8 p-1.5 bg-gray-200 rounded-full mr-3" />
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 text-left">
               <p className="text-sm font-medium text-gray-900 truncate">{userName}</p>
               <p className="text-xs text-gray-600 truncate">{merchantInfo.name}</p>
             </div>
-          </div>
+            <ChevronRight className="h-4 w-4 text-gray-400" />
+          </button>
           
           <button
             onClick={handleLogout}
