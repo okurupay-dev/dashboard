@@ -39,7 +39,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Add timeout to prevent hanging
       const queryPromise = supabase
         .from('users')
-        .select('*')
+        .select(`
+          user_id,
+          name,
+          email,
+          role,
+          merchant_id,
+          status,
+          approved,
+          created_at,
+          updated_at
+        `)
         .eq('auth_user_id', authUserId)
         .single()
 
