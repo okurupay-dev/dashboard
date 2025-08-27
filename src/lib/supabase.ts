@@ -31,7 +31,11 @@ export interface Merchant {
   merchant_id: string
   name: string
   logo_url?: string
-  business_address?: string
+  business_street?: string
+  business_city?: string
+  business_state?: string
+  business_country?: string
+  business_postal_code?: string
   website?: string
   industry?: string
   status: 'active' | 'inactive' | 'suspended'

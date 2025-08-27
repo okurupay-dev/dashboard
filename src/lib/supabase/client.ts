@@ -11,7 +11,11 @@ export interface Database {
           merchant_id: string;
           name: string;
           logo_url: string | null;
-          business_address: string | null;
+          business_street: string | null;
+          business_city: string | null;
+          business_state: string | null;
+          business_country: string | null;
+          business_postal_code: string | null;
           website: string | null;
           industry: string | null;
           created_at: string;

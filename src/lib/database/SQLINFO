@@ -128,8 +128,8 @@ CREATE TABLE public.merchant_documents (
   updated_at timestamp with time zone DEFAULT now(),
   is_active boolean DEFAULT true,
   CONSTRAINT merchant_documents_pkey PRIMARY KEY (document_id),
-  CONSTRAINT merchant_documents_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
-  CONSTRAINT merchant_documents_signed_by_user_id_fkey FOREIGN KEY (signed_by_user_id) REFERENCES public.users(user_id)
+  CONSTRAINT merchant_documents_signed_by_user_id_fkey FOREIGN KEY (signed_by_user_id) REFERENCES public.users(user_id),
+  CONSTRAINT merchant_documents_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id)
 );
 CREATE TABLE public.merchant_wallets (
   wallet_id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -143,7 +143,6 @@ CREATE TABLE public.merchants (
   merchant_id uuid NOT NULL DEFAULT uuid_generate_v4(),
   name character varying NOT NULL,
   logo_url character varying,
-  business_address text,
   website character varying,
   industry character varying,
   created_at timestamp with time zone DEFAULT now(),
@@ -155,6 +154,11 @@ CREATE TABLE public.merchants (
   payout_address character varying,
   merchant_agreement_url text,
   crypto_disclosure_url text,
+  business_street character varying,
+  business_city character varying,
+  business_state character varying,
+  business_country character varying,
+  business_postal_code character varying,
   CONSTRAINT merchants_pkey PRIMARY KEY (merchant_id)
 );
 CREATE TABLE public.okuru_alerts (
@@ -358,9 +362,9 @@ CREATE TABLE public.product_location_inventory (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT product_location_inventory_pkey PRIMARY KEY (inventory_id),
-  CONSTRAINT product_location_inventory_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
+  CONSTRAINT product_location_inventory_location_id_fkey FOREIGN KEY (location_id) REFERENCES public.locations(location_id),
   CONSTRAINT product_location_inventory_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(product_id),
-  CONSTRAINT product_location_inventory_location_id_fkey FOREIGN KEY (location_id) REFERENCES public.locations(location_id)
+  CONSTRAINT product_location_inventory_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id)
 );
 CREATE TABLE public.products (
   product_id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -393,9 +397,9 @@ CREATE TABLE public.products (
   updated_at timestamp with time zone DEFAULT now(),
   created_by uuid,
   CONSTRAINT products_pkey PRIMARY KEY (product_id),
+  CONSTRAINT products_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
   CONSTRAINT products_parent_product_id_fkey FOREIGN KEY (parent_product_id) REFERENCES public.products(product_id),
-  CONSTRAINT products_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(user_id),
-  CONSTRAINT products_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id)
+  CONSTRAINT products_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(user_id)
 );
 CREATE TABLE public.staff_permissions (
   permission_id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -406,8 +410,8 @@ CREATE TABLE public.staff_permissions (
   updated_at timestamp with time zone DEFAULT now(),
   created_by uuid,
   CONSTRAINT staff_permissions_pkey PRIMARY KEY (permission_id),
-  CONSTRAINT staff_permissions_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(user_id),
-  CONSTRAINT staff_permissions_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id)
+  CONSTRAINT staff_permissions_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
+  CONSTRAINT staff_permissions_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(user_id)
 );
 CREATE TABLE public.standalone_invoice_timeline (
   event_id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -417,8 +421,8 @@ CREATE TABLE public.standalone_invoice_timeline (
   created_at timestamp with time zone DEFAULT now(),
   created_by uuid,
   CONSTRAINT standalone_invoice_timeline_pkey PRIMARY KEY (event_id),
-  CONSTRAINT standalone_invoice_timeline_invoice_fkey FOREIGN KEY (invoice_id) REFERENCES public.standalone_invoices(id),
-  CONSTRAINT standalone_invoice_timeline_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(user_id)
+  CONSTRAINT standalone_invoice_timeline_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(user_id),
+  CONSTRAINT standalone_invoice_timeline_invoice_fkey FOREIGN KEY (invoice_id) REFERENCES public.standalone_invoices(id)
 );
 CREATE TABLE public.standalone_invoices (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -466,9 +470,9 @@ CREATE TABLE public.standalone_invoices (
   sent_at timestamp with time zone,
   expires_at timestamp with time zone,
   CONSTRAINT standalone_invoices_pkey PRIMARY KEY (id),
-  CONSTRAINT standalone_invoices_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
   CONSTRAINT standalone_invoices_settlement_wallet_fkey FOREIGN KEY (settlement_wallet_id) REFERENCES public.merchant_wallets(wallet_id),
-  CONSTRAINT standalone_invoices_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(user_id)
+  CONSTRAINT standalone_invoices_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(user_id),
+  CONSTRAINT standalone_invoices_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id)
 );
 CREATE TABLE public.tax_calculations (
   calculation_id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -482,9 +486,9 @@ CREATE TABLE public.tax_calculations (
   calculation_method character varying DEFAULT 'percentage'::character varying CHECK (calculation_method::text = ANY (ARRAY['percentage'::character varying, 'fixed'::character varying, 'compound'::character varying]::text[])),
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT tax_calculations_pkey PRIMARY KEY (calculation_id),
-  CONSTRAINT tax_calculations_tax_setting_id_fkey FOREIGN KEY (tax_setting_id) REFERENCES public.tax_settings(tax_id),
+  CONSTRAINT tax_calculations_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
   CONSTRAINT tax_calculations_invoice_id_fkey FOREIGN KEY (invoice_id) REFERENCES public.invoices(id),
-  CONSTRAINT tax_calculations_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id)
+  CONSTRAINT tax_calculations_tax_setting_id_fkey FOREIGN KEY (tax_setting_id) REFERENCES public.tax_settings(tax_id)
 );
 CREATE TABLE public.tax_settings (
   tax_id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -516,8 +520,8 @@ CREATE TABLE public.terminal_audit_log (
   user_agent text,
   timestamp timestamp with time zone DEFAULT now(),
   CONSTRAINT terminal_audit_log_pkey PRIMARY KEY (audit_id),
-  CONSTRAINT terminal_audit_log_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
   CONSTRAINT terminal_audit_log_actor_user_id_fkey FOREIGN KEY (actor_user_id) REFERENCES public.users(user_id),
+  CONSTRAINT terminal_audit_log_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
   CONSTRAINT terminal_audit_log_terminal_id_fkey FOREIGN KEY (terminal_id) REFERENCES public.terminals(terminal_id)
 );
 CREATE TABLE public.terminal_configurations (
@@ -771,8 +775,8 @@ CREATE TABLE public.virtual_terminal_settings_audit (
   user_agent text,
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT virtual_terminal_settings_audit_pkey PRIMARY KEY (audit_id),
-  CONSTRAINT virtual_terminal_settings_audit_changed_by_fkey FOREIGN KEY (changed_by) REFERENCES public.users(user_id),
-  CONSTRAINT virtual_terminal_settings_audit_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id)
+  CONSTRAINT virtual_terminal_settings_audit_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
+  CONSTRAINT virtual_terminal_settings_audit_changed_by_fkey FOREIGN KEY (changed_by) REFERENCES public.users(user_id)
 );
 CREATE TABLE public.wallet_addresses (
   address_id uuid NOT NULL DEFAULT uuid_generate_v4(),

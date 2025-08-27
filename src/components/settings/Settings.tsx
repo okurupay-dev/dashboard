@@ -16,7 +16,11 @@ interface UserProfile {
 
 interface CompanyProfile {
   businessName: string;
-  businessAddress: string;
+  businessStreet: string;
+  businessCity: string;
+  businessState: string;
+  businessCountry: string;
+  businessPostalCode: string;
   businessWebsite: string;
   businessType: string;
   businessPhone: string;
@@ -50,7 +54,11 @@ const Settings: React.FC = () => {
   // Company information (read-only, managed by Okuru admin)
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>({
     businessName: '',
-    businessAddress: '',
+    businessStreet: '',
+    businessCity: '',
+    businessState: '',
+    businessCountry: '',
+    businessPostalCode: '',
     businessWebsite: '',
     businessType: '',
     businessPhone: '',
@@ -92,12 +100,12 @@ const Settings: React.FC = () => {
           return;
         }
 
-        if (userData) {
-          // Set user profile data
+        if (userDataQuery) {
+          // Set user profile data from database query
           setProfile({
-            name: userData.name || '',
-            email: userData.email || '',
-            role: userData.role || '',
+            name: userDataQuery.name || '',
+            email: userDataQuery.email || '',
+            role: userDataQuery.role || '',
             theme: 'system', // Default until user_preferences table is created
             language: 'English',
             timezone: 'America/New_York'
@@ -140,7 +148,11 @@ const Settings: React.FC = () => {
               .from('merchants')
               .select(`
                 name,
-                business_address,
+                business_street,
+                business_city,
+                business_state,
+                business_country,
+                business_postal_code,
                 website,
                 industry,
                 business_phone,
@@ -152,7 +164,11 @@ const Settings: React.FC = () => {
             if (!merchantError && merchantData) {
               setCompanyProfile({
                 businessName: merchantData.name || '',
-                businessAddress: merchantData.business_address || '',
+                businessStreet: merchantData.business_street || '',
+                businessCity: merchantData.business_city || '',
+                businessState: merchantData.business_state || '',
+                businessCountry: merchantData.business_country || '',
+                businessPostalCode: merchantData.business_postal_code || '',
                 businessWebsite: merchantData.website || '',
                 businessType: merchantData.industry || '',
                 businessPhone: merchantData.business_phone || '',
@@ -360,14 +376,58 @@ const Settings: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Business Address</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Street Address</label>
               <input
                 type="text"
                 className="w-full p-3 sm:p-2 border rounded-lg bg-gray-50 text-base sm:text-sm"
-                value={companyProfile.businessAddress}
+                value={companyProfile.businessStreet}
                 disabled
                 title="Managed by Okuru"
               />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">City</label>
+                <input
+                  type="text"
+                  className="w-full p-3 sm:p-2 border rounded-lg bg-gray-50 text-base sm:text-sm"
+                  value={companyProfile.businessCity}
+                  disabled
+                  title="Managed by Okuru"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">State/Province</label>
+                <input
+                  type="text"
+                  className="w-full p-3 sm:p-2 border rounded-lg bg-gray-50 text-base sm:text-sm"
+                  value={companyProfile.businessState}
+                  disabled
+                  title="Managed by Okuru"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Country</label>
+                <input
+                  type="text"
+                  className="w-full p-3 sm:p-2 border rounded-lg bg-gray-50 text-base sm:text-sm"
+                  value={companyProfile.businessCountry}
+                  disabled
+                  title="Managed by Okuru"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Postal Code</label>
+                <input
+                  type="text"
+                  className="w-full p-3 sm:p-2 border rounded-lg bg-gray-50 text-base sm:text-sm"
+                  value={companyProfile.businessPostalCode}
+                  disabled
+                  title="Managed by Okuru"
+                />
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Website</label>
