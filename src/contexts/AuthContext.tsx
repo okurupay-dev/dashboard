@@ -69,6 +69,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }
 
+  // Fetch user data from database
+  const fetchUserData = async (authUserId: string): Promise<any> => {
+    try {
+      const { data: userData, error } = await supabase
+        .from('users')
+        .select(`
+          user_id,
+          name,
+          email,
+          role,
+          merchant_id
+        `)
+        .eq('auth_user_id', authUserId)
+        .single()
+
+      if (error) {
+        console.error('Error fetching user data:', error)
+        return null
+      }
+
+      return userData
+    } catch (error) {
+      console.error('Error in fetchUserData:', error)
+      return null
+    }
+  }
+
   // Fetch merchant data with timeout
   const fetchMerchantData = async (merchantId: string): Promise<Merchant | null> => {
     try {
@@ -130,21 +157,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const userRole = session.user.user_metadata?.role
         console.log('🎭 User role from metadata:', userRole)
         
-        // Create userData object from session metadata
+        // Fetch actual user data from database
+        const dbUserData = await fetchUserData(session.user.id)
+        
+        // Create userData object combining session and database data
         const userData = {
-          user_id: session.user.id,
+          user_id: dbUserData?.user_id || session.user.id,
           auth_user_id: session.user.id,
-          email: session.user.email,
+          email: dbUserData?.email || session.user.email,
           role: userRole,
-          name: session.user.user_metadata?.name || session.user.email,
-          merchant_id: session.user.user_metadata?.merchant_id,
+          name: dbUserData?.name || session.user.user_metadata?.name || session.user.email,
+          merchant_id: dbUserData?.merchant_id || session.user.user_metadata?.merchant_id,
           status: 'active' as const,
           approved: true,
           created_at: session.user.created_at,
           updated_at: session.user.updated_at
         }
         
-        console.log('📊 User data from metadata:', userData)
+        console.log('📊 User data from database:', userData)
         setUserData(userData)
         
         if (userData?.merchant_id) {
