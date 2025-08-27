@@ -77,7 +77,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Add timeout to prevent hanging
       const queryPromise = supabase
         .from('merchants')
-        .select('*')
+        .select(`
+          merchant_id,
+          name,
+          logo_url,
+          business_street,
+          business_city,
+          business_state,
+          business_country,
+          business_postal_code,
+          website,
+          industry,
+          status,
+          business_phone,
+          business_email,
+          virtual_terminal_enabled,
+          payout_address,
+          created_at,
+          updated_at
+        `)
         .eq('merchant_id', merchantId)
         .single()
 
