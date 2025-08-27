@@ -485,18 +485,25 @@ const Staff: React.FC = () => {
         </Button>
       </div>
 
-      {/* Active Staff Members */}
-      <Card className="p-6">
-        <div className="flex items-center mb-4">
-          <Users className="h-5 w-5 text-green-500 mr-2" />
-          <h2 className="text-lg font-semibold">Active Staff Members ({staffMembers.length})</h2>
-        </div>
-
-        {staffMembers.length === 0 ? (
-          <div className="text-center py-6">
-            <p className="text-gray-600">No active staff members yet</p>
+      {/* All Staff Members - Consolidated View */}
+      {(staffMembers.length > 0 || pendingStaff.length > 0) && (
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">Team Members</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                {staffMembers.length} active • {pendingStaff.length} pending approval
+              </p>
+            </div>
           </div>
-        ) : (
+
+          {/* Active Staff Section */}
+          {staffMembers.length > 0 && (
+            <div className="mb-8">
+              <div className="flex items-center mb-4">
+                <Users className="h-5 w-5 text-green-500 mr-2" />
+                <h3 className="text-lg font-medium text-gray-900">Active Members ({staffMembers.length})</h3>
+              </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -573,22 +580,17 @@ const Staff: React.FC = () => {
               </tbody>
             </table>
           </div>
-        )}
-      </Card>
+            </div>
+          )}
 
-      {/* Pending Staff Members */}
-      <Card className="p-6">
-        <div className="flex items-center mb-4">
-          <Shield className="h-5 w-5 text-yellow-500 mr-2" />
-          <h2 className="text-lg font-semibold">Pending Staff Members ({pendingStaff.length})</h2>
-          <span className="ml-2 text-sm text-gray-500">Awaiting Okuru Support Invitation</span>
-        </div>
-
-        {pendingStaff.length === 0 ? (
-          <div className="text-center py-6">
-            <p className="text-gray-600">No pending staff members</p>
-          </div>
-        ) : (
+          {/* Pending Staff Section */}
+          {pendingStaff.length > 0 && (
+            <div>
+              <div className="flex items-center mb-4">
+                <Shield className="h-5 w-5 text-yellow-500 mr-2" />
+                <h3 className="text-lg font-medium text-gray-900">Pending Approval ({pendingStaff.length})</h3>
+                <span className="ml-2 text-sm text-gray-500">• Awaiting invitation</span>
+              </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -680,20 +682,21 @@ const Staff: React.FC = () => {
                 ))}
               </tbody>
             </table>
-          </div>
-        )}
-      </Card>
+            </div>
+          )}
+        </Card>
+      )}
 
-      {/* Empty State - Show only when both lists are empty */}
+      {/* Consolidated Staff View */}
       {staffMembers.length === 0 && pendingStaff.length === 0 && (
-        <Card className="p-6">
-          <div className="text-center py-8">
-            <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No team members yet</h3>
-            <p className="text-gray-600 mb-4">Add your first team member to get started</p>
+        <Card className="p-8">
+          <div className="text-center">
+            <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">No team members yet</h3>
+            <p className="text-gray-600 mb-6">Add your first team member to get started</p>
             <Button 
               onClick={() => setShowAddStaffModal(true)}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-blue-600 hover:bg-blue-700 px-6 py-2"
             >
               <UserPlus className="h-4 w-4 mr-2" />
               Add Staff Member
