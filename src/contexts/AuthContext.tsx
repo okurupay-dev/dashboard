@@ -30,9 +30,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [userData, setUserData] = useState<User | null>(null)
   const [merchantData, setMerchantData] = useState<Merchant | null>(null)
   const [loading, setLoading] = useState(true)
+  
+  // Cache to avoid repeated queries
+  const [userDataCache, setUserDataCache] = useState<Map<string, User>>(new Map())
+  const [merchantDataCache, setMerchantDataCache] = useState<Map<string, Merchant>>(new Map())
 
-  // Fetch user data from database
+  // Fetch user data from database with caching
   const fetchUserData = async (authUserId: string) => {
+    // Check cache first
+    if (userDataCache.has(authUserId)) {
+      console.log('📋 Using cached user data for:', authUserId)
+      return userDataCache.get(authUserId)!
+    }
+    
     try {
       console.log('🔍 Fetching user data for auth_user_id:', authUserId)
       
@@ -54,7 +64,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single()
 
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Database query timeout')), 5000)
+        setTimeout(() => reject(new Error('Database query timeout')), 3000)
       )
 
       const { data: user, error } = await Promise.race([queryPromise, timeoutPromise]) as any
@@ -72,6 +82,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       console.log('✅ User data found:', user)
+      // Cache the result
+      if (user) {
+        setUserDataCache(prev => new Map(prev).set(authUserId, user))
+      }
       return user
     } catch (error) {
       console.error('❌ Error in fetchUserData:', error)
@@ -79,8 +93,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }
 
-  // Fetch merchant data with timeout
+  // Fetch merchant data with timeout and caching
   const fetchMerchantData = async (merchantId: string): Promise<Merchant | null> => {
+    // Check cache first
+    if (merchantDataCache.has(merchantId)) {
+      console.log('📋 Using cached merchant data for:', merchantId)
+      return merchantDataCache.get(merchantId)!
+    }
+    
     try {
       console.log('🔍 Fetching merchant data for ID:', merchantId)
       
@@ -110,7 +130,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single()
 
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Merchant data fetch timeout')), 10000)
+        setTimeout(() => reject(new Error('Merchant data fetch timeout')), 5000)
       )
 
       const { data: merchant, error } = await Promise.race([queryPromise, timeoutPromise]) as any
@@ -120,7 +140,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return null
       }
 
-      return merchant as Merchant
+      const merchantResult = merchant as Merchant
+      // Cache the result
+      if (merchantResult) {
+        setMerchantDataCache(prev => new Map(prev).set(merchantId, merchantResult))
+      }
+      return merchantResult
     } catch (error) {
       console.error('Error in fetchMerchantData:', error)
       return null
@@ -139,6 +164,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Get role from user_metadata like admin dashboard
         const userRole = session.user.user_metadata?.role
         console.log('🎭 User role from metadata:', userRole)
+        
+        // Set loading to false earlier for better UX
+        setLoading(false)
         
         // Fetch actual user data from database
         const dbUserData = await fetchUserData(session.user.id)
@@ -160,16 +188,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('📊 User data from database:', userData)
         setUserData(userData)
         
+        // Fetch merchant data in parallel for better performance
         if (userData?.merchant_id) {
           console.log('🏪 Fetching merchant data for:', userData.merchant_id)
-          try {
-            const merchantData = await fetchMerchantData(userData.merchant_id)
-            console.log('🏪 Merchant data:', merchantData)
-            setMerchantData(merchantData)
-          } catch (error) {
-            console.error('❌ Failed to fetch merchant data:', error)
-            setMerchantData(null)
-          }
+          // Don't await - let it load in background
+          fetchMerchantData(userData.merchant_id)
+            .then(merchantData => {
+              console.log('🏪 Merchant data:', merchantData)
+              setMerchantData(merchantData)
+            })
+            .catch(error => {
+              console.error('❌ Failed to fetch merchant data:', error)
+              setMerchantData(null)
+            })
         } else {
           console.log('⚠️ No merchant_id in user metadata')
           setMerchantData(null)
