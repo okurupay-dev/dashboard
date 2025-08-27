@@ -4,6 +4,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import DashboardLayout from './components/layout/DashboardLayout';
 import Dashboard from './components/dashboard/Dashboard';
 import Transactions from './components/transactions/Transactions';
+import Invoices from './components/invoices/Invoices';
 import Analytics from './components/analytics/Analytics';
 import Reports from './components/reports/Reports';
 import Taxes from './components/taxes/Taxes';
@@ -38,6 +39,7 @@ function App() {
           }>
             <Route index element={<Dashboard />} />
             <Route path="transactions" element={<Transactions />} />
+            <Route path="invoices" element={<Invoices />} />
             <Route path="terminals" element={<Terminals />} />
             <Route path="terminals/virtual" element={<VirtualTerminals />} />
             <Route path="analytics" element={<Analytics />} />

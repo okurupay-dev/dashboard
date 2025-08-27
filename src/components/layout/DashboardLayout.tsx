@@ -4,6 +4,11 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import logo from '../../assets/images/logo.svg';
+import { 
+  Home, Activity, DollarSign, CreditCard, Settings, 
+  Users, Package, BarChart3, FileText, Calculator,
+  Monitor, ChevronDown, ChevronRight, User, LogOut
+} from 'lucide-react';
 
 // Check if we're in development mode
 const isDevelopment = process.env.NODE_ENV === 'development';
@@ -27,6 +32,14 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const [merchantInfo, setMerchantInfo] = useState<MerchantInfo>({
     name: 'Loading...',
     logoUrl: logo
+  });
+  const [expandedSections, setExpandedSections] = useState<{[key: string]: boolean}>({
+    home: true,
+    activity: false,
+    sales: false,
+    finance: false,
+    operations: false,
+    tools: false
   });
   
   // Fetch user name and merchant info from database
@@ -60,6 +73,69 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       console.error('Error signing out:', error);
     }
   };
+
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  const navigationCategories = [
+    {
+      id: 'home',
+      title: 'Home',
+      icon: Home,
+      items: [
+        { path: '/', label: 'Dashboard', icon: Home, showIndicator: false, isSubItem: false }
+      ]
+    },
+    {
+      id: 'activity',
+      title: 'Activity',
+      icon: Activity,
+      items: [
+        { path: '/transactions', label: 'Transactions', icon: DollarSign, showIndicator: false, isSubItem: false }
+      ]
+    },
+    {
+      id: 'sales',
+      title: 'Sales',
+      icon: BarChart3,
+      items: [
+        { path: '/invoices', label: 'Invoices', icon: FileText, showIndicator: false, isSubItem: false },
+        { path: '/products', label: 'Products', icon: Package, showIndicator: false, isSubItem: false }
+      ]
+    },
+    {
+      id: 'finance',
+      title: 'Finance',
+      icon: CreditCard,
+      items: [
+        { path: '/wallets', label: 'Wallets', icon: CreditCard, showIndicator: shouldShowIndicator, isSubItem: false },
+        { path: '/taxes', label: 'Taxes', icon: Calculator, showIndicator: false, isSubItem: false }
+      ]
+    },
+    {
+      id: 'operations',
+      title: 'Operations',
+      icon: Monitor,
+      items: [
+        { path: '/terminals', label: 'Terminals', icon: Monitor, showIndicator: false, isSubItem: false },
+        { path: '/terminals/virtual', label: 'Virtual Terminals', icon: Monitor, showIndicator: false, isSubItem: true },
+        { path: '/staff', label: 'Staff', icon: Users, showIndicator: false, isSubItem: false }
+      ]
+    },
+    {
+      id: 'tools',
+      title: 'Tools',
+      icon: BarChart3,
+      items: [
+        { path: '/analytics', label: 'Analytics', icon: BarChart3, showIndicator: false, isSubItem: false },
+        { path: '/reports', label: 'Reports', icon: FileText, showIndicator: false, isSubItem: false }
+      ]
+    }
+  ];
   
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100 overflow-hidden">
@@ -69,135 +145,81 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
           <img src={logo} alt="Okuru Logo" className="h-12 w-auto" />
         </div>
         
-        <nav className="space-y-4 mt-2">
-          {/* 1. Dashboard */}
-          <Link to="/">
-            <div className={`sidebar-item flex items-center p-4 rounded-lg transition-all duration-200 ${currentPath === '/' ? 'bg-blue-50 text-blue-700 font-medium shadow-sm' : 'hover:bg-gray-50 text-gray-700'}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-              </svg>
-              <span className="ml-1">Dashboard</span>
-            </div>
-          </Link>
-          {/* 2. Transactions */}
-          <Link to="/transactions">
-            <div className={`sidebar-item flex items-center p-4 rounded-lg transition-all duration-200 ${currentPath === '/transactions' ? 'bg-blue-50 text-blue-700 font-medium shadow-sm' : 'hover:bg-gray-50 text-gray-700'}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className="ml-1">Transactions</span>
-            </div>
-          </Link>
-          {/* 3. Terminals */}
-          <Link to="/terminals">
-            <div className={`sidebar-item flex items-center p-4 rounded-lg transition-all duration-200 ${currentPath === '/terminals' ? 'bg-blue-50 text-blue-700 font-medium shadow-sm' : 'hover:bg-gray-50 text-gray-700'}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-              </svg>
-              <span className="ml-1">Terminals</span>
-            </div>
-          </Link>
-          {/* 3.1 Virtual Terminals Sub-page */}
-          <Link to="/terminals/virtual">
-            <div className={`sidebar-item flex items-center p-4 pl-12 rounded-lg transition-all duration-200 ${currentPath === '/terminals/virtual' ? 'bg-blue-50 text-blue-700 font-medium shadow-sm' : 'hover:bg-gray-50 text-gray-600'}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-              <span className="text-sm">Virtual Terminals</span>
-            </div>
-          </Link>
-          {/* 4. Staff */}
-          <Link to="/staff">
-            <div className={`sidebar-item flex items-center p-4 rounded-lg transition-all duration-200 ${currentPath === '/staff' ? 'bg-blue-50 text-blue-700 font-medium shadow-sm' : 'hover:bg-gray-50 text-gray-700'}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
-              <span className="ml-1">Staff</span>
-            </div>
-          </Link>
-          {/* 5. Products */}
-          <Link to="/products">
-            <div className={`sidebar-item flex items-center p-4 rounded-lg transition-all duration-200 ${currentPath === '/products' ? 'bg-blue-50 text-blue-700 font-medium shadow-sm' : 'hover:bg-gray-50 text-gray-700'}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-              </svg>
-              <span className="ml-1">Products</span>
-            </div>
-          </Link>
-          {/* 6. Wallets */}
-          <Link to="/wallets">
-            <div 
-              className={`sidebar-item flex items-center p-4 rounded-lg transition-all duration-200 
-                ${currentPath === '/wallets' ? 'bg-blue-50 text-blue-700 font-medium shadow-sm' : 'hover:bg-gray-50 text-gray-700'}
-                ${shouldShowIndicator ? 'wallet-attention-border' : ''}`}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-              </svg>
-              <span className="ml-1">Wallets</span>
-              {shouldShowIndicator && (
-                <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-100 text-yellow-800 opacity-80">
-                  required
-                </span>
-              )}
-            </div>
-          </Link>
-          {/* 7. Analytics */}
-          <Link to="/analytics">
-            <div className={`sidebar-item flex items-center p-4 rounded-lg transition-all duration-200 ${currentPath === '/analytics' ? 'bg-blue-50 text-blue-700 font-medium shadow-sm' : 'hover:bg-gray-50 text-gray-700'}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-              <span className="ml-1">Analytics</span>
-            </div>
-          </Link>
-          {/* 7.1 Reports */}
-          <Link to="/reports">
-            <div className={`sidebar-item flex items-center p-4 rounded-lg transition-all duration-200 ${currentPath === '/reports' ? 'bg-blue-50 text-blue-700 font-medium shadow-sm' : 'hover:bg-gray-50 text-gray-700'}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17h6l3 3v-3h2V9h-2M4 4h11v8H9l-3 3v-3H4V4z" />
-              </svg>
-              <span className="ml-1">Reports</span>
-            </div>
-          </Link>
-          {/* 8. Taxes */}
-          <Link to="/taxes">
-            <div className={`sidebar-item flex items-center p-4 rounded-lg transition-all duration-200 ${currentPath === '/taxes' ? 'bg-blue-50 text-blue-700 font-medium shadow-sm' : 'hover:bg-gray-50 text-gray-700'}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-              </svg>
-              <span className="ml-1">Taxes</span>
-            </div>
-          </Link>
-          {/* 9. Settings */}
-          <Link to="/settings">
-            <div className={`sidebar-item flex items-center p-4 rounded-lg transition-all duration-200 ${currentPath === '/settings' ? 'bg-blue-50 text-blue-700 font-medium shadow-sm' : 'hover:bg-gray-50 text-gray-700'}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              <span className="ml-1">Settings</span>
-            </div>
-          </Link>
+        <nav className="space-y-2 mt-2 flex-1">
+          {navigationCategories.map((category) => {
+            const CategoryIcon = category.icon;
+            const isExpanded = expandedSections[category.id];
+            
+            return (
+              <div key={category.id} className="space-y-1">
+                {/* Category Header */}
+                <button
+                  onClick={() => toggleSection(category.id)}
+                  className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 text-gray-700 font-medium text-sm transition-all duration-200"
+                >
+                  <div className="flex items-center">
+                    <CategoryIcon className="h-4 w-4 mr-3" />
+                    <span>{category.title}</span>
+                  </div>
+                  {isExpanded ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </button>
+                
+                {/* Category Items */}
+                {isExpanded && (
+                  <div className="space-y-1 ml-2">
+                    {category.items.map((item) => {
+                      const ItemIcon = item.icon;
+                      const isActive = currentPath === item.path;
+                      
+                      return (
+                        <Link key={item.path} to={item.path}>
+                          <div className={`
+                            sidebar-item flex items-center p-3 rounded-lg transition-all duration-200
+                            ${item.isSubItem ? 'ml-4' : ''}
+                            ${isActive 
+                              ? 'bg-blue-50 text-blue-700 font-medium shadow-sm' 
+                              : 'hover:bg-gray-50 text-gray-700'
+                            }
+                            ${item.showIndicator ? 'wallet-attention-border' : ''}
+                          `}>
+                            <ItemIcon className="h-4 w-4 mr-3" />
+                            <span className="text-sm">{item.label}</span>
+                            {item.showIndicator && (
+                              <span className="ml-auto inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-100 text-yellow-800 opacity-80">
+                                required
+                              </span>
+                            )}
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
         
-        <div className="mt-auto pt-8">
-          <div className="p-3 mb-3 border-t pt-3">
-            <div className="flex items-center mb-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              <span className="text-sm font-medium text-gray-700">{userName}</span>
+        {/* User Account Section */}
+        <div className="border-t border-gray-200 pt-4 mt-4">
+          <div className="flex items-center p-3 rounded-lg bg-gray-50 mb-3">
+            <User className="h-8 w-8 p-1.5 bg-gray-200 rounded-full mr-3" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900 truncate">{userName}</p>
+              <p className="text-xs text-gray-600 truncate">{merchantInfo.name}</p>
             </div>
           </div>
-          <button 
+          
+          <button
             onClick={handleLogout}
-            className="sidebar-item flex items-center text-gray-600 p-2 rounded-md hover:bg-gray-100 w-full text-left transition-colors duration-200 hover:text-red-600"
+            className="w-full flex items-center p-3 rounded-lg hover:bg-red-50 text-gray-700 hover:text-red-700 transition-all duration-200"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-            Logout
+            <LogOut className="h-4 w-4 mr-3" />
+            <span className="text-sm">Sign Out</span>
           </button>
         </div>
       </div>
@@ -207,14 +229,17 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         <div className="flex items-center justify-between p-4 border-b flex-shrink-0" style={{ background: 'linear-gradient(135deg, #ffffff 0%, #999999 100%)' }}>
           <div>
             <h1 className="text-2xl font-bold text-gray-800 tracking-tight">
-              {currentPath === '/dashboard' ? 'Dashboard' : ''}
+              {currentPath === '/' ? 'Dashboard' : ''}
               {currentPath === '/transactions' ? 'Transactions' : ''}
+              {currentPath === '/invoices' ? 'Invoices' : ''}
+              {currentPath === '/products' ? 'Products' : ''}
+              {currentPath === '/wallets' ? 'Wallets' : ''}
+              {currentPath === '/taxes' ? 'Taxes' : ''}
+              {currentPath === '/terminals' ? 'Terminals' : ''}
+              {currentPath === '/terminals/virtual' ? 'Virtual Terminals' : ''}
+              {currentPath === '/staff' ? 'Staff' : ''}
               {currentPath === '/analytics' ? 'Analytics' : ''}
               {currentPath === '/reports' ? 'Reports' : ''}
-              {currentPath === '/taxes' ? 'Taxes' : ''}
-              {currentPath === '/products' ? 'Products' : ''}
-              {currentPath === '/settings' ? 'Settings' : ''}
-              {currentPath === '/terminals' ? 'Terminals' : ''}
             </h1>
           </div>
           <div className="flex items-center">
