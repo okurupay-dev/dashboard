@@ -69,14 +69,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }
 
-  // Fetch merchant data
-  const fetchMerchantData = async (merchantId: string) => {
+  // Fetch merchant data with timeout
+  const fetchMerchantData = async (merchantId: string): Promise<Merchant | null> => {
     try {
-      const { data: merchant, error } = await supabase
+      console.log('🔍 Fetching merchant data for ID:', merchantId)
+      
+      // Add timeout to prevent hanging
+      const queryPromise = supabase
         .from('merchants')
         .select('*')
         .eq('merchant_id', merchantId)
         .single()
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Merchant data fetch timeout')), 10000)
+      )
+
+      const { data: merchant, error } = await Promise.race([queryPromise, timeoutPromise]) as any
 
       if (error) {
         console.error('Error fetching merchant data:', error)
@@ -90,63 +99,79 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }
 
-  // Auth state change handler
+  // Auth state change handler with timeout protection
   const handleAuthStateChange = useCallback(async (event: any, session: any) => {
     console.log('🔄 Auth state change:', event, 'Session exists:', !!session)
     
-    if (event === 'SIGNED_IN' && session?.user) {
-      console.log('👤 User signed in, checking role from user_metadata')
-      setUser(session.user)
-      
-      // Get role from user_metadata like admin dashboard
-      const userRole = session.user.user_metadata?.role
-      console.log('🎭 User role from metadata:', userRole)
-      
-      // Create userData object from session metadata
-      const userData = {
-        user_id: session.user.id,
-        auth_user_id: session.user.id,
-        email: session.user.email,
-        role: userRole,
-        name: session.user.user_metadata?.name || session.user.email,
-        merchant_id: session.user.user_metadata?.merchant_id,
-        status: 'active' as const,
-        approved: true,
-        created_at: session.user.created_at,
-        updated_at: session.user.updated_at
-      }
-      
-      console.log('📊 User data from metadata:', userData)
-      setUserData(userData)
-      
-      if (userData?.merchant_id) {
-        console.log('🏪 Fetching merchant data for:', userData.merchant_id)
-        const merchantData = await fetchMerchantData(userData.merchant_id)
-        console.log('🏪 Merchant data:', merchantData)
-        setMerchantData(merchantData)
-      } else {
-        console.log('⚠️ No merchant_id in user metadata')
+    try {
+      if (event === 'SIGNED_IN' && session?.user) {
+        console.log('👤 User signed in, checking role from user_metadata')
+        setUser(session.user)
+        
+        // Get role from user_metadata like admin dashboard
+        const userRole = session.user.user_metadata?.role
+        console.log('🎭 User role from metadata:', userRole)
+        
+        // Create userData object from session metadata
+        const userData = {
+          user_id: session.user.id,
+          auth_user_id: session.user.id,
+          email: session.user.email,
+          role: userRole,
+          name: session.user.user_metadata?.name || session.user.email,
+          merchant_id: session.user.user_metadata?.merchant_id,
+          status: 'active' as const,
+          approved: true,
+          created_at: session.user.created_at,
+          updated_at: session.user.updated_at
+        }
+        
+        console.log('📊 User data from metadata:', userData)
+        setUserData(userData)
+        
+        if (userData?.merchant_id) {
+          console.log('🏪 Fetching merchant data for:', userData.merchant_id)
+          try {
+            const merchantData = await fetchMerchantData(userData.merchant_id)
+            console.log('🏪 Merchant data:', merchantData)
+            setMerchantData(merchantData)
+          } catch (error) {
+            console.error('❌ Failed to fetch merchant data:', error)
+            setMerchantData(null)
+          }
+        } else {
+          console.log('⚠️ No merchant_id in user metadata')
+          setMerchantData(null)
+        }
+      } else if (event === 'SIGNED_OUT') {
+        console.log('👋 User signed out')
+        setUser(null)
+        setUserData(null)
         setMerchantData(null)
       }
-    } else if (event === 'SIGNED_OUT') {
-      console.log('👋 User signed out')
-      setUser(null)
-      setUserData(null)
-      setMerchantData(null)
+    } catch (error) {
+      console.error('❌ Error in auth state change handler:', error)
+    } finally {
+      console.log('🔄 Setting loading to false')
+      setLoading(false)
     }
-    
-    console.log('🔄 Setting loading to false')
-    setLoading(false)
   }, [])
 
-  // Initialize auth state
+  // Initialize auth state with timeout protection
   useEffect(() => {
     console.log('🚀 AuthContext initializing...')
     
     const initializeAuth = async () => {
       try {
         console.log('🔍 Getting initial session...')
-        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        // Add timeout to prevent hanging on session fetch
+        const sessionPromise = supabase.auth.getSession()
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Session fetch timeout')), 15000)
+        )
+        
+        const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]) as any
         
         if (error) {
           console.error('❌ Error getting session:', error)
@@ -158,6 +183,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         if (session?.user) {
           console.log('👤 Found existing session, processing...')
+          
+          // Check if session is older than 1 hour
+          const sessionAge = Date.now() - new Date(session.user.last_sign_in_at || session.created_at).getTime()
+          const oneHour = 60 * 60 * 1000
+          
+          if (sessionAge > oneHour) {
+            console.log('⏰ Session older than 1 hour, signing out...')
+            await supabase.auth.signOut()
+            setUser(null)
+            setUserData(null)
+            setMerchantData(null)
+            setLoading(false)
+            return
+          }
+          
           // Use the same logic as auth state change
           await handleAuthStateChange('SIGNED_IN', session)
         } else {
@@ -173,11 +213,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    initializeAuth()
+    // Set a maximum timeout for the entire initialization
+    const initTimeout = setTimeout(() => {
+      console.error('❌ Auth initialization timeout - forcing loading to false')
+      setLoading(false)
+    }, 20000)
+
+    initializeAuth().finally(() => {
+      clearTimeout(initTimeout)
+    })
 
     const subscription = supabase.auth.onAuthStateChange(handleAuthStateChange)
 
-    return () => subscription.data.subscription.unsubscribe()
+    return () => {
+      clearTimeout(initTimeout)
+      subscription.data.subscription.unsubscribe()
+    }
   }, [handleAuthStateChange])
 
   const signIn = async (email: string, password: string) => {
