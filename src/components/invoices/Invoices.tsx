@@ -39,10 +39,13 @@ const Invoices: React.FC = () => {
 
       const data = await invoiceApi.listInvoices(params);
       
+      // Ensure data is an array before filtering
+      const invoicesArray = Array.isArray(data) ? data : [];
+      
       // Filter based on active tab
-      let filteredData = data;
+      let filteredData = invoicesArray;
       if (activeTab === 'overview') {
-        filteredData = data.filter(invoice => 
+        filteredData = invoicesArray.filter(invoice => 
           invoice.status !== 'draft'
         );
       }

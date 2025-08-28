@@ -429,32 +429,6 @@ const InvoiceCreate: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Price Lock (seconds)
-                      </label>
-                      <input
-                        type="number"
-                        {...register('price_lock_secs', { valueAsNumber: true })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        min="60"
-                        max="3600"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Min Confirmations
-                      </label>
-                      <input
-                        type="number"
-                        {...register('min_confirmations', { valueAsNumber: true })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        min="1"
-                        max="12"
-                      />
-                    </div>
-                  </div>
 
                   <div className="flex items-center space-x-6">
                     <label className="flex items-center">
@@ -745,7 +719,6 @@ const InvoiceCreate: React.FC = () => {
                     
                     <div className="mt-6 p-4 bg-blue-50 rounded-lg">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-blue-800">Quote valid for 15 minutes</span>
                         <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center">
                           <span className="text-xs text-gray-500">QR Code</span>
                         </div>
@@ -795,12 +768,19 @@ const InvoiceCreate: React.FC = () => {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={handleSubmit((data: InvoiceFormData) => onSubmit(data, true))}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleSubmit((data: InvoiceFormData) => onSubmit(data, true))();
+                    }}
                   >
                     <Save className="h-4 w-4 mr-2" />
                     Save Draft
                   </Button>
-                  <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+                  <Button 
+                    type="submit" 
+                    className="bg-blue-600 hover:bg-blue-700"
+                    disabled={activeTab !== 'preview'}
+                  >
                     <Send className="h-4 w-4 mr-2" />
                     Create & Send
                   </Button>
