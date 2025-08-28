@@ -91,8 +91,14 @@ export interface Invoice {
 
 class InvoiceApiService {
   private async getAuthToken(): Promise<string | null> {
-    const { data: { session } } = await supabase.auth.getSession();
-    return session?.access_token || null;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log('Auth token status:', session ? 'Found' : 'Missing');
+      return session?.access_token || null;
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      return null;
+    }
   }
 
   async createInvoice(payload: InvoiceApiPayload): Promise<Invoice> {
@@ -135,7 +141,9 @@ class InvoiceApiService {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorText = await response.text();
+      console.error('API Error Response:', errorText);
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
     }
 
     return response.json();

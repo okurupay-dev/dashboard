@@ -50,6 +50,10 @@ const Invoices: React.FC = () => {
       setInvoices(filteredData);
     } catch (error) {
       console.error('Error loading invoices:', error);
+      // Check if it's an auth issue
+      if (error instanceof Error && (error.message?.includes('401') || error.message?.includes('403'))) {
+        console.error('Authentication error - user may need to re-login');
+      }
       setInvoices([]);
     } finally {
       setLoading(false);

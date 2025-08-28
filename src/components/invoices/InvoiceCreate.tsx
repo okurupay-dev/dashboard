@@ -144,7 +144,7 @@ const InvoiceCreate: React.FC = () => {
         
         // Settlement & metadata
         settlement_wallet_id: data.settlement_wallet_id,
-        fee_payer: data.fee_payer || "merchant",
+        fee_payer: "merchant",
         due_date: data.due_date,
         notes: data.notes,
         tags: processedTags,
@@ -577,39 +577,39 @@ const InvoiceCreate: React.FC = () => {
                 <div className="space-y-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Settlement Wallet *
-                      <span className="ml-2 inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-800">
-                        required
-                      </span>
+                      Settlement Wallet
                     </label>
-                    <select
-                      {...register('settlement_wallet_id')}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Select Wallet</option>
-                      {verifiedWallets.map((wallet) => (
-                        <option key={wallet.address_id} value={wallet.address_id}>
-                          Base Network - {wallet.address.slice(0, 6)}...{wallet.address.slice(-4)}
-                        </option>
-                      ))}
-                    </select>
-                    {errors.settlement_wallet_id && (
-                      <p className="text-red-600 text-sm mt-1">{errors.settlement_wallet_id.message}</p>
+                    {verifiedWallets.length > 0 ? (
+                      <div className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-50">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="font-medium text-gray-900">Base Network</span>
+                            <p className="text-sm text-gray-600">
+                              {verifiedWallets[0].address.slice(0, 8)}...{verifiedWallets[0].address.slice(-6)}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                            <span className="text-sm text-green-600 font-medium">Verified</span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-full px-3 py-2 border border-red-200 rounded-md bg-red-50">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                          <span className="text-sm text-red-600">No verified Base wallet found</span>
+                        </div>
+                        <p className="text-xs text-red-500 mt-1">
+                          Please verify a Base network wallet in the Wallets section first
+                        </p>
+                      </div>
                     )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Fee Payer
-                    </label>
-                    <select
-                      {...register('fee_payer')}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="merchant">Merchant</option>
-                      <option value="customer">Customer</option>
-                      <option value="split">Split</option>
-                    </select>
+                    <input
+                      type="hidden"
+                      {...register('settlement_wallet_id')}
+                      value={verifiedWallets[0]?.address_id || ''}
+                    />
                   </div>
 
                   <div>

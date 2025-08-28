@@ -115,6 +115,24 @@ const Wallets: React.FC = () => {
         throw new Error('Merchant ID not found');
       }
 
+      // Check if merchant already has a verified Base network address
+      const { data: existingAddress } = await supabase
+        .from('wallet_addresses')
+        .select(`
+          address_id,
+          address,
+          is_verified,
+          merchant_wallets!inner(merchant_id)
+        `)
+        .eq('merchant_wallets.merchant_id', merchantId)
+        .eq('blockchain', 'Base')
+        .eq('is_verified', true)
+        .maybeSingle();
+
+      if (existingAddress) {
+        throw new Error('Merchant already has a verified Base network address. Only one address per merchant is allowed.');
+      }
+
       // Get or create merchant wallet record
       const { data: walletData, error: walletError } = await supabase
         .from('merchant_wallets')
@@ -135,12 +153,12 @@ const Wallets: React.FC = () => {
         walletId = newWallet.wallet_id;
       }
 
-      // Store verified wallet address
+      // Store verified wallet address (immutable once verified)
       const { error } = await supabase
         .from('wallet_addresses')
         .insert({
           wallet_id: walletId,
-          blockchain: baseNetwork.name,
+          blockchain: 'Base',
           address: walletConnection.address,
           is_verified: true,
           verification_signature: JSON.stringify({
@@ -150,8 +168,9 @@ const Wallets: React.FC = () => {
               auth_user_id: userData?.auth_user_id
             },
             timestamp: Date.now(),
-            network: baseNetwork.name,
-            address: walletConnection.address
+            network: 'Base',
+            address: walletConnection.address,
+            immutable: true
           }),
           verified_at: new Date().toISOString()
         });
