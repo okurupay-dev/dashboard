@@ -97,6 +97,14 @@ const InvoiceCreate: React.FC = () => {
       loadVerifiedWallets();
     }
   }, [userData, merchantData]);
+  
+  // Effect to set settlement_wallet_id when wallets are loaded
+  useEffect(() => {
+    if (verifiedWallets.length > 0) {
+      console.log('Setting settlement_wallet_id to:', verifiedWallets[0].address_id);
+      setValue('settlement_wallet_id', verifiedWallets[0].address_id);
+    }
+  }, [verifiedWallets, setValue]);
 
   const tabs = [
     { id: 'details', label: 'Details' },
@@ -603,10 +611,10 @@ const InvoiceCreate: React.FC = () => {
                         </p>
                       </div>
                     )}
+                    {/* Hidden input for settlement_wallet_id */}
                     <input
                       type="hidden"
                       {...register('settlement_wallet_id')}
-                      value={verifiedWallets[0]?.address_id || ''}
                     />
                   </div>
 
