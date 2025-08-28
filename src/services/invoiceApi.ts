@@ -104,6 +104,8 @@ class InvoiceApiService {
   async createInvoice(payload: InvoiceApiPayload): Promise<Invoice> {
     const token = await this.getAuthToken();
     
+    console.log('Sending invoice payload:', payload);
+    
     const response = await fetch(`${API_BASE_URL}/dashboard-invoices`, {
       method: 'POST',
       headers: {
@@ -114,7 +116,17 @@ class InvoiceApiService {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      // Try to get the error message from the response
+      try {
+        const errorData = await response.json();
+        console.error('API Error Response:', errorData);
+        throw new Error(`HTTP error! status: ${response.status}, message: ${JSON.stringify(errorData)}`);
+      } catch (e) {
+        // If we can't parse the JSON, just get the text
+        const errorText = await response.text();
+        console.error('API Error Response (text):', errorText);
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      }
     }
 
     return response.json();
