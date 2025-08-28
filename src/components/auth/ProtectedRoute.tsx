@@ -20,8 +20,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   // Remove development mode bypass - always enforce authentication
 
-  // Show loading while authentication is being checked
-  if (loading) {
+  // Show loading while authentication is being checked OR if we don't have user data yet
+  if (loading || (isAuthenticated && !userData)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-lg">Loading...</div>
@@ -35,8 +35,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   }
 
   // If user is authenticated but not approved, show pending message
-  // Only show pending approval if we have user data and the user is actually not approved
-  if (isAuthenticated && !isApproved && !loading) {
+  if (isAuthenticated && !isApproved) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="max-w-md w-full space-y-8 text-center">
