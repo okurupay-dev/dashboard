@@ -186,139 +186,66 @@ const Wallets: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      {/* Header */}
-      <div className="flex items-center space-x-3">
-        <Wallet className="h-8 w-8 text-blue-600" />
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Wallet Setup</h1>
-          <p className="text-gray-600">Connect your Non-custodial wallet to accept payments</p>
-        </div>
-      </div>
+    <div className="space-y-4 max-w-2xl">
+      <h1 className="text-2xl font-bold text-gray-900">Non-Custodial Wallets</h1>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-start">
-            <AlertCircle className="h-5 w-5 text-red-500 mr-2 mt-0.5 flex-shrink-0" />
-            <span className="text-red-700">{error}</span>
-          </div>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+          <span className="text-red-700 text-sm">{error}</span>
         </div>
       )}
 
-      {/* Wallet Connection Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <span>Connect Wallet</span>
-            {walletConnection?.address && (
-              <div className="flex items-center gap-2">
-                <Info className="h-4 w-4 text-blue-500" />
-                <span className="text-sm font-normal text-gray-600">
-                  Non-custodial • Cannot be altered after signing
-                </span>
-              </div>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <WalletConnectWidget 
-            onWalletConnected={(walletInfo) => {
-              setWalletConnection({
-                address: walletInfo.address,
-                provider: 'MetaMask',
-                chainId: walletInfo.chainId,
-                isConnected: true
-              });
-            }}
-            onWalletDisconnected={() => {
-              setWalletConnection(null);
-            }}
-          />
-        </CardContent>
-      </Card>
+      <WalletConnectWidget 
+        onWalletConnected={(walletInfo) => {
+          setWalletConnection({
+            address: walletInfo.address,
+            provider: 'MetaMask',
+            chainId: walletInfo.chainId,
+            isConnected: true
+          });
+        }}
+        onWalletDisconnected={() => {
+          setWalletConnection(null);
+        }}
+      />
 
-      {/* Base Network Toggle */}
       {walletConnection?.address && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Base Network</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <p className="text-sm text-gray-600 mb-3">
-                Supported tokens: {baseNetwork.tokens.join(' • ')}
+        <div className="flex items-center justify-between p-3 border rounded-lg">
+          <div>
+            <span className="font-medium">Base Network</span>
+            {isBaseVerified && (
+              <p className="text-sm text-gray-500 mt-1">
+                {verifiedNetworks[0]?.address.slice(0, 6)}...{verifiedNetworks[0]?.address.slice(-4)}
               </p>
-            </div>
-
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="font-medium text-gray-900">Activate Base Network</h3>
-                  {isBaseVerified && (
-                    <Badge className="bg-green-100 text-green-800">
-                      <CheckCircle className="h-3 w-3 mr-1" />
-                      Active
-                    </Badge>
-                  )}
-                </div>
-                <p className="text-sm text-gray-600">
-                  {isBaseVerified 
-                    ? `Connected: ${verifiedNetworks[0]?.address.slice(0, 6)}...${verifiedNetworks[0]?.address.slice(-4)}`
-                    : 'Enable Base network to accept crypto payments'
-                  }
-                </p>
-              </div>
-              
-              <button
-                onClick={handleVerifyNetwork}
-                disabled={verifyingNetwork || isBaseVerified}
-                className={`
-                  relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-                  ${isBaseVerified 
-                    ? 'bg-green-600' 
-                    : verifyingNetwork 
-                      ? 'bg-gray-400' 
-                      : 'bg-gray-200 hover:bg-gray-300'
-                  }
-                  ${verifyingNetwork ? 'cursor-not-allowed' : 'cursor-pointer'}
-                `}
-              >
-                <span
-                  className={`
-                    inline-block h-4 w-4 transform rounded-full bg-white transition-transform flex items-center justify-center
-                    ${isBaseVerified ? 'translate-x-6' : 'translate-x-1'}
-                  `}
-                >
-                  {verifyingNetwork && (
-                    <Loader2 className="h-2 w-2 animate-spin text-gray-600" />
-                  )}
-                </span>
-              </button>
-            </div>
-
-            {verifyingNetwork && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <p className="text-sm text-blue-700">
-                  Please sign the verification message in your wallet to activate Base network...
-                </p>
-              </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+          
+          <button
+            onClick={handleVerifyNetwork}
+            disabled={verifyingNetwork || isBaseVerified}
+            className={`
+              relative inline-flex h-6 w-11 items-center rounded-full transition-colors
+              ${isBaseVerified ? 'bg-green-600' : 'bg-gray-200 hover:bg-gray-300'}
+            `}
+          >
+            <span
+              className={`
+                inline-block h-4 w-4 transform rounded-full bg-white transition-transform flex items-center justify-center
+                ${isBaseVerified ? 'translate-x-6' : 'translate-x-1'}
+              `}
+            >
+              {verifyingNetwork && (
+                <Loader2 className="h-2 w-2 animate-spin text-gray-600" />
+              )}
+            </span>
+          </button>
+        </div>
       )}
 
-      {/* Security Notice */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-start">
-          <AlertTriangle className="h-5 w-5 text-blue-500 mr-2 mt-0.5 flex-shrink-0" />
-          <div>
-            <h3 className="text-sm font-medium text-blue-900 mb-1">Security Notice</h3>
-            <p className="text-sm text-blue-700">
-              Your wallet remains fully under your control. Okuru never has access to your private keys or funds. 
-              Network verification only proves ownership of the wallet address for payment processing.
-            </p>
-          </div>
-        </div>
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+        <p className="text-sm text-blue-700">
+          Your non-custodial wallet remains under your control. Okuru never accesses your private keys or funds.
+        </p>
       </div>
     </div>
   );
