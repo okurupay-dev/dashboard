@@ -420,7 +420,7 @@ const InvoiceCreate: React.FC = () => {
                       <input
                         type="number"
                         step="0.01"
-                        {...register('amount_crypto', { valueAsNumber: true })}
+                        {...register('simple_amount', { valueAsNumber: true })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="0.00"
                       />
@@ -707,7 +707,7 @@ const InvoiceCreate: React.FC = () => {
                       <div className="flex justify-between">
                         <span className="font-medium">Amount:</span>
                         <span>
-                          {`${watchedValues.amount_crypto || watchedValues.simple_amount || 0} ${watchedValues.crypto_asset}`}
+                          {`${watchedValues.simple_amount || 0} ${watchedValues.crypto_asset}`}
                         </span>
                       </div>
                       <div className="flex justify-between">
@@ -839,7 +839,7 @@ const InvoiceCreate: React.FC = () => {
               <div>
                 <span className="text-gray-600">Amount:</span>
                 <div className="font-medium">
-                  {`${watchedValues.amount_crypto || watchedValues.simple_amount || 0} ${watchedValues.crypto_asset || 'USDC'}`}
+                  {`${watchedValues.simple_amount || 0} ${watchedValues.crypto_asset || 'USDC'}`}
                 </div>
               </div>
               <div>
