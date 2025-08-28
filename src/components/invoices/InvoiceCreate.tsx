@@ -108,7 +108,13 @@ const InvoiceCreate: React.FC = () => {
   ];
 
   const onSubmit = async (data: InvoiceFormData, isDraft = false) => {
-    if (!merchantData || !userData) return;
+    console.log('onSubmit called with isDraft:', isDraft);
+    console.log('Form data:', data);
+    
+    if (!merchantData || !userData) {
+      console.error('Missing merchantData or userData');
+      return;
+    }
 
     try {
       setLoading(true);
@@ -252,7 +258,13 @@ const InvoiceCreate: React.FC = () => {
               </nav>
             </div>
 
-            <form onSubmit={handleSubmit((data: InvoiceFormData) => onSubmit(data, false))}>
+            <form onSubmit={(e) => {
+                console.log('Form submit event triggered');
+                handleSubmit((data: InvoiceFormData) => {
+                  console.log('handleSubmit callback executed');
+                  return onSubmit(data, false);
+                })(e);
+              }}>
               {/* Details Tab */}
               {activeTab === 'details' && (
                 <div className="space-y-6">
@@ -805,6 +817,7 @@ const InvoiceCreate: React.FC = () => {
                     variant="outline"
                     onClick={(e) => {
                       e.preventDefault();
+                      console.log('Save Draft button clicked');
                       handleSubmit((data: InvoiceFormData) => onSubmit(data, true))();
                     }}
                   >
@@ -815,6 +828,7 @@ const InvoiceCreate: React.FC = () => {
                     type="submit" 
                     className="bg-blue-600 hover:bg-blue-700"
                     disabled={activeTab !== 'preview'}
+                    onClick={() => console.log('Create & Send button clicked')}
                   >
                     <Send className="h-4 w-4 mr-2" />
                     Create & Send

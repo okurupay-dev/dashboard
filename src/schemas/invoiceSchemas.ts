@@ -32,7 +32,6 @@ export const invoiceFormSchema = z.object({
   currency_mode: z.enum(['crypto']),
   crypto_asset: z.enum(['USDC', 'USDT', 'DAI', 'USDbC']),
   chain: z.enum(['BASE']),
-  amount_crypto: z.number().min(0).optional(),
   price_lock_secs: z.number().min(60).max(3600).optional().default(900),
   min_confirmations: z.number().min(1).max(12).optional().default(1),
   allow_partial: z.boolean().optional().default(false),
@@ -68,7 +67,7 @@ export const invoiceFormSchema = z.object({
   kyc_threshold: z.number().min(0).optional()
 }).refine((data) => {
   // Validate crypto payment details (Base network only)
-  return data.crypto_asset && data.chain && (data.amount_crypto !== undefined || data.simple_amount !== undefined);
+  return data.crypto_asset && data.chain && data.simple_amount !== undefined;
 }, {
   message: 'Crypto payment details are required',
   path: ['currency_mode']
