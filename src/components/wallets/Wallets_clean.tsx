@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { Wallet, CheckCircle, AlertTriangle, Loader2, AlertCircle } from 'lucide-react';
+import { Wallet, CheckCircle, AlertTriangle, Loader2, AlertCircle, Info, ToggleLeft, ToggleRight } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { WalletConnectWidget } from './WalletConnectWidget';
@@ -205,83 +205,107 @@ const Wallets: React.FC = () => {
         </div>
       )}
 
-      {/* Base Network Card */}
+      {/* Wallet Connection Section */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Base Network</span>
-            {isBaseVerified ? (
-              <Badge className="bg-green-100 text-green-800">
-                <CheckCircle className="h-3 w-3 mr-1" />
-                Verified
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-300">
-                Setup Required
-              </Badge>
+          <CardTitle className="flex items-center gap-2">
+            <span>Connect Wallet</span>
+            {walletConnection?.address && (
+              <div className="flex items-center gap-2">
+                <Info className="h-4 w-4 text-blue-500" />
+                <span className="text-sm font-normal text-gray-600">
+                  Non-custodial • Cannot be altered after signing
+                </span>
+              </div>
             )}
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <p className="text-sm text-gray-600 mb-3">
-              Supported tokens: {baseNetwork.tokens.join(' • ')}
-            </p>
-          </div>
-
-          {isBaseVerified ? (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <div className="flex items-center">
-                <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
-                <div>
-                  <p className="font-medium text-green-900">Base Network Verified</p>
-                  <p className="text-sm text-green-700">
-                    Address: {verifiedNetworks[0]?.address.slice(0, 6)}...{verifiedNetworks[0]?.address.slice(-4)}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <WalletConnectWidget 
-                onWalletConnected={(walletInfo) => {
-                  setWalletConnection({
-                    address: walletInfo.address,
-                    provider: 'MetaMask',
-                    chainId: walletInfo.chainId,
-                    isConnected: true
-                  });
-                }}
-                onWalletDisconnected={() => {
-                  setWalletConnection(null);
-                }}
-              />
-              
-              {walletConnection?.address && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-sm text-blue-700 mb-3">
-                    Connected: {walletConnection.address.slice(0, 6)}...{walletConnection.address.slice(-4)}
-                  </p>
-                  <Button
-                    onClick={handleVerifyNetwork}
-                    disabled={verifyingNetwork}
-                    className="w-full"
-                  >
-                    {verifyingNetwork ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        Verifying Base Network...
-                      </>
-                    ) : (
-                      'Verify Base Network'
-                    )}
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
+        <CardContent>
+          <WalletConnectWidget 
+            onWalletConnected={(walletInfo) => {
+              setWalletConnection({
+                address: walletInfo.address,
+                provider: 'MetaMask',
+                chainId: walletInfo.chainId,
+                isConnected: true
+              });
+            }}
+            onWalletDisconnected={() => {
+              setWalletConnection(null);
+            }}
+          />
         </CardContent>
       </Card>
+
+      {/* Base Network Toggle */}
+      {walletConnection?.address && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Base Network</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <p className="text-sm text-gray-600 mb-3">
+                Supported tokens: {baseNetwork.tokens.join(' • ')}
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-medium text-gray-900">Activate Base Network</h3>
+                  {isBaseVerified && (
+                    <Badge className="bg-green-100 text-green-800">
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Active
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-sm text-gray-600">
+                  {isBaseVerified 
+                    ? `Connected: ${verifiedNetworks[0]?.address.slice(0, 6)}...${verifiedNetworks[0]?.address.slice(-4)}`
+                    : 'Enable Base network to accept crypto payments'
+                  }
+                </p>
+              </div>
+              
+              <button
+                onClick={handleVerifyNetwork}
+                disabled={verifyingNetwork || isBaseVerified}
+                className={`
+                  relative inline-flex h-6 w-11 items-center rounded-full transition-colors
+                  ${isBaseVerified 
+                    ? 'bg-green-600' 
+                    : verifyingNetwork 
+                      ? 'bg-gray-400' 
+                      : 'bg-gray-200 hover:bg-gray-300'
+                  }
+                  ${verifyingNetwork ? 'cursor-not-allowed' : 'cursor-pointer'}
+                `}
+              >
+                <span
+                  className={`
+                    inline-block h-4 w-4 transform rounded-full bg-white transition-transform flex items-center justify-center
+                    ${isBaseVerified ? 'translate-x-6' : 'translate-x-1'}
+                  `}
+                >
+                  {verifyingNetwork && (
+                    <Loader2 className="h-2 w-2 animate-spin text-gray-600" />
+                  )}
+                </span>
+              </button>
+            </div>
+
+            {verifyingNetwork && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-sm text-blue-700">
+                  Please sign the verification message in your wallet to activate Base network...
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Security Notice */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
