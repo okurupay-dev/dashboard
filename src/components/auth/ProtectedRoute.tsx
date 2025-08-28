@@ -28,7 +28,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
           <img 
             src="/Loading.gif" 
             alt="Loading..." 
-            className="w-24 h-24 mx-auto mb-4"
+            className="w-42 h-42 mx-auto mb-4"
           />
           <div className="text-sm text-gray-600">Preparing your dashboard...</div>
         </div>
