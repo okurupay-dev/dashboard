@@ -16,8 +16,10 @@ const InvoiceCreate: React.FC = () => {
   const { userData, merchantData } = useAuth();
   const { createInvoice, mockWallets } = useInvoiceStore();
   const [activeTab, setActiveTab] = useState('details');
-  const [showPreview, setShowPreview] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [verifiedWallets, setVerifiedWallets] = useState<any[]>([]);
+  const [createdInvoice, setCreatedInvoice] = useState<any>(null);
+  const [qrCodeData, setQrCodeData] = useState<string>('');
 
   const form = useForm({
     resolver: zodResolver(invoiceFormSchema),
@@ -109,17 +111,17 @@ const InvoiceCreate: React.FC = () => {
     if (!merchantData || !userData) return;
 
     try {
-      // Process arrays from comma-separated strings
-      const processedCCEmails = data.customer_cc_emails 
-        ? data.customer_cc_emails.split(',').map(email => email.trim()).filter(email => email)
-        : [];
+      setLoading(true);
       
-      const processedTags = data.tags 
-        ? data.tags.split(',').map(tag => tag.trim()).filter(tag => tag)
-        : [];
+      // Process comma-separated strings for arrays
+      const processedCCEmails = data.customer_cc_emails ? 
+        data.customer_cc_emails.split(',').map(email => email.trim()).filter(email => email) : [];
+      
+      const processedTags = data.tags ? 
+        data.tags.split(',').map(tag => tag.trim()).filter(tag => tag) : [];
 
-      const payload = {
-        // Basic details
+      const payload: InvoiceApiPayload = {
+        // Basic info
         title: data.title,
         description: data.description,
         
@@ -163,17 +165,29 @@ const InvoiceCreate: React.FC = () => {
       };
 
       const result = await invoiceApi.createInvoice(payload);
-
-      if (!isDraft) {
-        alert('Invoice created and sent successfully!');
-      } else {
-        alert('Invoice saved as draft!');
+      console.log('Invoice created:', result);
+      
+      // Store created invoice for QR code and pay link
+      setCreatedInvoice(result);
+      
+      // Generate QR code if not draft
+      if (!isDraft && result.invoice_id) {
+        try {
+          const qrResult = await invoiceApi.getQRCode(result.invoice_id);
+          setQrCodeData(qrResult.qr_code_data);
+        } catch (qrError) {
+          console.error('Error generating QR code:', qrError);
+        }
       }
-
-      navigate('/invoices');
+      
+      // Only redirect if it's a draft, otherwise stay on preview
+      if (isDraft) {
+        navigate('/invoices');
+      }
     } catch (error) {
       console.error('Error creating invoice:', error);
-      alert('Failed to create invoice. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -266,7 +280,7 @@ const InvoiceCreate: React.FC = () => {
                   </div>
 
                   <div className="space-y-4">
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-4 mb-4">
                       <label className="flex items-center">
                         <input
                           type="radio"
@@ -287,23 +301,7 @@ const InvoiceCreate: React.FC = () => {
                       </label>
                     </div>
 
-                    {watchedValues.is_simple_amount ? (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Amount *
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          {...register('simple_amount', { valueAsNumber: true })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="0.00"
-                        />
-                        {errors.simple_amount && (
-                          <p className="text-red-600 text-sm mt-1">{errors.simple_amount.message}</p>
-                        )}
-                      </div>
-                    ) : (
+                    {!watchedValues.is_simple_amount && (
                       <div className="space-y-4">
                         <div className="flex justify-between items-center">
                           <h3 className="text-lg font-medium">Line Items</h3>
@@ -690,9 +688,6 @@ const InvoiceCreate: React.FC = () => {
               )}
 
               {/* Preview Tab */}
-              {activeTab === 'preview' && (
-                <div className="space-y-6">
-                  <div className="bg-gray-50 p-6 rounded-lg">
                     <h3 className="text-lg font-medium mb-4">Invoice Preview</h3>
                     <div className="space-y-4">
                       <div className="flex justify-between">
@@ -701,7 +696,11 @@ const InvoiceCreate: React.FC = () => {
                       </div>
                       <div className="flex justify-between">
                         <span className="font-medium">Customer:</span>
-                        <span>{watchedValues.customer_name || watchedValues.customer_email}</span>
+                        <span>{watchedValues.customer_name || 'Not set'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-medium">Email:</span>
+                        <span>{watchedValues.customer_email || 'Not set'}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="font-medium">Amount:</span>
@@ -709,10 +708,26 @@ const InvoiceCreate: React.FC = () => {
                           {`${watchedValues.amount_crypto || watchedValues.simple_amount || 0} ${watchedValues.crypto_asset}`}
                         </span>
                       </div>
-                      {watchedValues.currency_mode === 'crypto' && (
+                      <div className="flex justify-between">
+                        <span className="font-medium">Chain:</span>
+                        <span>{watchedValues.chain}</span>
+                      </div>
+                      {watchedValues.due_date && (
                         <div className="flex justify-between">
-                          <span className="font-medium">Chain:</span>
-                          <span>{watchedValues.chain}</span>
+                          <span className="font-medium">Due Date:</span>
+                          <span>{new Date(watchedValues.due_date).toLocaleDateString()}</span>
+                        </div>
+                      )}
+                      {watchedValues.description && (
+                        <div className="flex justify-between">
+                          <span className="font-medium">Description:</span>
+                          <span className="text-right max-w-xs truncate">{watchedValues.description}</span>
+                        </div>
+                      )}
+                      {watchedValues.tags && (
+                        <div className="flex justify-between">
+                          <span className="font-medium">Tags:</span>
+                          <span className="text-right">{watchedValues.tags}</span>
                         </div>
                       )}
                     </div>
@@ -720,10 +735,29 @@ const InvoiceCreate: React.FC = () => {
                     <div className="mt-6 p-4 bg-blue-50 rounded-lg">
                       <div className="flex items-center justify-between">
                         <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center">
-                          <span className="text-xs text-gray-500">QR Code</span>
+                          {qrCodeData ? (
+                            <img 
+                              src={qrCodeData} 
+                              alt="Payment QR Code" 
+                              className="w-full h-full object-contain rounded"
+                            />
+                          ) : (
+                            <span className="text-xs text-gray-500">QR Code</span>
+                          )}
                         </div>
                       </div>
-                      <Button className="w-full mt-4" variant="outline">
+                      <Button 
+                        className="w-full mt-4" 
+                        variant="outline"
+                        onClick={() => {
+                          if (createdInvoice?.public_url) {
+                            navigator.clipboard.writeText(createdInvoice.public_url);
+                            alert('Pay link copied to clipboard!');
+                          } else {
+                            alert('Create invoice first to get pay link');
+                          }
+                        }}
+                      >
                         Copy Pay Link
                       </Button>
                     </div>
