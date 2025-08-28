@@ -28,7 +28,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   }
 
   // If user is authenticated but not approved, show pending message
-  if (!isApproved) {
+  // Only show pending approval if we have user data and the user is actually not approved
+  if (isAuthenticated && !isApproved && !loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="max-w-md w-full space-y-8 text-center">

@@ -413,7 +413,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signOut,
     resetPassword,
     isAuthenticated: !!user,
-    isApproved: userData?.role === 'merchant' || userData?.role === 'merchant_admin' || userData?.role === 'admin' || userData?.role === 'staff' || userData?.role === 'okuru_admin',
+    isApproved: !!user && (userData?.role === 'merchant' || userData?.role === 'merchant_admin' || userData?.role === 'admin' || userData?.role === 'staff' || userData?.role === 'okuru_admin'),
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
