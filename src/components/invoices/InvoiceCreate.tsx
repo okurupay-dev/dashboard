@@ -732,37 +732,36 @@ const InvoiceCreate: React.FC = () => {
                           <span className="text-right">{watchedValues.tags.split(',').map(tag => tag.trim()).join(', ')}</span>
                         </div>
                       )}
-                    </div>
-                    
-                    <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center">
-                          {qrCodeData ? (
-                            <img 
-                              src={qrCodeData} 
-                              alt="Payment QR Code" 
-                              className="w-full h-full object-contain rounded"
-                            />
-                          ) : (
-                            <span className="text-xs text-gray-500">QR Code</span>
-                          )}
-                        </div>
+                  </div>
+                  
+                  <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center">
+                        {qrCodeData ? (
+                          <img 
+                            src={qrCodeData} 
+                            alt="Payment QR Code" 
+                            className="w-full h-full object-contain rounded"
+                          />
+                        ) : (
+                          <span className="text-xs text-gray-500">QR Code</span>
+                        )}
                       </div>
-                      <Button 
-                        className="w-full mt-4" 
-                        variant="outline"
-                        onClick={() => {
-                          if (createdInvoice?.public_url) {
-                            navigator.clipboard.writeText(createdInvoice.public_url);
-                            alert('Pay link copied to clipboard!');
-                          } else {
-                            alert('Create invoice first to get pay link');
-                          }
-                        }}
-                      >
-                        Copy Pay Link
-                      </Button>
                     </div>
+                    <Button 
+                      className="w-full mt-4" 
+                      variant="outline"
+                      onClick={() => {
+                        if (createdInvoice?.public_url) {
+                          navigator.clipboard.writeText(createdInvoice.public_url);
+                          alert('Pay link copied to clipboard!');
+                        } else {
+                          alert('Create invoice first to get pay link');
+                        }
+                      }}
+                    >
+                      Copy Pay Link
+                    </Button>
                   </div>
                 </div>
               )}
