@@ -23,8 +23,15 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   // Show loading while authentication is being checked OR if we don't have user data yet
   if (loading || (isAuthenticated && !userData)) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+        <div className="text-center">
+          <img 
+            src="/Loading.gif" 
+            alt="Loading..." 
+            className="w-24 h-24 mx-auto mb-4"
+          />
+          <div className="text-sm text-gray-600">Preparing your dashboard...</div>
+        </div>
       </div>
     )
   }
