@@ -5,11 +5,11 @@ import { Button } from '../ui/button';
 import { Plus, FileText, Send, Eye, Download, Edit, Trash2, Search, Filter, Copy, MoreHorizontal, Calendar } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useInvoiceStore, InvoiceStatus } from '../../stores/invoiceStore';
+import { invoiceApi, Invoice } from '../../services/invoiceApi';
 
 const Invoices: React.FC = () => {
   const navigate = useNavigate();
   const { 
-    listInvoices, 
     sendInvoice, 
     cancelInvoice, 
     copyPayLink 
@@ -22,38 +22,43 @@ const Invoices: React.FC = () => {
   const [dateTo, setDateTo] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'drafted'>('overview');
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
 
-  // Get filtered invoices based on active tab
-  const getFilteredInvoices = () => {
-    const baseFilters = {
-      search: searchTerm || undefined,
-      date_from: dateFrom || undefined,
-      date_to: dateTo || undefined
-    };
+  // Load invoices from API
+  const loadInvoices = async () => {
+    try {
+      setLoading(true);
+      const params: any = {};
+      
+      if (searchTerm) params.search = searchTerm;
+      if (activeTab === 'drafted') {
+        params.status = 'draft';
+      } else if (statusFilter !== 'all') {
+        params.status = statusFilter;
+      }
 
-    if (activeTab === 'drafted') {
-      return listInvoices({
-        ...baseFilters,
-        status: 'draft'
-      });
-    } else {
-      // Overview tab - show sent/paid invoices
-      const allInvoices = listInvoices(baseFilters);
-      return allInvoices.filter(invoice => 
-        invoice.status === 'sent' || 
-        invoice.status === 'paid' || 
-        invoice.status === 'viewed' || 
-        invoice.status === 'pending_payment' ||
-        invoice.status === 'expired' ||
-        invoice.status === 'canceled' ||
-        invoice.status === 'underpaid' ||
-        invoice.status === 'overpaid' ||
-        invoice.status === 'refunded'
-      );
+      const data = await invoiceApi.listInvoices(params);
+      
+      // Filter based on active tab
+      let filteredData = data;
+      if (activeTab === 'overview') {
+        filteredData = data.filter(invoice => 
+          invoice.status !== 'draft'
+        );
+      }
+      
+      setInvoices(filteredData);
+    } catch (error) {
+      console.error('Error loading invoices:', error);
+      setInvoices([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const invoices = getFilteredInvoices();
+  useEffect(() => {
+    loadInvoices();
+  }, [activeTab, statusFilter, searchTerm]);
 
   const getStatusColor = (status: InvoiceStatus) => {
     switch (status) {
@@ -71,27 +76,48 @@ const Invoices: React.FC = () => {
     }
   };
 
-  const handleSendInvoice = (id: string) => {
-    sendInvoice(id);
-    // Show toast notification (mock)
-    alert('Invoice sent successfully!');
-  };
-
-  const handleCancelInvoice = (id: string, invoice: any) => {
-    if (window.confirm(`Are you sure you want to cancel invoice ${invoice.invoice_number}?`)) {
-      cancelInvoice(id);
-      alert('Invoice canceled successfully!');
+  const handleSendInvoice = async (id: string) => {
+    try {
+      await invoiceApi.updateInvoiceStatus(id, 'sent');
+      alert('Invoice sent successfully!');
+      loadInvoices(); // Refresh the list
+    } catch (error) {
+      console.error('Error sending invoice:', error);
+      alert('Failed to send invoice. Please try again.');
     }
   };
 
-  const handleCopyPayLink = (id: string) => {
-    const link = copyPayLink(id);
-    alert(`Pay link copied to clipboard: ${link}`);
+  const handleCancelInvoice = async (id: string, invoice: any) => {
+    if (window.confirm(`Are you sure you want to cancel invoice ${invoice.invoice_number}?`)) {
+      try {
+        await invoiceApi.updateInvoiceStatus(id, 'canceled');
+        alert('Invoice canceled successfully!');
+        loadInvoices(); // Refresh the list
+      } catch (error) {
+        console.error('Error canceling invoice:', error);
+        alert('Failed to cancel invoice. Please try again.');
+      }
+    }
   };
 
-  const handleResendInvoice = (id: string) => {
-    // Mock resend action
-    alert('Invoice resent successfully!');
+  const handleCopyPayLink = (invoice: Invoice) => {
+    if (invoice.public_url) {
+      navigator.clipboard.writeText(invoice.public_url);
+      alert(`Pay link copied to clipboard: ${invoice.public_url}`);
+    } else {
+      alert('Public URL not available for this invoice');
+    }
+  };
+
+  const handleResendInvoice = async (id: string) => {
+    try {
+      await invoiceApi.updateInvoiceStatus(id, 'sent');
+      alert('Invoice resent successfully!');
+      loadInvoices(); // Refresh the list
+    } catch (error) {
+      console.error('Error resending invoice:', error);
+      alert('Failed to resend invoice. Please try again.');
+    }
   };
 
   return (
@@ -296,16 +322,11 @@ const Invoices: React.FC = () => {
                     </td>
                     <td className="py-3 px-4">
                       <div className="font-medium text-gray-900">
-                        {invoice.currency_mode === 'fiat' 
-                          ? `${invoice.fiat_currency} ${invoice.total_amount.toFixed(2)}`
-                          : `${invoice.amount_crypto?.toFixed(6)} ${invoice.crypto_asset}`
+                        {invoice.currency_mode === 'crypto' 
+                          ? `${(invoice.amount_crypto || invoice.simple_amount || 0).toFixed(6)} ${invoice.crypto_asset}`
+                          : `${invoice.fiat_currency || 'USD'} ${(invoice.total_amount || 0).toFixed(2)}`
                         }
                       </div>
-                      {invoice.currency_mode === 'fiat' && invoice.amount_fiat && (
-                        <div className="text-sm text-gray-600">
-                          ${invoice.amount_fiat.toFixed(2)}
-                        </div>
-                      )}
                     </td>
                     <td className="py-3 px-4">
                       {invoice.currency_mode === 'crypto' ? (
@@ -318,7 +339,7 @@ const Invoices: React.FC = () => {
                       )}
                     </td>
                     <td className="py-3 px-4">
-                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(invoice.status)}`}>
+                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(invoice.status as InvoiceStatus)}`}>
                         {invoice.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                       </span>
                     </td>
@@ -336,7 +357,7 @@ const Invoices: React.FC = () => {
                         <Button 
                           size="sm" 
                           variant="outline" 
-                          onClick={() => handleCopyPayLink(invoice.id)}
+                          onClick={() => handleCopyPayLink(invoice)}
                           title="Copy Pay Link"
                         >
                           <Copy className="h-3 w-3" />

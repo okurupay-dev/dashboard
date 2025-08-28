@@ -9,6 +9,7 @@ import { useInvoiceStore } from '../../stores/invoiceStore';
 import { invoiceFormSchema, InvoiceFormData } from '../../schemas/invoiceSchemas';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { invoiceApi } from '../../services/invoiceApi';
 
 const InvoiceCreate: React.FC = () => {
   const navigate = useNavigate();
@@ -34,7 +35,22 @@ const InvoiceCreate: React.FC = () => {
       restricted_jurisdictions: false,
       line_items: [],
       customer_email: '',
-      settlement_wallet_id: ''
+      customer_name: '',
+      customer_cc_emails: '',
+      billing_address: {
+        street: '',
+        city: '',
+        state: '',
+        postal_code: '',
+        country: ''
+      },
+      settlement_wallet_id: '',
+      due_date: '',
+      notes: '',
+      tags: '',
+      webhook_url: '',
+      notification_email: '',
+      send_email: true
     }
   });
 
@@ -89,28 +105,76 @@ const InvoiceCreate: React.FC = () => {
     { id: 'preview', label: 'Preview' }
   ];
 
-  const onSubmit = (data: InvoiceFormData, isDraft = false) => {
+  const onSubmit = async (data: InvoiceFormData, isDraft = false) => {
     if (!merchantData || !userData) return;
 
-    const invoice = createInvoice({
-      ...data,
-      status: isDraft ? 'draft' : 'sent',
-      merchant_id: merchantData.merchant_id,
-      created_by: userData.user_id,
-      line_items: data.line_items || [],
-      subtotal: 0,
-      tax_amount: 0,
-      discount_amount: 0,
-      total_amount: 0
-    });
+    try {
+      // Process arrays from comma-separated strings
+      const processedCCEmails = data.customer_cc_emails 
+        ? data.customer_cc_emails.split(',').map(email => email.trim()).filter(email => email)
+        : [];
+      
+      const processedTags = data.tags 
+        ? data.tags.split(',').map(tag => tag.trim()).filter(tag => tag)
+        : [];
 
-    if (!isDraft) {
-      alert('Invoice created and sent successfully!');
-    } else {
-      alert('Invoice saved as draft!');
+      const payload = {
+        // Basic details
+        title: data.title,
+        description: data.description,
+        
+        // Amount structure
+        is_simple_amount: data.is_simple_amount,
+        simple_amount: data.simple_amount,
+        line_items: data.line_items || [],
+        
+        // Payment configuration
+        currency_mode: "crypto" as const,
+        crypto_asset: data.crypto_asset || 'USDC',
+        chain: "BASE" as const,
+        price_lock_secs: data.price_lock_secs || 900,
+        min_confirmations: data.min_confirmations || 1,
+        allow_partial: data.allow_partial || false,
+        
+        // Customer details
+        customer_email: data.customer_email,
+        customer_name: data.customer_name,
+        customer_cc_emails: processedCCEmails,
+        billing_address: data.billing_address?.street ? data.billing_address : undefined,
+        
+        // Settlement & metadata
+        settlement_wallet_id: data.settlement_wallet_id,
+        fee_payer: data.fee_payer || "merchant",
+        due_date: data.due_date,
+        notes: data.notes,
+        tags: processedTags,
+        
+        // Notifications
+        webhook_url: data.webhook_url,
+        notification_email: data.notification_email,
+        send_email: data.send_email !== false,
+        
+        // Policy
+        terms_conditions: data.terms_url,
+        refund_policy: data.refund_policy_url,
+        
+        // Status
+        status: (isDraft ? 'draft' : 'sent') as 'draft' | 'sent'
+      };
+
+      const result = await invoiceApi.createInvoice(payload);
+
+      if (!isDraft) {
+        alert('Invoice created and sent successfully!');
+      } else {
+        alert('Invoice saved as draft!');
+      }
+
+      navigate('/invoices');
+    } catch (error) {
+      console.error('Error creating invoice:', error);
+      alert('Failed to create invoice. Please try again.');
     }
-
-    navigate('/invoices');
   };
 
   const addLineItem = () => {
@@ -442,6 +506,69 @@ const InvoiceCreate: React.FC = () => {
                       />
                     </div>
                   </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      CC Emails (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      {...register('customer_cc_emails')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="email1@example.com, email2@example.com"
+                    />
+                    <p className="text-sm text-gray-500 mt-1">Separate multiple emails with commas</p>
+                  </div>
+
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-3">Billing Address (Optional)</h3>
+                    <div className="grid grid-cols-1 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Street Address</label>
+                        <input
+                          {...register('billing_address.street')}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="123 Main St"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                          <input
+                            {...register('billing_address.city')}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="New York"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                          <input
+                            {...register('billing_address.state')}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="NY"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Postal Code</label>
+                          <input
+                            {...register('billing_address.postal_code')}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="10001"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                          <input
+                            {...register('billing_address.country')}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="United States"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -483,6 +610,77 @@ const InvoiceCreate: React.FC = () => {
                       <option value="customer">Customer</option>
                       <option value="split">Split</option>
                     </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Due Date (Optional)
+                    </label>
+                    <input
+                      type="date"
+                      {...register('due_date')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Internal Notes (Optional)
+                    </label>
+                    <textarea
+                      {...register('notes')}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Internal notes for this invoice..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Tags (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      {...register('tags')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="tag1, tag2, tag3"
+                    />
+                    <p className="text-sm text-gray-500 mt-1">Separate tags with commas</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Webhook URL (Optional)
+                    </label>
+                    <input
+                      type="url"
+                      {...register('webhook_url')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="https://your-site.com/webhook"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Notification Email (Optional)
+                    </label>
+                    <input
+                      type="email"
+                      {...register('notification_email')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="notifications@yourcompany.com"
+                    />
+                  </div>
+
+                  <div className="flex items-center">
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        {...register('send_email')}
+                        className="mr-2"
+                      />
+                      Send email to customer automatically
+                    </label>
                   </div>
                 </div>
               )}
@@ -534,10 +732,7 @@ const InvoiceCreate: React.FC = () => {
                       <div className="flex justify-between">
                         <span className="font-medium">Amount:</span>
                         <span>
-                          {watchedValues.currency_mode === 'fiat' 
-                            ? `${watchedValues.fiat_currency} ${watchedValues.amount_fiat || watchedValues.simple_amount || 0}`
-                            : `${watchedValues.amount_crypto || watchedValues.simple_amount || 0} ${watchedValues.crypto_asset}`
-                          }
+                          {`${watchedValues.amount_crypto || watchedValues.simple_amount || 0} ${watchedValues.crypto_asset}`}
                         </span>
                       </div>
                       {watchedValues.currency_mode === 'crypto' && (
@@ -628,10 +823,7 @@ const InvoiceCreate: React.FC = () => {
               <div>
                 <span className="text-gray-600">Amount:</span>
                 <div className="font-medium">
-                  {watchedValues.currency_mode === 'fiat' 
-                    ? `${watchedValues.fiat_currency || 'USD'} ${watchedValues.amount_fiat || watchedValues.simple_amount || 0}`
-                    : `${watchedValues.amount_crypto || watchedValues.simple_amount || 0} ${watchedValues.crypto_asset || 'N/A'}`
-                  }
+                  {`${watchedValues.amount_crypto || watchedValues.simple_amount || 0} ${watchedValues.crypto_asset || 'USDC'}`}
                 </div>
               </div>
               <div>
