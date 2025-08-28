@@ -176,6 +176,8 @@ const Wallets: React.FC = () => {
 
   const isBaseVerified = verifiedNetworks.some(vn => vn.blockchain === 'Base');
 
+  const [activeTab, setActiveTab] = useState<'non-custodial' | 'on-off-ramp'>('non-custodial');
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -184,8 +186,6 @@ const Wallets: React.FC = () => {
       </div>
     );
   }
-
-  const [activeTab, setActiveTab] = useState<'non-custodial' | 'on-off-ramp'>('non-custodial');
 
   return (
     <div className="space-y-4 max-w-4xl">
