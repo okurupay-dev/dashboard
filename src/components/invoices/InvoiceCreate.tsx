@@ -691,7 +691,7 @@ const InvoiceCreate: React.FC = () => {
               {activeTab === 'preview' && (
                 <div className="space-y-6">
                   <h3 className="text-lg font-medium mb-4">Invoice Preview</h3>
-                    <div className="space-y-4">
+                  <div className="space-y-4">
                       <div className="flex justify-between">
                         <span className="font-medium">Title:</span>
                         <span>{watchedValues.title || 'Untitled Invoice'}</span>
