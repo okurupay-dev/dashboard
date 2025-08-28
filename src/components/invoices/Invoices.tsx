@@ -21,14 +21,39 @@ const Invoices: React.FC = () => {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'drafted'>('overview');
 
-  // Get filtered invoices
-  const invoices = listInvoices({
-    status: statusFilter === 'all' ? undefined : statusFilter,
-    search: searchTerm || undefined,
-    date_from: dateFrom || undefined,
-    date_to: dateTo || undefined
-  });
+  // Get filtered invoices based on active tab
+  const getFilteredInvoices = () => {
+    const baseFilters = {
+      search: searchTerm || undefined,
+      date_from: dateFrom || undefined,
+      date_to: dateTo || undefined
+    };
+
+    if (activeTab === 'drafted') {
+      return listInvoices({
+        ...baseFilters,
+        status: 'draft'
+      });
+    } else {
+      // Overview tab - show sent/paid invoices
+      const allInvoices = listInvoices(baseFilters);
+      return allInvoices.filter(invoice => 
+        invoice.status === 'sent' || 
+        invoice.status === 'paid' || 
+        invoice.status === 'viewed' || 
+        invoice.status === 'pending_payment' ||
+        invoice.status === 'expired' ||
+        invoice.status === 'canceled' ||
+        invoice.status === 'underpaid' ||
+        invoice.status === 'overpaid' ||
+        invoice.status === 'refunded'
+      );
+    }
+  };
+
+  const invoices = getFilteredInvoices();
 
   const getStatusColor = (status: InvoiceStatus) => {
     switch (status) {
@@ -86,6 +111,36 @@ const Invoices: React.FC = () => {
         </Button>
       </div>
 
+      {/* Tab Navigation */}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`
+              py-2 px-1 border-b-2 font-medium text-sm transition-colors
+              ${activeTab === 'overview'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }
+            `}
+          >
+            Overview
+          </button>
+          <button
+            onClick={() => setActiveTab('drafted')}
+            className={`
+              py-2 px-1 border-b-2 font-medium text-sm transition-colors
+              ${activeTab === 'drafted'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }
+            `}
+          >
+            Drafted
+          </button>
+        </nav>
+      </div>
+
       {/* Filters and Search */}
       <Card className="p-4">
         <div className="flex flex-col lg:flex-row gap-4">
@@ -103,26 +158,27 @@ const Invoices: React.FC = () => {
             </div>
           </div>
 
-          {/* Status Filter */}
-          <div className="w-full lg:w-48">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as InvoiceStatus | 'all')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Statuses</option>
-              <option value="draft">Draft</option>
-              <option value="sent">Sent</option>
-              <option value="viewed">Viewed</option>
-              <option value="pending_payment">Pending Payment</option>
-              <option value="paid">Paid</option>
-              <option value="expired">Expired</option>
-              <option value="canceled">Canceled</option>
-              <option value="underpaid">Underpaid</option>
-              <option value="overpaid">Overpaid</option>
-              <option value="refunded">Refunded</option>
-            </select>
-          </div>
+          {/* Status Filter - Only show for Overview tab */}
+          {activeTab === 'overview' && (
+            <div className="w-full lg:w-48">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as InvoiceStatus | 'all')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">All Statuses</option>
+                <option value="sent">Sent</option>
+                <option value="viewed">Viewed</option>
+                <option value="pending_payment">Pending Payment</option>
+                <option value="paid">Paid</option>
+                <option value="expired">Expired</option>
+                <option value="canceled">Canceled</option>
+                <option value="underpaid">Underpaid</option>
+                <option value="overpaid">Overpaid</option>
+                <option value="refunded">Refunded</option>
+              </select>
+            </div>
+          )}
 
           {/* Date Filters Toggle */}
           <Button

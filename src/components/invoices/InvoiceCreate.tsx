@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,6 +8,7 @@ import { Plus, Minus, ArrowLeft, Save, Send, Eye } from 'lucide-react';
 import { useInvoiceStore } from '../../stores/invoiceStore';
 import { invoiceFormSchema, InvoiceFormData } from '../../schemas/invoiceSchemas';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
 
 const InvoiceCreate: React.FC = () => {
   const navigate = useNavigate();
@@ -15,13 +16,15 @@ const InvoiceCreate: React.FC = () => {
   const { createInvoice, mockWallets } = useInvoiceStore();
   const [activeTab, setActiveTab] = useState('details');
   const [showPreview, setShowPreview] = useState(false);
+  const [verifiedWallets, setVerifiedWallets] = useState<any[]>([]);
 
   const form = useForm({
     resolver: zodResolver(invoiceFormSchema),
     defaultValues: {
       is_simple_amount: true,
-      currency_mode: 'fiat',
-      fiat_currency: 'USD',
+      currency_mode: 'crypto',
+      crypto_asset: 'USDC',
+      chain: 'BASE',
       price_lock_secs: 900,
       min_confirmations: 1,
       allow_partial: false,
@@ -37,6 +40,45 @@ const InvoiceCreate: React.FC = () => {
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = form;
   const watchedValues = watch();
+
+  // Load verified wallets from database
+  const loadVerifiedWallets = async () => {
+    if (!userData || !merchantData) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('wallet_addresses')
+        .select(`
+          address_id,
+          blockchain,
+          address,
+          is_verified,
+          verified_at,
+          merchant_wallets!inner(merchant_id)
+        `)
+        .eq('merchant_wallets.merchant_id', merchantData.merchant_id)
+        .eq('is_verified', true)
+        .eq('blockchain', 'Base')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      setVerifiedWallets(data || []);
+      
+      // Auto-select first verified wallet if available
+      if (data && data.length > 0 && !watchedValues.settlement_wallet_id) {
+        setValue('settlement_wallet_id', data[0].address_id);
+      }
+    } catch (err: any) {
+      console.error('Error loading verified wallets:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (userData && merchantData) {
+      loadVerifiedWallets();
+    }
+  }, [userData, merchantData]);
 
   const tabs = [
     { id: 'details', label: 'Details' },
@@ -277,106 +319,51 @@ const InvoiceCreate: React.FC = () => {
               {/* Payment Tab */}
               {activeTab === 'payment' && (
                 <div className="space-y-6">
-                  <div className="flex items-center space-x-4">
-                    <label className="flex items-center">
-                      <input
-                        type="radio"
-                        {...register('currency_mode')}
-                        value="fiat"
-                        className="mr-2"
-                      />
-                      Fiat Currency
-                    </label>
-                    <label className="flex items-center">
-                      <input
-                        type="radio"
-                        {...register('currency_mode')}
-                        value="crypto"
-                        className="mr-2"
-                      />
-                      Cryptocurrency
-                    </label>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                    <p className="text-sm text-blue-700">
+                      Only stablecoins are supported for payments. Select your preferred stablecoin and network.
+                    </p>
                   </div>
 
-                  {watchedValues.currency_mode === 'fiat' ? (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Currency *
-                        </label>
-                        <select
-                          {...register('fiat_currency')}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="USD">USD</option>
-                          <option value="EUR">EUR</option>
-                          <option value="JPY">JPY</option>
-                          <option value="THB">THB</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Amount *
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          {...register('amount_fiat', { valueAsNumber: true })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="0.00"
-                        />
-                      </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Stablecoin *
+                      </label>
+                      <select
+                        {...register('crypto_asset')}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="USDC">USDC</option>
+                        <option value="USDT">USDT</option>
+                        <option value="DAI">DAI</option>
+                        <option value="USDbC">USDbC</option>
+                      </select>
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Asset *
-                        </label>
-                        <select
-                          {...register('crypto_asset')}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="">Select Asset</option>
-                          <option value="USDC">USDC</option>
-                          <option value="USDT">USDT</option>
-                          <option value="ETH">ETH</option>
-                          <option value="BTC">BTC</option>
-                          <option value="SOL">SOL</option>
-                          <option value="ADA">ADA</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Chain *
-                        </label>
-                        <select
-                          {...register('chain')}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="">Select Chain</option>
-                          <option value="ETHEREUM">Ethereum</option>
-                          <option value="BASE">Base</option>
-                          <option value="SOLANA">Solana</option>
-                          <option value="CARDANO">Cardano</option>
-                          <option value="AVALANCHE">Avalanche</option>
-                          <option value="APTOS">Aptos</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Amount *
-                        </label>
-                        <input
-                          type="number"
-                          step="0.000001"
-                          {...register('amount_crypto', { valueAsNumber: true })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="0.000000"
-                        />
-                      </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Network *
+                      </label>
+                      <select
+                        {...register('chain')}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="BASE">Base</option>
+                      </select>
                     </div>
-                  )}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Amount *
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        {...register('amount_crypto', { valueAsNumber: true })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -473,9 +460,9 @@ const InvoiceCreate: React.FC = () => {
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Select Wallet</option>
-                      {mockWallets.map((wallet) => (
-                        <option key={wallet.id} value={wallet.id}>
-                          {wallet.name} ({wallet.asset}) - {wallet.balance.toFixed(2)}
+                      {verifiedWallets.map((wallet) => (
+                        <option key={wallet.address_id} value={wallet.address_id}>
+                          Base Network - {wallet.address.slice(0, 6)}...{wallet.address.slice(-4)}
                         </option>
                       ))}
                     </select>
@@ -526,30 +513,6 @@ const InvoiceCreate: React.FC = () => {
                         placeholder="https://example.com/refund"
                       />
                     </div>
-                  </div>
-
-                  <div className="flex items-center space-x-6">
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        {...register('restricted_jurisdictions')}
-                        className="mr-2"
-                      />
-                      Restricted Jurisdictions
-                    </label>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      KYC Threshold (Optional)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      {...register('kyc_threshold', { valueAsNumber: true })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="1000.00"
-                    />
                   </div>
                 </div>
               )}
@@ -674,7 +637,7 @@ const InvoiceCreate: React.FC = () => {
               <div>
                 <span className="text-gray-600">Settlement:</span>
                 <div className="font-medium">
-                  {mockWallets.find(w => w.id === watchedValues.settlement_wallet_id)?.name || 'Not selected'}
+                  {verifiedWallets.find(w => w.address_id === watchedValues.settlement_wallet_id)?.address.slice(0, 6) + '...' + verifiedWallets.find(w => w.address_id === watchedValues.settlement_wallet_id)?.address.slice(-4) || 'Not selected'}
                 </div>
               </div>
             </div>
