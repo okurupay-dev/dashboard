@@ -86,10 +86,25 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   };
 
   const toggleSection = (section: string) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
+    setExpandedSections(prev => {
+      const isCurrentlyExpanded = prev[section];
+      
+      // If clicking on an already expanded section, collapse it
+      if (isCurrentlyExpanded) {
+        return {
+          ...prev,
+          [section]: false
+        };
+      }
+      
+      // Otherwise, collapse all sections and expand only the clicked one
+      const newState: {[key: string]: boolean} = {};
+      Object.keys(prev).forEach(key => {
+        newState[key] = key === section;
+      });
+      
+      return newState;
+    });
   };
 
   const navigationCategories = [
