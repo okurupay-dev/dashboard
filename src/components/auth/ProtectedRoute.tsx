@@ -7,9 +7,16 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { isAuthenticated, isApproved, loading } = useAuth()
+  const { isAuthenticated, isApproved, loading, userData, user } = useAuth()
 
-  console.log('🔒 ProtectedRoute check:', { isAuthenticated, isApproved, loading })
+  console.log('🔒 ProtectedRoute check:', { 
+    isAuthenticated, 
+    isApproved, 
+    loading, 
+    hasUser: !!user,
+    hasUserData: !!userData,
+    userRole: userData?.role 
+  })
 
   // Remove development mode bypass - always enforce authentication
 
