@@ -15,7 +15,7 @@ import Settings from './components/settings/Settings';
 import Terminals from './components/terminals/Terminals';
 import VirtualTerminals from './components/terminals/VirtualTerminals';
 import Staff from './components/staff/Staff';
-import Wallets from './components/wallets/Wallets';
+import Wallets from './components/wallets/Wallets_clean';
 import Products from './components/products/Products';
 import SupabaseSignIn from './components/auth/SupabaseSignIn';
 import AcceptInvitation from './components/auth/AcceptInvitation';
