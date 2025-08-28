@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { Wallet, CheckCircle, AlertTriangle, Loader2, AlertCircle, Info, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Wallet, CheckCircle, Loader2, Info, ToggleLeft, ToggleRight } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { WalletConnectWidget } from './WalletConnectWidget';
@@ -185,68 +185,148 @@ const Wallets: React.FC = () => {
     );
   }
 
+  const [activeTab, setActiveTab] = useState<'non-custodial' | 'on-off-ramp'>('non-custodial');
+
   return (
-    <div className="space-y-4 max-w-2xl">
-      <h1 className="text-2xl font-bold text-gray-900">Non-Custodial Wallets</h1>
+    <div className="space-y-4 max-w-4xl">
+      <h1 className="text-2xl font-bold text-gray-900">Wallets</h1>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-          <span className="text-red-700 text-sm">{error}</span>
-        </div>
-      )}
-
-      <WalletConnectWidget 
-        onWalletConnected={(walletInfo) => {
-          setWalletConnection({
-            address: walletInfo.address,
-            provider: 'MetaMask',
-            chainId: walletInfo.chainId,
-            isConnected: true
-          });
-        }}
-        onWalletDisconnected={() => {
-          setWalletConnection(null);
-        }}
-      />
-
-      {walletConnection?.address && (
-        <div className="flex items-center justify-between p-3 border rounded-lg">
-          <div>
-            <span className="font-medium">Base Network</span>
-            {isBaseVerified && (
-              <p className="text-sm text-gray-500 mt-1">
-                {verifiedNetworks[0]?.address.slice(0, 6)}...{verifiedNetworks[0]?.address.slice(-4)}
-              </p>
-            )}
-          </div>
-          
+      {/* Tab Navigation */}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8">
           <button
-            onClick={handleVerifyNetwork}
-            disabled={verifyingNetwork || isBaseVerified}
+            onClick={() => setActiveTab('non-custodial')}
             className={`
-              relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-              ${isBaseVerified ? 'bg-green-600' : 'bg-gray-200 hover:bg-gray-300'}
+              py-2 px-1 border-b-2 font-medium text-sm
+              ${activeTab === 'non-custodial'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }
             `}
           >
-            <span
-              className={`
-                inline-block h-4 w-4 transform rounded-full bg-white transition-transform flex items-center justify-center
-                ${isBaseVerified ? 'translate-x-6' : 'translate-x-1'}
-              `}
-            >
-              {verifyingNetwork && (
-                <Loader2 className="h-2 w-2 animate-spin text-gray-600" />
-              )}
-            </span>
+            Non-Custodial
           </button>
+          <button
+            onClick={() => setActiveTab('on-off-ramp')}
+            className={`
+              py-2 px-1 border-b-2 font-medium text-sm
+              ${activeTab === 'on-off-ramp'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }
+            `}
+          >
+            On/Off Ramp Wallet
+          </button>
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'non-custodial' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left Column - Wallet Connection */}
+          <div className="space-y-4">
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <span className="text-red-700 text-sm">{error}</span>
+              </div>
+            )}
+
+            <WalletConnectWidget 
+              onWalletConnected={(walletInfo) => {
+                setWalletConnection({
+                  address: walletInfo.address,
+                  provider: 'MetaMask',
+                  chainId: walletInfo.chainId,
+                  isConnected: true
+                });
+              }}
+              onWalletDisconnected={() => {
+                setWalletConnection(null);
+              }}
+            />
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-sm text-blue-700">
+                Your non-custodial wallet remains under your control. Okuru never accesses your private keys or funds.
+              </p>
+            </div>
+          </div>
+
+          {/* Right Column - Network Status & Configuration */}
+          <div className="space-y-4">
+            <div className="border rounded-lg p-4">
+              <h3 className="font-medium text-gray-900 mb-3">Network Status</h3>
+              
+              {!walletConnection?.address ? (
+                <div className="text-center py-8 text-gray-500">
+                  <Wallet className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">Connect wallet to configure networks</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div>
+                      <span className="font-medium">Base Network</span>
+                      {isBaseVerified && (
+                        <p className="text-sm text-gray-500 mt-1">
+                          {verifiedNetworks[0]?.address.slice(0, 6)}...{verifiedNetworks[0]?.address.slice(-4)}
+                        </p>
+                      )}
+                    </div>
+                    
+                    <button
+                      onClick={handleVerifyNetwork}
+                      disabled={verifyingNetwork || isBaseVerified}
+                      className={`
+                        relative inline-flex h-6 w-11 items-center rounded-full transition-colors
+                        ${isBaseVerified ? 'bg-green-600' : 'bg-gray-200 hover:bg-gray-300'}
+                      `}
+                    >
+                      <span
+                        className={`
+                          inline-block h-4 w-4 transform rounded-full bg-white transition-transform flex items-center justify-center
+                          ${isBaseVerified ? 'translate-x-6' : 'translate-x-1'}
+                        `}
+                      >
+                        {verifyingNetwork && (
+                          <Loader2 className="h-2 w-2 animate-spin text-gray-600" />
+                        )}
+                      </span>
+                    </button>
+                  </div>
+
+                  {isBaseVerified && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        <span className="text-sm font-medium text-green-900">Ready to accept payments</span>
+                      </div>
+                      <p className="text-xs text-green-700 mt-1">
+                        Supported: {baseNetwork.tokens.join(', ')}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-        <p className="text-sm text-blue-700">
-          Your non-custodial wallet remains under your control. Okuru never accesses your private keys or funds.
-        </p>
-      </div>
+      {activeTab === 'on-off-ramp' && (
+        <div className="space-y-4">
+          <div className="text-center py-12">
+            <div className="text-gray-400 mb-4">
+              <Wallet className="h-16 w-16 mx-auto" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">On/Off Ramp Wallet</h3>
+            <p className="text-gray-600 max-w-md mx-auto">
+              Convert between crypto and fiat currencies seamlessly. Coming soon.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
