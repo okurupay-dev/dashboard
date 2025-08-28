@@ -9,7 +9,7 @@ import { useInvoiceStore } from '../../stores/invoiceStore';
 import { invoiceFormSchema, InvoiceFormData } from '../../schemas/invoiceSchemas';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { invoiceApi } from '../../services/invoiceApi';
+import { invoiceApi, InvoiceApiPayload } from '../../services/invoiceApi';
 
 const InvoiceCreate: React.FC = () => {
   const navigate = useNavigate();
@@ -171,9 +171,9 @@ const InvoiceCreate: React.FC = () => {
       setCreatedInvoice(result);
       
       // Generate QR code if not draft
-      if (!isDraft && result.invoice_id) {
+      if (!isDraft && result.id) {
         try {
-          const qrResult = await invoiceApi.getQRCode(result.invoice_id);
+          const qrResult = await invoiceApi.getQRCode(result.id);
           setQrCodeData(qrResult.qr_code_data);
         } catch (qrError) {
           console.error('Error generating QR code:', qrError);
@@ -688,7 +688,9 @@ const InvoiceCreate: React.FC = () => {
               )}
 
               {/* Preview Tab */}
-                    <h3 className="text-lg font-medium mb-4">Invoice Preview</h3>
+              {activeTab === 'preview' && (
+                <div className="space-y-6">
+                  <h3 className="text-lg font-medium mb-4">Invoice Preview</h3>
                     <div className="space-y-4">
                       <div className="flex justify-between">
                         <span className="font-medium">Title:</span>
@@ -727,7 +729,7 @@ const InvoiceCreate: React.FC = () => {
                       {watchedValues.tags && (
                         <div className="flex justify-between">
                           <span className="font-medium">Tags:</span>
-                          <span className="text-right">{watchedValues.tags}</span>
+                          <span className="text-right">{watchedValues.tags.split(',').map(tag => tag.trim()).join(', ')}</span>
                         </div>
                       )}
                     </div>
