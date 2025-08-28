@@ -126,6 +126,10 @@ const InvoiceCreate: React.FC = () => {
       const processedTags = data.tags ? 
         data.tags.split(',').map(tag => tag.trim()).filter(tag => tag) : [];
 
+      // Debug wallet information
+      console.log('Available verified wallets:', verifiedWallets);
+      console.log('Selected settlement_wallet_id:', data.settlement_wallet_id);
+      
       const payload: InvoiceApiPayload = {
         // Basic info
         title: data.title,
@@ -169,6 +173,16 @@ const InvoiceCreate: React.FC = () => {
         // Status
         status: (isDraft ? 'draft' : 'sent') as 'draft' | 'sent'
       };
+      
+      // Debug final payload
+      console.log('Final API payload:', JSON.stringify(payload, null, 2));
+      console.log('Required fields check:', {
+        customer_email: !!payload.customer_email,
+        settlement_wallet_id: !!payload.settlement_wallet_id,
+        crypto_asset: !!payload.crypto_asset,
+        chain: !!payload.chain,
+        simple_amount: payload.simple_amount
+      });
 
       const result = await invoiceApi.createInvoice(payload);
       console.log('Invoice created:', result);
