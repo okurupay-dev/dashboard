@@ -98,8 +98,14 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   };
 
   const toggleSection = (section: string) => {
-    // Don't allow section expansion when sidebar is collapsed
-    if (isCollapsed) return;
+    // If sidebar is collapsed, navigate to first item in the category
+    if (isCollapsed) {
+      const category = navigationCategories.find(cat => cat.id === section);
+      if (category && category.items.length > 0) {
+        navigate(category.items[0].path);
+      }
+      return;
+    }
     
     setExpandedSections(prev => {
       const isCurrentlyExpanded = prev[section];
