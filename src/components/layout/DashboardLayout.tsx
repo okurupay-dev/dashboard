@@ -46,10 +46,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [expandedSections, setExpandedSections] = useState<{[key: string]: boolean}>({
     home: true,
-    activity: false,
-    sales: false,
-    finance: false,
     operations: false,
+    finance: false,
     tools: false
   });
   
@@ -92,10 +90,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
     if (!isCollapsed) {
       setExpandedSections({
         home: false,
-        activity: false,
-        sales: false,
-        finance: false,
         operations: false,
+        finance: false,
         tools: false
       });
     }
@@ -129,27 +125,22 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const navigationCategories = [
     {
       id: 'home',
-      title: 'Home',
+      title: 'Dashboard',
       icon: Home,
       items: [
-        { path: '/', label: 'Dashboard', icon: Home, showIndicator: false, isSubItem: false }
-      ]
-    },
-    {
-      id: 'activity',
-      title: 'Activity',
-      icon: Activity,
-      items: [
+        { path: '/', label: 'Overview', icon: Home, showIndicator: false, isSubItem: false },
         { path: '/transactions', label: 'Transactions', icon: DollarSign, showIndicator: false, isSubItem: false }
       ]
     },
     {
-      id: 'sales',
-      title: 'Sales',
-      icon: BarChart3,
+      id: 'operations',
+      title: 'Operations',
+      icon: Monitor,
       items: [
         { path: '/invoices', label: 'Invoices', icon: FileText, showIndicator: false, isSubItem: false },
-        { path: '/products', label: 'Products', icon: Package, showIndicator: false, isSubItem: false }
+        { path: '/terminals', label: 'Terminals', icon: Monitor, showIndicator: false, isSubItem: false },
+        { path: '/terminals/virtual', label: 'Virtual Terminals', icon: Smartphone, showIndicator: false, isSubItem: false },
+        { path: '/staff', label: 'Staff', icon: Users, showIndicator: false, isSubItem: false }
       ]
     },
     {
@@ -163,20 +154,11 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       ]
     },
     {
-      id: 'operations',
-      title: 'Operations',
-      icon: Monitor,
-      items: [
-        { path: '/terminals', label: 'Terminals', icon: Monitor, showIndicator: false, isSubItem: false },
-        { path: '/terminals/virtual', label: 'Virtual Terminals', icon: Smartphone, showIndicator: false, isSubItem: false },
-        { path: '/staff', label: 'Staff', icon: Users, showIndicator: false, isSubItem: false }
-      ]
-    },
-    {
       id: 'tools',
       title: 'Tools',
       icon: BarChart3,
       items: [
+        { path: '/products', label: 'Products', icon: Package, showIndicator: false, isSubItem: false },
         { path: '/analytics', label: 'Analytics', icon: BarChart3, showIndicator: false, isSubItem: false },
         { path: '/reports', label: 'Reports', icon: FileText, showIndicator: false, isSubItem: false }
       ]
