@@ -223,24 +223,24 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
             </div>
           )}
           
-          <nav className="space-y-1">
+          <nav className="space-y-3">
             {navigationCategories.map((category) => {
               const CategoryIcon = category.icon;
               const isExpanded = expandedSections[category.id];
               const hasActiveItem = category.items.some(item => currentPath === item.path);
               
               return (
-                <div key={category.id} className="space-y-1">
+                <div key={category.id} className="space-y-2">
                   {/* Category Header */}
                   <button
                     onClick={() => toggleSection(category.id)}
-                    className={`w-full flex items-center ${isCollapsed ? 'justify-center p-3' : 'justify-between p-3'} rounded-lg hover:bg-gray-100 transition-all duration-200 group ${
+                    className={`w-full flex items-center ${isCollapsed ? 'justify-center p-4' : 'justify-between p-4'} rounded-lg hover:bg-gray-100 transition-all duration-200 group ${
                       hasActiveItem ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
                     }`}
                     title={isCollapsed ? category.title : ''}
                   >
                     <div className="flex items-center">
-                      <CategoryIcon className={`h-5 w-5 ${isCollapsed ? '' : 'mr-3'} ${hasActiveItem ? 'text-blue-600' : 'text-gray-500'}`} />
+                      <CategoryIcon className={`h-5 w-5 ${isCollapsed ? '' : 'mr-4'} ${hasActiveItem ? 'text-blue-600' : 'text-gray-500'}`} />
                       {!isCollapsed && (
                         <span className="font-medium text-sm">{category.title}</span>
                       )}
@@ -254,7 +254,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                   
                   {/* Category Items */}
                   {isExpanded && !isCollapsed && (
-                    <div className="space-y-1 ml-4 pl-4 border-l border-gray-200">
+                    <div className="space-y-2 ml-6 pl-4 border-l border-gray-200">
                       {category.items.map((item) => {
                         const ItemIcon = item.icon;
                         const isActive = currentPath === item.path;
@@ -262,14 +262,14 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                         return (
                           <Link key={item.path} to={item.path}>
                             <div className={`
-                              flex items-center p-2 rounded-lg transition-all duration-200 text-sm
+                              flex items-center p-3 rounded-lg transition-all duration-200 text-sm
                               ${isActive 
                                 ? 'bg-blue-100 text-blue-700 font-medium' 
                                 : 'hover:bg-gray-50 text-gray-600'
                               }
                               ${item.showIndicator ? 'border border-yellow-200 bg-yellow-50' : ''}
                             `}>
-                              <ItemIcon className="h-4 w-4 mr-3" />
+                              <ItemIcon className="h-4 w-4 mr-4" />
                               <span>{item.label}</span>
                               {item.showIndicator && (
                                 <span className="ml-auto inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-200 text-yellow-800">
@@ -295,22 +295,22 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
             </div>
           )}
           
-          <div className="space-y-1">
+          <div className="space-y-2">
             <button
               onClick={() => navigate('/settings')}
-              className={`w-full flex items-center ${isCollapsed ? 'justify-center p-3' : 'p-3'} rounded-lg hover:bg-gray-100 transition-all duration-200 text-gray-700`}
+              className={`w-full flex items-center ${isCollapsed ? 'justify-center p-4' : 'p-4'} rounded-lg hover:bg-gray-100 transition-all duration-200 text-gray-700`}
               title={isCollapsed ? 'Settings' : ''}
             >
-              <Settings className={`h-5 w-5 ${isCollapsed ? '' : 'mr-3'}`} />
+              <Settings className={`h-5 w-5 ${isCollapsed ? '' : 'mr-4'}`} />
               {!isCollapsed && <span className="text-sm">Settings</span>}
             </button>
             
             <button
               onClick={handleLogout}
-              className={`w-full flex items-center ${isCollapsed ? 'justify-center p-3' : 'p-3'} rounded-lg hover:bg-red-50 text-gray-700 hover:text-red-700 transition-all duration-200`}
+              className={`w-full flex items-center ${isCollapsed ? 'justify-center p-4' : 'p-4'} rounded-lg hover:bg-red-50 text-gray-700 hover:text-red-700 transition-all duration-200`}
               title={isCollapsed ? 'Sign Out' : ''}
             >
-              <LogOut className={`h-5 w-5 ${isCollapsed ? '' : 'mr-3'}`} />
+              <LogOut className={`h-5 w-5 ${isCollapsed ? '' : 'mr-4'}`} />
               {!isCollapsed && <span className="text-sm">Sign Out</span>}
             </button>
           </div>
