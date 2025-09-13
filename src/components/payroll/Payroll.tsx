@@ -33,33 +33,6 @@ const Payroll: React.FC = () => {
       </div>
 
 
-      {/* Coming Soon Section */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
-        <div className="text-center">
-          <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-            <UserCheck className="h-8 w-8 text-blue-600" />
-          </div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">Payroll System Coming Soon</h3>
-          <p className="text-gray-600 mb-6 max-w-md mx-auto">
-            Our comprehensive payroll management system is currently in development. 
-            You'll be able to manage employee payments, process payroll, and generate reports all in one place.
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto">
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <h4 className="font-medium text-gray-900 mb-2">Employee Management</h4>
-              <p className="text-sm text-gray-600">Add and manage employee information, roles, and payment details</p>
-            </div>
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <h4 className="font-medium text-gray-900 mb-2">Automated Payments</h4>
-              <p className="text-sm text-gray-600">Schedule and process payroll payments with crypto or traditional methods</p>
-            </div>
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <h4 className="font-medium text-gray-900 mb-2">Tax & Compliance</h4>
-              <p className="text-sm text-gray-600">Generate tax reports and ensure compliance with local regulations</p>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };
