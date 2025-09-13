@@ -16,7 +16,7 @@ import {
   Calculator,
   Package,
   Wallet,
-  Home, Activity, DollarSign, Monitor
+  Home, Activity, DollarSign, Monitor, UserCheck
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useWalletStatus } from '../../hooks/useWalletStatus';
@@ -139,7 +139,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       icon: CreditCard,
       items: [
         { path: '/wallets', label: 'Wallets', icon: CreditCard, showIndicator: shouldShowIndicator, isSubItem: false },
-        { path: '/taxes', label: 'Taxes', icon: Calculator, showIndicator: false, isSubItem: false }
+        { path: '/taxes', label: 'Taxes', icon: Calculator, showIndicator: false, isSubItem: false },
+        { path: '/payroll', label: 'Payroll', icon: UserCheck, showIndicator: false, isSubItem: false }
       ]
     },
     {
@@ -265,6 +266,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
               {currentPath === '/products' ? 'Products' : ''}
               {currentPath === '/wallets' ? 'Wallets' : ''}
               {currentPath === '/taxes' ? 'Taxes' : ''}
+              {currentPath === '/payroll' ? 'Payroll' : ''}
               {currentPath === '/terminals' ? 'Terminals' : ''}
               {currentPath === '/terminals/virtual' ? 'Virtual Terminals' : ''}
               {currentPath === '/staff' ? 'Staff' : ''}
