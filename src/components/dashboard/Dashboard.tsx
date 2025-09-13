@@ -283,10 +283,17 @@ const Dashboard = () => {
     navigate('/staff');
   };
 
+  const handleCreateInvoice = () => {
+    navigate('/invoices/create');
+  };
+
   const handleQuickAction = (action: string) => {
     console.log(`Quick action triggered: ${action}`);
     
     switch(action) {
+      case 'createInvoice':
+        handleCreateInvoice();
+        break;
       case 'exportTodayData':
         handleExportData();
         break;
