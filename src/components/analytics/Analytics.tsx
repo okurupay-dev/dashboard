@@ -378,7 +378,7 @@ const Analytics: React.FC = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Analytics</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
           {merchantInfo && (
             <p className="text-sm text-gray-600 mt-1">
               {merchantInfo.name} • Real-time data and live conversion rates

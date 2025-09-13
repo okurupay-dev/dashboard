@@ -799,7 +799,7 @@ const getBlockchainForToken = (symbol: string, network?: string): string => {
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center mb-4">
-          <h1 className="text-3xl font-bold text-gray-900">Virtual Terminal Management</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Virtual Terminal Management</h1>
         </div>
         <p className="text-gray-600">
           Manage your virtual terminal settings, password security, and accepted payment tokens.

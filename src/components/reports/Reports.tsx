@@ -219,7 +219,7 @@ const Reports: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Reports</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
           <p className="text-gray-600 mt-2">
             Generate custom reports and analytics for your business
           </p>

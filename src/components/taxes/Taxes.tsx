@@ -208,7 +208,7 @@ const Taxes: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Tax Management</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Tax Management</h1>
           <p className="text-gray-600 mt-2">
             Configure tax settings and track tax liability for your transactions
           </p>
