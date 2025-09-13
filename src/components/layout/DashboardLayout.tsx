@@ -289,43 +289,69 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         </div>
         {/* Settings Section */}
         <div className="border-t border-gray-200 p-4">
-          <div className="space-y-2">
-            <button
-              onClick={handleLogout}
-              className={`w-full flex items-center ${isCollapsed ? 'justify-center p-4' : 'p-4'} rounded-lg hover:bg-red-50 text-gray-700 hover:text-red-700 transition-all duration-200`}
-              title={isCollapsed ? 'Sign Out' : ''}
-            >
-              <LogOut className={`h-5 w-5 ${isCollapsed ? '' : 'mr-4'}`} />
-              {!isCollapsed && <span className="text-sm">Sign Out</span>}
-            </button>
-          </div>
-          
-          {/* User Info - Clickable to Settings */}
+          {/* User Info with Dropdown Menu */}
           {!isCollapsed && (
-            <button
-              onClick={() => navigate('/settings')}
-              className="mt-4 w-full p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all duration-200 cursor-pointer"
-            >
-              <div className="flex items-center">
-                <User className="h-8 w-8 p-1.5 bg-gray-200 rounded-full mr-3" />
-                <div className="flex-1 min-w-0 text-left">
-                  <p className="text-sm font-medium text-gray-900 truncate">{userName}</p>
-                  <p className="text-xs text-gray-600 truncate">{merchantInfo.name}</p>
+            <div className="relative group">
+              <div className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all duration-200 cursor-pointer">
+                <div className="flex items-center">
+                  <User className="h-8 w-8 p-1.5 bg-gray-200 rounded-full mr-3" />
+                  <div className="flex-1 min-w-0 text-left">
+                    <p className="text-sm font-medium text-gray-900 truncate">{userName}</p>
+                    <p className="text-xs text-gray-600 truncate">{merchantInfo.name}</p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-gray-400 transform group-hover:rotate-90 transition-transform duration-200" />
                 </div>
-                <Settings className="h-4 w-4 text-gray-400" />
               </div>
-            </button>
+              
+              {/* Dropdown Menu */}
+              <div className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                <div className="py-2">
+                  <button
+                    onClick={() => navigate('/settings')}
+                    className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors duration-150"
+                  >
+                    <Settings className="h-4 w-4 mr-3" />
+                    Settings
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-700 transition-colors duration-150"
+                  >
+                    <LogOut className="h-4 w-4 mr-3" />
+                    Sign Out
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
           
-          {/* Collapsed User Icon - Clickable to Settings */}
+          {/* Collapsed User Icon with Tooltip Menu */}
           {isCollapsed && (
-            <button
-              onClick={() => navigate('/settings')}
-              className="w-full flex justify-center p-4 rounded-lg hover:bg-gray-100 transition-all duration-200"
-              title="Settings"
-            >
-              <User className="h-5 w-5 text-gray-500" />
-            </button>
+            <div className="relative group">
+              <button className="w-full flex justify-center p-4 rounded-lg hover:bg-gray-100 transition-all duration-200">
+                <User className="h-5 w-5 text-gray-500" />
+              </button>
+              
+              {/* Tooltip Menu */}
+              <div className="absolute bottom-full right-0 mb-2 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 min-w-[120px]">
+                <div className="py-2">
+                  <button
+                    onClick={() => navigate('/settings')}
+                    className="w-full flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors duration-150"
+                  >
+                    <Settings className="h-4 w-4 mr-2" />
+                    Settings
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-700 transition-colors duration-150"
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Sign Out
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>
