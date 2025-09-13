@@ -289,22 +289,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         </div>
         {/* Settings Section */}
         <div className="border-t border-gray-200 p-4">
-          {!isCollapsed && (
-            <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">
-              Settings
-            </div>
-          )}
-          
           <div className="space-y-2">
-            <button
-              onClick={() => navigate('/settings')}
-              className={`w-full flex items-center ${isCollapsed ? 'justify-center p-4' : 'p-4'} rounded-lg hover:bg-gray-100 transition-all duration-200 text-gray-700`}
-              title={isCollapsed ? 'Settings' : ''}
-            >
-              <Settings className={`h-5 w-5 ${isCollapsed ? '' : 'mr-4'}`} />
-              {!isCollapsed && <span className="text-sm">Settings</span>}
-            </button>
-            
             <button
               onClick={handleLogout}
               className={`w-full flex items-center ${isCollapsed ? 'justify-center p-4' : 'p-4'} rounded-lg hover:bg-red-50 text-gray-700 hover:text-red-700 transition-all duration-200`}
@@ -315,17 +300,32 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
             </button>
           </div>
           
-          {/* User Info */}
+          {/* User Info - Clickable to Settings */}
           {!isCollapsed && (
-            <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+            <button
+              onClick={() => navigate('/settings')}
+              className="mt-4 w-full p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all duration-200 cursor-pointer"
+            >
               <div className="flex items-center">
                 <User className="h-8 w-8 p-1.5 bg-gray-200 rounded-full mr-3" />
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 text-left">
                   <p className="text-sm font-medium text-gray-900 truncate">{userName}</p>
                   <p className="text-xs text-gray-600 truncate">{merchantInfo.name}</p>
                 </div>
+                <Settings className="h-4 w-4 text-gray-400" />
               </div>
-            </div>
+            </button>
+          )}
+          
+          {/* Collapsed User Icon - Clickable to Settings */}
+          {isCollapsed && (
+            <button
+              onClick={() => navigate('/settings')}
+              className="w-full flex justify-center p-4 rounded-lg hover:bg-gray-100 transition-all duration-200"
+              title="Settings"
+            >
+              <User className="h-5 w-5 text-gray-500" />
+            </button>
           )}
         </div>
       </div>
