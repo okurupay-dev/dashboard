@@ -798,12 +798,12 @@ const getBlockchainForToken = (symbol: string, network?: string): string => {
     <div className="container mx-auto py-6">
       {/* Header */}
       <div className="mb-8">
-        <div className="flex items-center mb-4">
+        <div>
           <h1 className="text-2xl font-bold text-gray-900">Virtual Terminal Management</h1>
+          <p className="text-gray-600">
+            Manage your virtual terminal settings, password security, and accepted payment tokens.
+          </p>
         </div>
-        <p className="text-gray-600">
-          Manage your virtual terminal settings, password security, and accepted payment tokens.
-        </p>
       </div>
 
       {/* Main Content */}

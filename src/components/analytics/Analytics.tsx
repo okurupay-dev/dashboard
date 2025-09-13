@@ -380,7 +380,7 @@ const Analytics: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
           {merchantInfo && (
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-gray-600">
               {merchantInfo.name} • Real-time data and live conversion rates
             </p>
           )}
