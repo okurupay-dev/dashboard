@@ -138,9 +138,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       icon: Monitor,
       items: [
         { path: '/invoices', label: 'Invoices', icon: FileText, showIndicator: false, isSubItem: false },
+        { path: '/staff', label: 'Staff', icon: Users, showIndicator: false, isSubItem: false },
         { path: '/terminals', label: 'Terminals', icon: Monitor, showIndicator: false, isSubItem: false },
-        { path: '/terminals/virtual', label: 'Virtual Terminals', icon: Smartphone, showIndicator: false, isSubItem: false },
-        { path: '/staff', label: 'Staff', icon: Users, showIndicator: false, isSubItem: false }
+        { path: '/terminals/virtual', label: 'Virtual Terminals', icon: Smartphone, showIndicator: false, isSubItem: false }
       ]
     },
     {
