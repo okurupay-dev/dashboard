@@ -1,0 +1,613 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Badge } from '../ui/badge';
+import SavedContacts from './SavedContacts';
+import { 
+  Plus, 
+  Minus, 
+  ArrowLeft, 
+  Save, 
+  Send, 
+  Eye, 
+  Grid3X3,
+  User,
+  Mail,
+  X,
+  Calendar,
+  Clock,
+  DollarSign,
+  Settings,
+  HelpCircle,
+  Bell,
+  Search,
+  FileText,
+  Trash2,
+  Download,
+  Link,
+  Copy
+} from 'lucide-react';
+import { useInvoiceStore } from '../../stores/invoiceStore';
+import { invoiceFormSchema, InvoiceFormData } from '../../schemas/invoiceSchemas';
+import { useAuth } from '../../contexts/AuthContext';
+import { invoiceApi, InvoiceApiPayload } from '../../services/invoiceApi';
+import { invoiceService } from '../../services/invoiceService';
+import { supabase } from '../../lib/supabase';
+
+interface LineItem {
+  id: string;
+  name: string;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  image?: string;
+}
+
+const InvoiceCreateModern: React.FC = () => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { userData, merchantData } = useAuth();
+  const { createInvoice, mockWallets } = useInvoiceStore();
+  const [activeSection, setActiveSection] = useState('details');
+  const [loading, setLoading] = useState(false);
+  const [verifiedWallets, setVerifiedWallets] = useState<any[]>([]);
+  const [createdInvoice, setCreatedInvoice] = useState<any>(null);
+  const [lineItems, setLineItems] = useState<LineItem[]>([]);
+  const [showContactPicker, setShowContactPicker] = useState(false);
+  const [showLinkNotification, setShowLinkNotification] = useState(false);
+  const [paymentLink, setPaymentLink] = useState('');
+
+  const form = useForm({
+    resolver: zodResolver(invoiceFormSchema),
+    defaultValues: {
+      is_simple_amount: true,
+      currency_mode: 'crypto',
+      crypto_asset: 'USDC',
+      chain: 'BASE',
+      price_lock_secs: 900,
+      min_confirmations: 1,
+      allow_partial: false,
+      tip_suggestions: [0, 10, 15],
+      tax_inclusive: false,
+      fee_payer: 'merchant',
+      restricted_jurisdictions: false,
+      line_items: [],
+      customer_email: '',
+      customer_name: '',
+      customer_cc_emails: '',
+      billing_address: {
+        street: '',
+        city: '',
+        state: '',
+        postal_code: '',
+        country: ''
+      },
+      settlement_wallet_id: '',
+      due_date: '',
+      notes: '',
+      tags: '',
+      webhook_url: '',
+      notification_email: '',
+      send_email: true,
+      title: 'Electronic purchasing',
+      description: '',
+      simple_amount: 0
+    }
+  });
+
+  // Load draft data if editing
+  const loadDraftData = async (invoiceId: string) => {
+    try {
+      const { data: invoice, error } = await supabase
+        .from('standalone_invoices')
+        .select('*')
+        .eq('id', invoiceId)
+        .single();
+
+      if (error) throw error;
+
+      if (invoice) {
+        // Populate form with draft data
+        form.reset({
+          ...form.getValues(),
+          title: invoice.title || 'Electronic purchasing',
+          description: invoice.description || '',
+          customer_email: invoice.customer_email || '',
+          customer_name: invoice.customer_name || '',
+          simple_amount: invoice.simple_amount || 0,
+          notes: invoice.notes || '',
+          crypto_asset: invoice.crypto_asset || 'USDC',
+          chain: invoice.chain || 'BASE'
+        });
+
+        // Load line items if they exist
+        if (invoice.line_items && Array.isArray(invoice.line_items)) {
+          setLineItems(invoice.line_items);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading draft data:', error);
+    }
+  };
+
+  useEffect(() => {
+    const editId = searchParams.get('edit');
+    if (editId) {
+      loadDraftData(editId);
+    }
+  }, [searchParams]);
+
+  const loadVerifiedWallets = async () => {
+    try {
+      const wallets = await invoiceService.getVerifiedWallets(merchantData?.merchant_id || '');
+      setVerifiedWallets(wallets || []);
+    } catch (error) {
+      console.error('Error loading verified wallets:', error);
+      setVerifiedWallets([]);
+    }
+  };
+
+  useEffect(() => {
+    if (userData && merchantData) {
+      loadVerifiedWallets();
+    }
+  }, [userData, merchantData]);
+
+  const handleFormSubmit = async (data: InvoiceFormData, isDraft: boolean = false) => {
+    try {
+      setLoading(true);
+      
+      // Use the actual lineItems state, not form data
+      const subtotal = lineItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+      const taxAmount = subtotal * 0.1; // 10% tax
+      const total = subtotal + taxAmount;
+      
+      // Custom validation based on isDraft flag
+      if (!isDraft) {
+        // For sent invoices, require amount > 0 or line items with total > 0
+        const hasSimpleAmount = data.simple_amount && data.simple_amount > 0;
+        const hasLineItemsWithTotal = lineItems.length > 0 && total > 0;
+        
+        if (!hasSimpleAmount && !hasLineItemsWithTotal) {
+          alert('Please add an amount or line items with prices before sending the invoice.');
+          setLoading(false);
+          return;
+        }
+      }
+      
+      // Process comma-separated strings for arrays
+      const processedCCEmails = data.customer_cc_emails ? 
+        data.customer_cc_emails.split(',').map((email: string) => email.trim()).filter((email: string) => email) : [];
+      
+      const processedTags = data.tags ? 
+        data.tags.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag) : [];
+
+      const invoiceData = {
+        // Basic info
+        title: data.title || 'Invoice',
+        description: data.description || '',
+        notes: data.notes || '',
+        
+        // Customer info
+        customer_email: data.customer_email || '',
+        customer_name: data.customer_name || '',
+        customer_cc_emails: processedCCEmails,
+        billing_address: data.billing_address,
+        
+        // Amount structure
+        is_simple_amount: lineItems.length === 0,
+        simple_amount: lineItems.length > 0 ? total : (data.simple_amount || 0),
+        line_items: lineItems.length > 0 ? lineItems.map(item => ({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          unit_price: item.unit_price
+        })) : [],
+        
+        // Amount calculations
+        subtotal: lineItems.length > 0 ? subtotal : 0,
+        tax_amount: lineItems.length > 0 ? taxAmount : 0,
+        discount_amount: 0,
+        total_amount: lineItems.length > 0 ? total : (data.simple_amount || 0),
+        
+        // Payment settings
+        currency_mode: data.currency_mode,
+        crypto_currency: data.crypto_asset,
+        crypto_chain: data.chain,
+        settlement_wallet_id: data.settlement_wallet_id,
+        price_lock_secs: data.price_lock_secs,
+        min_confirmations: data.min_confirmations,
+        allow_partial: data.allow_partial,
+        tip_suggestions: data.tip_suggestions,
+        tax_inclusive: data.tax_inclusive,
+        fee_payer: data.fee_payer,
+        restricted_jurisdictions: data.restricted_jurisdictions,
+        
+        // Metadata
+        due_date: data.due_date,
+        tags: processedTags,
+        webhook_url: data.webhook_url,
+        notification_email: data.notification_email,
+        send_email: data.send_email,
+        
+        // Status
+        status: 'sent' as const
+      };
+
+      if (isDraft) {
+        // Save as draft to Supabase
+        const { data: savedDraft, error } = await supabase
+          .from('standalone_invoices')
+          .insert([{
+            ...invoiceData,
+            merchant_id: merchantData?.merchant_id,
+            status: 'draft',
+            created_at: new Date().toISOString()
+          }])
+          .select()
+          .single();
+
+        if (error) throw error;
+        
+        alert('Draft saved successfully!');
+        navigate('/invoices');
+      } else {
+        // Send invoice via API
+        const response = await invoiceApi.createInvoice(invoiceData);
+        setCreatedInvoice(response);
+        alert('Invoice created successfully!');
+      }
+    } catch (error) {
+      console.error('Error submitting invoice:', error);
+      alert('Error creating invoice. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateLink = () => {
+    form.handleSubmit((data) => {
+      // Create invoice without sending email
+      const modifiedData = { ...data, send_email: false };
+      handleFormSubmit(modifiedData, false).then(() => {
+        if (createdInvoice?.public_id) {
+          const link = `${window.location.origin}/pay/${createdInvoice.public_id}`;
+          setPaymentLink(link);
+          setShowLinkNotification(true);
+        }
+      });
+    })();
+  };
+
+  const handleSendInvoice = () => {
+    form.handleSubmit((data) => {
+      handleFormSubmit(data, false);
+    })();
+  };
+
+  const handleSaveDraft = () => {
+    form.handleSubmit((data) => {
+      handleFormSubmit(data, true);
+    })();
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    alert('Link copied to clipboard!');
+  };
+
+  const addLineItem = () => {
+    const newItem: LineItem = {
+      id: Date.now().toString(),
+      name: '',
+      description: '',
+      quantity: 1,
+      unit_price: 0
+    };
+    setLineItems([...lineItems, newItem]);
+  };
+
+  const updateLineItem = (id: string, field: keyof LineItem, value: any) => {
+    setLineItems(lineItems.map(item => 
+      item.id === id ? { ...item, [field]: value } : item
+    ));
+  };
+
+  const removeLineItem = (id: string) => {
+    setLineItems(lineItems.filter(item => item.id !== id));
+  };
+
+  const subtotal = lineItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+  const taxAmount = subtotal * 0.1;
+  const total = subtotal + taxAmount;
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-6">
+      {/* Link Notification */}
+      {showLinkNotification && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-green-600">Invoice Link Created!</h3>
+              <button
+                onClick={() => setShowLinkNotification(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-gray-600 mb-4">
+              Your invoice payment link has been created. Share this link with your customer:
+            </p>
+            <div className="bg-gray-50 p-3 rounded border mb-4">
+              <p className="text-sm font-mono break-all">{paymentLink}</p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => copyToClipboard(paymentLink)}
+                className="flex-1"
+              >
+                <Copy className="w-4 h-4 mr-2" />
+                Copy Link
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowLinkNotification(false)}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/invoices')}
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Invoices
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold">Create Invoice</h1>
+              <p className="text-gray-500">Create and send professional invoices</p>
+            </div>
+          </div>
+          
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={handleSaveDraft}
+              disabled={loading}
+            >
+              <Save className="w-4 h-4 mr-2" />
+              Save as Draft
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleCreateLink}
+              disabled={loading}
+              className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
+            >
+              <Link className="w-4 h-4 mr-2" />
+              Create Invoice Link
+            </Button>
+            <Button
+              onClick={handleSendInvoice}
+              disabled={loading}
+            >
+              <Send className="w-4 h-4 mr-2" />
+              Send Invoice
+            </Button>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <Card>
+          <CardContent className="p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Left Column - Form */}
+              <div className="space-y-6">
+                {/* Basic Details */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Invoice Details</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="title">Title</Label>
+                      <Input
+                        id="title"
+                        {...form.register('title')}
+                        placeholder="Invoice title"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="description">Description</Label>
+                      <Textarea
+                        id="description"
+                        {...form.register('description')}
+                        placeholder="Invoice description"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="simple_amount">Amount ($)</Label>
+                      <Input
+                        id="simple_amount"
+                        type="number"
+                        step="0.01"
+                        {...form.register('simple_amount', { valueAsNumber: true })}
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Customer Details */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Customer Information</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="customer_name">Customer Name</Label>
+                      <Input
+                        id="customer_name"
+                        {...form.register('customer_name')}
+                        placeholder="Customer name"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="customer_email">Customer Email</Label>
+                      <Input
+                        id="customer_email"
+                        type="email"
+                        {...form.register('customer_email')}
+                        placeholder="customer@example.com"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Line Items */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold">Line Items</h3>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addLineItem}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Item
+                    </Button>
+                  </div>
+                  
+                  {lineItems.map((item) => (
+                    <div key={item.id} className="border rounded-lg p-4 mb-4">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="md:col-span-2">
+                          <Label>Item Name</Label>
+                          <Input
+                            value={item.name}
+                            onChange={(e) => updateLineItem(item.id, 'name', e.target.value)}
+                            placeholder="Item name"
+                          />
+                        </div>
+                        <div>
+                          <Label>Quantity</Label>
+                          <Input
+                            type="number"
+                            value={item.quantity}
+                            onChange={(e) => updateLineItem(item.id, 'quantity', parseInt(e.target.value) || 0)}
+                            placeholder="1"
+                          />
+                        </div>
+                        <div>
+                          <Label>Unit Price</Label>
+                          <div className="flex">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={item.unit_price}
+                              onChange={(e) => updateLineItem(item.id, 'unit_price', parseFloat(e.target.value) || 0)}
+                              placeholder="0.00"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => removeLineItem(item.id)}
+                              className="ml-2"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Right Column - Preview */}
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Invoice Preview</h3>
+                <div className="border rounded-lg p-6 bg-white">
+                  <div className="mb-6">
+                    <h2 className="text-2xl font-bold">{form.watch('title') || 'Invoice'}</h2>
+                    <p className="text-gray-600">{form.watch('description')}</p>
+                  </div>
+                  
+                  <div className="mb-6">
+                    <h4 className="font-semibold mb-2">Bill To:</h4>
+                    <p>{form.watch('customer_name') || 'Customer Name'}</p>
+                    <p>{form.watch('customer_email') || 'customer@example.com'}</p>
+                  </div>
+
+                  {lineItems.length > 0 ? (
+                    <div className="mb-6">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left py-2">Item</th>
+                            <th className="text-right py-2">Qty</th>
+                            <th className="text-right py-2">Price</th>
+                            <th className="text-right py-2">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {lineItems.map((item) => (
+                            <tr key={item.id} className="border-b">
+                              <td className="py-2">{item.name || 'Item'}</td>
+                              <td className="text-right py-2">{item.quantity}</td>
+                              <td className="text-right py-2">${item.unit_price.toFixed(2)}</td>
+                              <td className="text-right py-2">${(item.quantity * item.unit_price).toFixed(2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      
+                      <div className="mt-4 space-y-2">
+                        <div className="flex justify-between">
+                          <span>Subtotal:</span>
+                          <span>${subtotal.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Tax (10%):</span>
+                          <span>${taxAmount.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between font-bold text-lg border-t pt-2">
+                          <span>Total:</span>
+                          <span>${total.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mb-6">
+                      <div className="flex justify-between font-bold text-lg">
+                        <span>Amount:</span>
+                        <span>${(form.watch('simple_amount') || 0).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+export default InvoiceCreateModern;

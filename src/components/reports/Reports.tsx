@@ -4,21 +4,19 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { 
-  FileText, 
+  Eye, 
   Download, 
+  Save, 
   Calendar, 
   Filter, 
   BarChart3, 
-  Settings, 
-  Play,
-  Save,
-  Share,
-  Clock,
-  Mail,
-  Webhook,
-  ChevronDown,
-  Eye,
-  Plus,
+  FileText, 
+  Clock, 
+  BookOpen, 
+  Mail, 
+  Webhook, 
+  ChevronDown, 
+  Plus, 
   Trash2
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -53,6 +51,10 @@ interface ExportJob {
   created_at: string;
   download_url?: string;
   file_size?: number;
+  export_type?: string;
+  record_count?: number;
+  filters?: string;
+  columns?: string;
 }
 
 const Reports: React.FC = () => {
@@ -73,13 +75,8 @@ const Reports: React.FC = () => {
   // Builder state
   const [builderConfig, setBuilderConfig] = useState({
     dateRange: { start: '', end: '' },
-    filters: {
-      status: 'all',
-      currency: 'all',
-      terminal: 'all',
-      staff: 'all'
-    },
-    columns: ['amount_fiat', 'crypto_currency', 'status', 'created_at'],
+    filters: { status: 'all' },
+    columns: ['transaction_id', 'amount_fiat', 'status', 'created_at'],
     groupBy: 'none',
     aggregations: ['count'],
     sorting: { field: 'created_at', direction: 'desc' }
@@ -89,50 +86,245 @@ const Reports: React.FC = () => {
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
   const [scheduledReports, setScheduledReports] = useState<ScheduledReport[]>([]);
   const [exportJobs, setExportJobs] = useState<ExportJob[]>([]);
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [templateDescription, setTemplateDescription] = useState('');
 
-  // Available columns for report builder
+  // Load templates from database
+  const loadTemplates = async () => {
+    if (!merchantData?.merchant_id) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('report_templates')
+        .select('*')
+        .eq('merchant_id', merchantData.merchant_id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error loading templates:', error);
+        return;
+      }
+
+      const templates: ReportTemplate[] = data.map(item => ({
+        template_id: item.template_id,
+        name: item.name,
+        description: item.description || '',
+        filters: item.filters,
+        columns: item.columns,
+        group_by: item.group_by,
+        aggregations: item.aggregations,
+        created_by: item.created_by,
+        created_at: item.created_at
+      }));
+
+      setTemplates(templates);
+      console.log(`📋 Loaded ${templates.length} templates from database`);
+    } catch (err) {
+      console.error('Failed to load templates:', err);
+    }
+  };
+
+  // Load export history from database
+  const loadExportHistory = async () => {
+    if (!merchantData?.merchant_id) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('report_exports')
+        .select('*')
+        .eq('merchant_id', merchantData.merchant_id)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) {
+        console.error('Error loading export history:', error);
+        return;
+      }
+
+      const exports: ExportJob[] = data.map(item => ({
+        export_id: item.export_id,
+        name: item.filename,
+        filename: item.filename,
+        format: item.format,
+        status: item.status,
+        created_at: item.created_at,
+        file_size: item.file_size,
+        download_url: undefined // URLs are generated on demand
+      }));
+
+      setExportJobs(exports);
+      console.log(`📊 Loaded ${exports.length} export jobs from database`);
+    } catch (err) {
+      console.error('Failed to load export history:', err);
+    }
+  };
+
+  // Load data when component mounts or merchant changes
+  useEffect(() => {
+    if (merchantData?.merchant_id) {
+      loadTemplates();
+      loadExportHistory();
+    }
+  }, [merchantData?.merchant_id]);
+
+  // Save template function
+  const saveTemplate = async () => {
+    if (!templateName.trim() || !merchantData?.merchant_id || !userData?.user_id) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('report_templates')
+        .insert({
+          merchant_id: merchantData.merchant_id,
+          name: templateName.trim(),
+          filters: builderConfig.filters,
+          columns: builderConfig.columns,
+          group_by: builderConfig.groupBy,
+          aggregations: builderConfig.aggregations,
+          created_by: userData.user_id
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error saving template:', error);
+        return;
+      }
+
+      const template: ReportTemplate = {
+        template_id: data.template_id,
+        name: data.name,
+        description: data.description || '',
+        filters: data.filters,
+        columns: data.columns,
+        group_by: data.group_by,
+        aggregations: data.aggregations,
+        created_by: data.created_by,
+        created_at: data.created_at
+      };
+      
+      setTemplates(prev => [template, ...prev]);
+      setShowSaveTemplate(false);
+      setTemplateName('');
+      setTemplateDescription('');
+      
+      console.log(`✅ Template saved to database: ${template.name}`);
+    } catch (err) {
+      console.error('Failed to save template:', err);
+    }
+  };
+
+  // Load template function
+  const loadTemplate = (template: ReportTemplate) => {
+    setBuilderConfig(prev => ({
+      ...prev,
+      filters: template.filters as any,
+      columns: template.columns as string[],
+      groupBy: template.group_by as any,
+      aggregations: template.aggregations as string[]
+    }));
+    console.log(`📋 Template loaded: ${template.name}`);
+  };
+
+  // Export from template
+  const exportFromTemplate = (template: ReportTemplate, format: 'csv' | 'xlsx' | 'json') => {
+    // Temporarily apply template config
+    const originalConfig = { ...builderConfig };
+    setBuilderConfig(prev => ({
+      ...prev,
+      filters: template.filters as any,
+      columns: template.columns as string[],
+      groupBy: template.group_by as any,
+      aggregations: template.aggregations as string[]
+    }));
+    
+    // Export with template name
+    setTimeout(() => {
+      exportReport(format, `template_${template.name.toLowerCase().replace(/\s+/g, '_')}`);
+      // Restore original config
+      setBuilderConfig(originalConfig);
+    }, 100);
+  };
+
+  // Download function for export jobs
+  const downloadExportFile = (job: ExportJob) => {
+    if (job.status !== 'completed') return;
+    
+    try {
+      // Create fresh CSV content with proper formatting
+      const csvHeaders = [
+        'Transaction ID',
+        'Invoice Number', 
+        'Amount',
+        'Network/Chain',
+        'Status',
+        'Date',
+        'Customer Email',
+        'Customer Name',
+        'Location',
+        'Transaction Hash'
+      ];
+      
+      if (job.download_url) {
+        const link = document.createElement('a');
+        link.href = job.download_url;
+        link.download = job.name || 'export.csv';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        console.log(`📥 Downloaded export: ${job.name}`);
+      } else {
+        console.error('No download URL available for export:', job.name);
+        alert('Download not available for this export.');
+      }
+    } catch (error) {
+      console.error('Download failed:', error);
+      alert('Download failed. Please try again.');
+    }
+  };
+
+  // Available columns for report builder (updated for invoice data)
   const availableColumns = [
-    { key: 'transaction_id', label: 'Transaction ID' },
-    { key: 'amount_fiat', label: 'Amount (Fiat)' },
-    { key: 'fiat_currency', label: 'Fiat Currency' },
-    { key: 'amount_crypto', label: 'Amount (Crypto)' },
-    { key: 'crypto_currency', label: 'Crypto Currency' },
-    { key: 'blockchain', label: 'Blockchain' },
+    { key: 'transaction_id', label: 'Invoice Number' },
+    { key: 'amount_fiat', label: 'Amount' },
+    { key: 'fiat_currency', label: 'Currency' },
+    { key: 'blockchain', label: 'Network/Chain' },
     { key: 'tx_hash', label: 'Transaction Hash' },
     { key: 'status', label: 'Status' },
-    { key: 'fee', label: 'Fee' },
-    { key: 'tip', label: 'Tip' },
-    { key: 'terminal_id', label: 'Terminal' },
-    { key: 'staff_user_id', label: 'Staff' },
     { key: 'created_at', label: 'Date Created' },
-    { key: 'updated_at', label: 'Date Updated' }
+    { key: 'customer_email', label: 'Customer Email' },
+    { key: 'customer_name', label: 'Customer Name' }
   ];
 
-  // Fetch overview data
+  // Fetch overview data from standalone_invoices
   useEffect(() => {
     const fetchOverviewData = async () => {
       if (!merchantData?.merchant_id) return;
       
       setLoading(true);
       try {
-        // Fetch transaction summary
-        const { data: transactions, error } = await supabase
-          .from('transactions')
-          .select('amount_fiat, status, fee, tip, created_at')
+        // Fetch invoice data from standalone_invoices table
+        const { data: invoices, error } = await supabase
+          .from('standalone_invoices')
+          .select('total_amount, status, tax_amount, created_at, customer_email, invoice_number')
           .eq('merchant_id', merchantData.merchant_id);
 
-        if (transactions && !error) {
-          const completed = transactions.filter(t => t.status === 'completed');
-          const refunded = transactions.filter(t => t.status === 'refunded');
+        if (invoices && !error) {
+          const paid = invoices.filter(inv => ['paid', 'partially_paid', 'overpaid'].includes(inv.status));
+          const refunded = invoices.filter(inv => inv.status === 'refunded');
           
           setOverviewData({
-            totalSales: completed.reduce((sum, t) => sum + (t.amount_fiat || 0), 0),
-            totalTransactions: completed.length,
-            totalTax: completed.reduce((sum, t) => sum + (t.amount_fiat || 0) * 0.085, 0), // Assuming 8.5% tax
-            totalRefunds: refunded.reduce((sum, t) => sum + (t.amount_fiat || 0), 0),
-            topProducts: [] as any[], // Would need products table join
-            recentActivity: transactions.slice(0, 5) as any[]
+            totalSales: paid.reduce((sum, inv) => sum + (parseFloat(inv.total_amount?.toString() || '0') || 0), 0),
+            totalTransactions: paid.length,
+            totalTax: paid.reduce((sum, inv) => sum + (parseFloat(inv.tax_amount?.toString() || '0') || 0), 0),
+            totalRefunds: refunded.reduce((sum, inv) => sum + (parseFloat(inv.total_amount?.toString() || '0') || 0), 0),
+            topProducts: [] as any[], // Not applicable for invoice-based system
+            recentActivity: invoices.slice(0, 5) as any[]
           });
+          
+          console.log(`✅ Reports overview loaded: ${paid.length} paid invoices, $${paid.reduce((sum, inv) => sum + (parseFloat(inv.total_amount?.toString() || '0') || 0), 0).toFixed(2)} total sales`);
         }
       } catch (error) {
         console.error('Error fetching overview data:', error);
@@ -144,15 +336,15 @@ const Reports: React.FC = () => {
     fetchOverviewData();
   }, [merchantData?.merchant_id]);
 
-  // Generate preview data based on builder config
+  // Generate preview data from standalone_invoices
   const generatePreview = async () => {
     if (!merchantData?.merchant_id) return;
     
     setLoading(true);
     try {
       let query = supabase
-        .from('transactions')
-        .select('*')
+        .from('standalone_invoices')
+        .select('id, invoice_number, total_amount, status, created_at, customer_email, customer_name, crypto_chain, payment_tx_hash')
         .eq('merchant_id', merchantData.merchant_id);
 
       // Apply filters
@@ -169,7 +361,7 @@ const Reports: React.FC = () => {
       }
 
       // Apply sorting
-      query = query.order(builderConfig.sorting.field, { 
+      query = query.order('created_at', { 
         ascending: builderConfig.sorting.direction === 'asc' 
       });
 
@@ -179,7 +371,43 @@ const Reports: React.FC = () => {
       const { data, error } = await query;
       
       if (data && !error) {
-        setPreviewData(data);
+        // Transform data to match expected format - only include selected columns
+        const transformedData = data.map(invoice => {
+          const row: any = {};
+          
+          // Map database fields to display columns based on selection
+          if (builderConfig.columns.includes('transaction_id')) {
+            row.transaction_id = invoice.invoice_number;
+          }
+          if (builderConfig.columns.includes('amount_fiat')) {
+            row.amount_fiat = parseFloat(invoice.total_amount?.toString() || '0');
+          }
+          if (builderConfig.columns.includes('fiat_currency')) {
+            row.fiat_currency = 'USD';
+          }
+          if (builderConfig.columns.includes('blockchain')) {
+            row.blockchain = invoice.crypto_chain || 'Base';
+          }
+          if (builderConfig.columns.includes('tx_hash')) {
+            row.tx_hash = invoice.payment_tx_hash;
+          }
+          if (builderConfig.columns.includes('status')) {
+            row.status = invoice.status;
+          }
+          if (builderConfig.columns.includes('created_at')) {
+            row.created_at = invoice.created_at;
+          }
+          if (builderConfig.columns.includes('customer_email')) {
+            row.customer_email = invoice.customer_email;
+          }
+          if (builderConfig.columns.includes('customer_name')) {
+            row.customer_name = invoice.customer_name;
+          }
+          
+          return row;
+        });
+        
+        setPreviewData(transformedData as any);
       }
     } catch (error) {
       console.error('Error generating preview:', error);
@@ -188,26 +416,266 @@ const Reports: React.FC = () => {
     }
   };
 
-  const exportReport = async (format: 'csv' | 'xlsx' | 'json') => {
-    // This would typically queue a background job
-    const exportJob: ExportJob = {
-      export_id: `export-${Date.now()}`,
-      name: `Report Export ${new Date().toLocaleDateString()}`,
-      format,
-      status: 'pending',
-      created_at: new Date().toISOString()
-    };
+  // Export report data as CSV
+  const exportReport = async (format: 'csv' | 'xlsx' | 'json', reportType?: string) => {
+    if (!merchantData?.merchant_id) {
+      console.error('No merchant ID available for export');
+      return;
+    }
     
-    setExportJobs(prev => [exportJob, ...prev]);
+    console.log(`🔄 Starting ${format} export for ${reportType || 'custom'} report...`);
     
-    // Simulate processing
-    setTimeout(() => {
-      setExportJobs(prev => prev.map(job => 
-        job.export_id === exportJob.export_id 
-          ? { ...job, status: 'completed', download_url: '#', file_size: 1024 }
-          : job
-      ));
-    }, 3000);
+    try {
+      // First check what tables and data exist
+      console.log('🔍 Checking available invoice data...');
+      
+      // Try standalone_invoices first
+      const standaloneResult = await supabase
+        .from('standalone_invoices')
+        .select('*')
+        .eq('merchant_id', merchantData.merchant_id)
+        .limit(5);
+        
+      console.log('📋 Standalone invoices result:', standaloneResult);
+      console.log('📋 Standalone data:', standaloneResult.data);
+      console.log('📋 Standalone error:', standaloneResult.error);
+      
+      // Try invoices table as backup
+      const invoicesResult = await supabase
+        .from('invoices')
+        .select('*')
+        .eq('merchant_id', merchantData.merchant_id)
+        .limit(5);
+        
+      console.log('📋 Invoices table result:', invoicesResult);
+      console.log('📋 Invoices data:', invoicesResult.data);
+      console.log('📋 Invoices error:', invoicesResult.error);
+      
+      // Use whichever table has data
+      let query = supabase
+        .from('standalone_invoices')
+        .select('id, invoice_number, total_amount, status, created_at, customer_email, customer_name, crypto_chain, payment_tx_hash, billing_address')
+        .eq('merchant_id', merchantData.merchant_id);
+        
+      // If standalone_invoices is empty, try invoices table
+      if ((!standaloneResult.data || standaloneResult.data.length === 0) && 
+          invoicesResult.data && invoicesResult.data.length > 0) {
+        query = supabase
+          .from('invoices')
+          .select('id, invoice_number, total_amount, status, created_at, customer_email, customer_name, crypto_chain, payment_tx_hash, billing_address')
+          .eq('merchant_id', merchantData.merchant_id);
+      }
+
+      // Apply date filters for specific report types
+      const now = new Date();
+      if (reportType === 'today') {
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+        console.log('📅 Today filter:', today.toISOString(), 'to', tomorrow.toISOString());
+        query = query.gte('created_at', today.toISOString()).lt('created_at', tomorrow.toISOString());
+      } else if (reportType === 'weekly') {
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        console.log('📅 Weekly filter: from', weekAgo.toISOString());
+        query = query.gte('created_at', weekAgo.toISOString());
+      } else if (reportType === 'monthly') {
+        const monthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+        console.log('📅 Monthly filter: from', monthAgo.toISOString());
+        query = query.gte('created_at', monthAgo.toISOString());
+      }
+
+      // Apply builder filters if not a quick report
+      if (!reportType) {
+        if (builderConfig.filters.status !== 'all') {
+          query = query.eq('status', builderConfig.filters.status);
+        }
+        if (builderConfig.dateRange.start) {
+          query = query.gte('created_at', builderConfig.dateRange.start);
+        }
+        if (builderConfig.dateRange.end) {
+          query = query.lte('created_at', builderConfig.dateRange.end);
+        }
+      }
+
+      query = query.order('created_at', { ascending: false });
+      const { data: invoicesData, error: queryError } = await query;
+      
+      // Handle empty results gracefully
+      const invoices = invoicesData || [];
+      const error = queryError;
+
+      if (error || !invoices) {
+        console.error('Error fetching export data:', error);
+        alert('Failed to fetch data for export. Please try again.');
+        return;
+      }
+
+      console.log(`📊 Found ${invoices.length} invoices for export`);
+      console.log('🔍 Query details:', {
+        merchant_id: merchantData.merchant_id,
+        filters: JSON.stringify(builderConfig.filters),
+        dateRange: JSON.stringify(builderConfig.dateRange),
+        reportType
+      });
+      
+      // Show sample of found data for debugging
+      if (invoices.length > 0) {
+        console.log('📋 Sample invoice data:', invoices[0]);
+      } else {
+        console.log('⚠️ No invoices found - checking raw data from standalone_invoices...');
+        // Show what's actually in the table
+        if (standaloneResult.data && standaloneResult.data.length > 0) {
+          console.log('📋 Raw standalone invoice sample:', standaloneResult.data[0]);
+          console.log('📋 Invoice created_at values:', standaloneResult.data.map(inv => inv.created_at));
+        }
+      }
+
+      // Create export job immediately
+      const exportJob: ExportJob = {
+        export_id: `export-${Date.now()}`,
+        name: `${reportType ? reportType.charAt(0).toUpperCase() + reportType.slice(1) : 'Custom'} Report ${new Date().toLocaleDateString()}`,
+        format,
+        status: 'processing',
+        created_at: new Date().toISOString(),
+        download_url: undefined,
+        file_size: undefined
+      };
+      
+      setExportJobs(prev => [exportJob, ...prev]);
+
+      // Switch to exports tab to show progress
+      setActiveTab('exports');
+
+      if (format === 'csv') {
+        // Generate CSV content
+        const csvHeaders = [
+          'Transaction ID',
+          'Invoice Number', 
+          'Amount',
+          'Network/Chain',
+          'Status',
+          'Date',
+          'Customer Email',
+          'Customer Name',
+          'Location',
+          'Transaction Hash'
+        ];
+
+        const csvRows = invoices.map(invoice => {
+          const billingAddress = invoice.billing_address as any;
+          const location = billingAddress ? 
+            `${billingAddress.city || ''}, ${billingAddress.state || ''}, ${billingAddress.country || ''}`.replace(/^,\s*|,\s*$/g, '') : 
+            'N/A';
+            
+          return [
+            invoice.id,
+            invoice.invoice_number,
+            `$${parseFloat(invoice.total_amount?.toString() || '0').toFixed(2)}`,
+            invoice.crypto_chain || 'Base',
+            invoice.status,
+            new Date(invoice.created_at).toLocaleDateString(),
+            invoice.customer_email || '',
+            invoice.customer_name || '',
+            location,
+            invoice.payment_tx_hash || 'N/A'
+          ];
+        });
+
+        // Always include headers, even with no data
+        const csvContent = csvRows.length > 0 
+          ? [
+              csvHeaders.join(','),
+              ...csvRows.map(row => row.map(cell => `"${cell}"`).join(','))
+            ].join('\n')
+          : csvHeaders.join(','); // Headers only when no data
+
+        // Store CSV content for download
+        const filename = `${reportType || 'custom'}_report_${new Date().toISOString().split('T')[0]}.csv`;
+          
+        console.log('📄 CSV Content Preview:', csvContent.substring(0, 200) + '...');
+          
+        // Create blob with proper MIME type and BOM for Excel compatibility
+        const BOM = '\uFEFF';
+        const csvWithBOM = BOM + csvContent;
+        const blob = new Blob([csvWithBOM], { 
+          type: 'text/csv;charset=utf-8;' 
+        });
+          
+        // Create download URL
+        const downloadUrl = URL.createObjectURL(blob);
+        console.log('🔗 Download URL created:', downloadUrl);
+
+        // Save to database and update state
+        setTimeout(async () => {
+          try {
+            const exportPayload = {
+              merchant_id: merchantData.merchant_id,
+              name: filename,
+              export_type: reportType ? 'quick' : 'custom',
+              format: format,
+              status: 'completed',
+              record_count: invoices.length,
+              file_size_kb: Math.round(blob.size / 1024),
+              filters: builderConfig.filters,
+              columns: builderConfig.columns,
+              created_by: userData?.user_id
+            };
+            
+            console.log('💾 Attempting to save export to database:');
+            console.log('📄 Payload:', JSON.stringify(exportPayload, null, 2));
+
+            const { data, error } = await supabase
+              .from('report_exports')
+              .insert(exportPayload)
+              .select()
+              .single();
+
+            if (error) {
+              console.error('❌ Database insert error:', error);
+              console.error('❌ Error details:', JSON.stringify(error, null, 2));
+              console.error('❌ Error message:', error.message);
+              console.error('❌ Error code:', error.code);
+            }
+
+            if (!error) {
+              setExportJobs(prev => prev.map(job => 
+                job.export_id === exportJob.export_id 
+                  ? { 
+                      ...job, 
+                      export_id: data.export_id,
+                      status: 'completed', 
+                      download_url: downloadUrl,
+                      file_size: Math.round(blob.size / 1024),
+                      filename,
+                      csvContent: csvWithBOM
+                    }
+                  : job
+              ));
+            }
+          } catch (dbError) {
+            console.error('Failed to save export to database:', dbError);
+            // Still update UI even if DB save fails
+            setExportJobs(prev => prev.map(job => 
+              job.export_id === exportJob.export_id 
+                ? { 
+                    ...job, 
+                    status: 'completed', 
+                    download_url: downloadUrl,
+                    file_size: Math.round(blob.size / 1024),
+                    filename,
+                    csvContent: csvWithBOM
+                  }
+                : job
+            ));
+          }
+          
+          console.log(`✅ CSV export completed: ${invoices.length} records exported`);
+          console.log(`📊 File size: ${Math.round(blob.size / 1024)} KB`);
+        }, 1500);
+      }
+      
+    } catch (error) {
+      console.error('Error exporting report:', error);
+    }
   };
 
   if (!userData || !merchantData) {
@@ -228,10 +696,9 @@ const Reports: React.FC = () => {
 
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6" defaultValue="overview">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="builder">Builder</TabsTrigger>
-          <TabsTrigger value="scheduled">Scheduled</TabsTrigger>
           <TabsTrigger value="exports">Exports</TabsTrigger>
         </TabsList>
 
@@ -302,15 +769,27 @@ const Reports: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Button variant="outline" className="justify-start">
+                <Button 
+                  variant="outline" 
+                  className="justify-start"
+                  onClick={() => exportReport('csv', 'today')}
+                >
                   <FileText className="h-4 w-4 mr-2" />
                   Today's Sales
                 </Button>
-                <Button variant="outline" className="justify-start">
+                <Button 
+                  variant="outline" 
+                  className="justify-start"
+                  onClick={() => exportReport('csv', 'weekly')}
+                >
                   <Calendar className="h-4 w-4 mr-2" />
                   Weekly Summary
                 </Button>
-                <Button variant="outline" className="justify-start">
+                <Button 
+                  variant="outline" 
+                  className="justify-start"
+                  onClick={() => exportReport('csv', 'monthly')}
+                >
                   <BarChart3 className="h-4 w-4 mr-2" />
                   Monthly Report
                 </Button>
@@ -346,7 +825,7 @@ const Reports: React.FC = () => {
                       }))}
                       className="px-3 py-2 border border-gray-300 rounded-md text-sm"
                     />
-                    <input
+                    <input 
                       type="date"
                       value={builderConfig.dateRange.end}
                       onChange={(e) => setBuilderConfig(prev => ({
@@ -372,9 +851,12 @@ const Reports: React.FC = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                   >
                     <option value="all">All Statuses</option>
-                    <option value="completed">Completed</option>
-                    <option value="pending">Pending</option>
-                    <option value="failed">Failed</option>
+                    <option value="paid">Paid</option>
+                    <option value="partially_paid">Partially Paid</option>
+                    <option value="sent">Sent</option>
+                    <option value="draft">Draft</option>
+                    <option value="expired">Expired</option>
+                    <option value="cancelled">Cancelled</option>
                     <option value="refunded">Refunded</option>
                   </select>
                 </div>
@@ -417,7 +899,11 @@ const Reports: React.FC = () => {
                     <Eye className="h-4 w-4 mr-2" />
                     Preview
                   </Button>
-                  <Button variant="outline" className="w-full">
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => setShowSaveTemplate(true)}
+                  >
                     <Save className="h-4 w-4 mr-2" />
                     Save Template
                   </Button>
@@ -458,11 +944,15 @@ const Reports: React.FC = () => {
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
-                          {builderConfig.columns.map(column => (
-                            <th key={column} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              {availableColumns.find(c => c.key === column)?.label || column}
-                            </th>
-                          ))}
+                          {builderConfig.columns.map(column => {
+                            const columnDef = availableColumns.find(c => c.key === column);
+                            console.log(`Column: ${column}, Label: ${columnDef?.label}`);
+                            return (
+                              <th key={column} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                {columnDef?.label || column}
+                              </th>
+                            );
+                          })}
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
@@ -491,26 +981,6 @@ const Reports: React.FC = () => {
           </div>
         </TabsContent>
 
-        {/* Scheduled Tab */}
-        <TabsContent value="scheduled" className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-medium">Scheduled Reports</h3>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              New Schedule
-            </Button>
-          </div>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="text-center py-8 text-gray-500">
-                <Clock className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                <p>No scheduled reports yet</p>
-                <p className="text-sm">Create automated reports that run on your schedule</p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         {/* Exports Tab */}
         <TabsContent value="exports" className="space-y-6">
@@ -522,34 +992,110 @@ const Reports: React.FC = () => {
             <CardContent className="p-6">
               {exportJobs.length > 0 ? (
                 <div className="space-y-4">
-                  {exportJobs.map(job => (
-                    <div key={job.export_id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center space-x-4">
-                        <FileText className="h-8 w-8 text-gray-400" />
-                        <div>
-                          <p className="font-medium">{job.name}</p>
-                          <p className="text-sm text-gray-500">
-                            {job.format.toUpperCase()} • {new Date(job.created_at).toLocaleDateString()}
-                          </p>
+                  {exportJobs.map(job => {
+                    const filters = job.filters ? JSON.parse(job.filters) : {};
+                    const columns = job.columns ? JSON.parse(job.columns) : [];
+                    
+                    return (
+                      <div key={job.export_id} className="border rounded-lg p-4 space-y-3">
+                        {/* Header Row */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <FileText className="h-8 w-8 text-blue-600" />
+                            <div>
+                              <p className="font-medium text-lg">{job.name}</p>
+                              <p className="text-sm text-gray-500">
+                                {job.export_type === 'quick' ? 'Quick Export' : 'Custom Report'} • 
+                                {job.format.toUpperCase()} • 
+                                {new Date(job.created_at).toLocaleDateString()} at {new Date(job.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <Badge variant={
+                              job.status === 'completed' ? 'default' :
+                              job.status === 'failed' ? 'destructive' :
+                              'secondary'
+                            }>
+                              {job.status}
+                            </Badge>
+                            {job.status === 'completed' && job.download_url && (
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => downloadExportFile(job)}
+                              >
+                                <Download className="h-4 w-4 mr-2" />
+                                Download
+                              </Button>
+                            )}
+                            {job.status === 'processing' && (
+                              <div className="flex items-center space-x-2">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                                <span className="text-sm text-gray-500">Processing...</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center space-x-4">
-                        <Badge variant={
-                          job.status === 'completed' ? 'default' :
-                          job.status === 'failed' ? 'destructive' :
-                          'secondary'
-                        }>
-                          {job.status}
-                        </Badge>
-                        {job.status === 'completed' && job.download_url && (
-                          <Button size="sm" variant="outline">
-                            <Download className="h-4 w-4 mr-2" />
-                            Download
-                          </Button>
+                        
+                        {/* Export Details */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                          <div className="bg-gray-50 p-3 rounded">
+                            <p className="font-medium text-gray-700 mb-1">Records Exported</p>
+                            <p className="text-lg font-semibold">{job.record_count || 0}</p>
+                            {job.file_size && (
+                              <p className="text-gray-500">{job.file_size} KB</p>
+                            )}
+                          </div>
+                          
+                          <div className="bg-gray-50 p-3 rounded">
+                            <p className="font-medium text-gray-700 mb-1">Date Range</p>
+                            {filters.dateRange ? (
+                              <p>{filters.dateRange === 'today' ? 'Today' : 
+                                   filters.dateRange === 'week' ? 'This Week' :
+                                   filters.dateRange === 'month' ? 'This Month' :
+                                   filters.dateRange === 'custom' ? 'Custom Range' : 'All Time'}</p>
+                            ) : (
+                              <p>All Time</p>
+                            )}
+                            {filters.startDate && filters.endDate && (
+                              <p className="text-gray-500 text-xs">
+                                {new Date(filters.startDate).toLocaleDateString()} - {new Date(filters.endDate).toLocaleDateString()}
+                              </p>
+                            )}
+                          </div>
+                          
+                          <div className="bg-gray-50 p-3 rounded">
+                            <p className="font-medium text-gray-700 mb-1">Columns Included</p>
+                            <p>{columns.length || 'All'} columns</p>
+                            {columns.length > 0 && (
+                              <p className="text-gray-500 text-xs truncate">
+                                {columns.slice(0, 3).join(', ')}{columns.length > 3 ? '...' : ''}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Additional Filters */}
+                        {(filters.status || filters.minAmount || filters.maxAmount) && (
+                          <div className="bg-blue-50 p-3 rounded">
+                            <p className="font-medium text-gray-700 mb-2">Applied Filters</p>
+                            <div className="flex flex-wrap gap-2">
+                              {filters.status && (
+                                <Badge variant="secondary">Status: {filters.status}</Badge>
+                              )}
+                              {filters.minAmount && (
+                                <Badge variant="secondary">Min: ${filters.minAmount}</Badge>
+                              )}
+                              {filters.maxAmount && (
+                                <Badge variant="secondary">Max: ${filters.maxAmount}</Badge>
+                              )}
+                            </div>
+                          </div>
                         )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-8 text-gray-500">
@@ -562,6 +1108,124 @@ const Reports: React.FC = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Save Template Dialog */}
+      {showSaveTemplate && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Save Report Template</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Template Name *
+                </label>
+                <input
+                  type="text"
+                  value={templateName}
+                  onChange={(e) => setTemplateName(e.target.value)}
+                  placeholder="e.g., Monthly Invoice Report"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+            </div>
+            
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowSaveTemplate(false);
+                  setTemplateName('');
+                  setTemplateDescription('');
+                }}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveTemplate}
+                disabled={!templateName.trim()}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Save Template
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Saved Templates Section */}
+      {templates.length > 0 && (
+        <div className="mt-8">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <BookOpen className="h-5 w-5 mr-2" />
+                Saved Templates ({templates.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4">
+                {templates.map((template) => (
+                  <div key={template.template_id} className="border rounded-lg p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-900">{template.name}</h4>
+                        <div className="flex items-center text-xs text-gray-500 mt-2 space-x-4">
+                          <span>{template.columns.length} columns</span>
+                          <span>Created {new Date(template.created_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2 ml-4">
+                        <button
+                          onClick={() => loadTemplate(template)}
+                          className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                        >
+                          Load
+                        </button>
+                        
+                        <div className="relative group">
+                          <button className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200">
+                            Export ▼
+                          </button>
+                          <div className="absolute right-0 top-full mt-1 bg-white border rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                            <button
+                              onClick={() => exportFromTemplate(template, 'csv')}
+                              className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
+                            >
+                              Export as CSV
+                            </button>
+                            <button
+                              onClick={() => exportFromTemplate(template, 'xlsx')}
+                              className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
+                            >
+                              Export as Excel
+                            </button>
+                            <button
+                              onClick={() => exportFromTemplate(template, 'json')}
+                              className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
+                            >
+                              Export as JSON
+                            </button>
+                          </div>
+                        </div>
+                        
+                        <button
+                          onClick={() => setTemplates(prev => prev.filter(t => t.template_id !== template.template_id))}
+                          className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };

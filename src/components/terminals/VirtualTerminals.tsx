@@ -119,13 +119,6 @@ const VirtualTerminals = (): React.ReactElement => {
   const isFirstTimeSetup = !passwordInfo.lastChanged;
   
   const [availableTokens] = useState<AcceptedToken[]>([
-    // Ethereum Network - Top 5 (Coming Soon)
-    { id: '1', symbol: 'ETH', name: 'Ethereum (Coming Soon)', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'ethereum', network: 'Ethereum', disabled: true, comingSoon: true },
-    { id: '2', symbol: 'USDC', name: 'Circle USDC (Coming Soon)', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'usd-coin', network: 'Ethereum', disabled: true, comingSoon: true },
-    { id: '3', symbol: 'USDT', name: 'Tether USDT (Coming Soon)', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'tether', network: 'Ethereum', disabled: true, comingSoon: true },
-    { id: '4', symbol: 'DAI', name: 'MakerDAO DAI (Coming Soon)', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'dai', network: 'Ethereum', disabled: true, comingSoon: true },
-    { id: '5', symbol: 'WBTC', name: 'Wrapped BTC (Coming Soon)', walletAddress: '', priority: 0, isSelected: false, coingeckoId: 'wrapped-bitcoin', network: 'Ethereum', disabled: true, comingSoon: true },
-    
     // Base Network - Available Tokens
     { id: '7', symbol: 'USDC', name: 'Circle USDC (Base)', walletAddress: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', priority: 0, isSelected: false, coingeckoId: 'usd-coin', network: 'Base' },
     { id: '10', symbol: 'USDT', name: 'Tether USDT (Base)', walletAddress: '0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2', priority: 0, isSelected: false, coingeckoId: 'tether', network: 'Base' },
@@ -810,7 +803,7 @@ const getBlockchainForToken = (symbol: string, network?: string): string => {
       <Tabs value={activeTab} onValueChange={setActiveTab} defaultValue="password" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="password">Virtual Terminal Password</TabsTrigger>
-          <TabsTrigger value="tokens">Accepted Tokens</TabsTrigger>
+          <TabsTrigger value="tokens">VT Accepted Tokens</TabsTrigger>
           <TabsTrigger value="settings">Terminal Settings</TabsTrigger>
         </TabsList>
 
@@ -1078,46 +1071,6 @@ const getBlockchainForToken = (symbol: string, network?: string): string => {
                 <div>
                   <h3 className="font-medium text-gray-900 mb-4">Available Tokens</h3>
                   
-                  {/* Ethereum Network Tokens */}
-                  <div className="mb-6">
-                    <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
-                      <span className="w-3 h-3 bg-blue-500 rounded-full mr-2"></span>
-                      Ethereum Network
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {availableTokens
-                        .filter(token => !selectedTokens.find(selected => selected.id === token.id) && token.network === 'Ethereum')
-                        .map((token) => (
-                          <div
-                            key={token.id}
-                            className={`flex items-center justify-between p-3 border border-gray-200 rounded-lg ${token.disabled ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
-                          >
-                            <div>
-                              <div className="font-medium flex items-center gap-2">
-                                {token.symbol}
-                                <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 border-blue-300">
-                                  Ethereum
-                                </Badge>
-                                {token.comingSoon && (
-                                  <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800 border-amber-300">
-                                    Coming Soon
-                                  </Badge>
-                                )}
-                              </div>
-                              <div className="text-sm text-gray-600">{token.name}</div>
-                            </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleTokenSelect(token)}
-                              disabled={selectedTokens.length >= 3 || token.disabled}
-                            >
-                              {token.comingSoon ? 'Coming Soon' : 'Add'}
-                            </Button>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
 
                   {/* Base Network Tokens */}
                   <div>

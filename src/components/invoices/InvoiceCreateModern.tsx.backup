@@ -1,0 +1,1057 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Badge } from '../ui/badge';
+import SavedContacts from './SavedContacts';
+import { 
+  Plus, 
+  Minus, 
+  ArrowLeft, 
+  Save, 
+  Send, 
+  Eye, 
+  Grid3X3,
+  User,
+  Mail,
+  X,
+  Calendar,
+  Clock,
+  DollarSign,
+  Settings,
+  HelpCircle,
+  Bell,
+  Search,
+  FileText,
+  Trash2,
+  Download,
+  Link,
+  Copy
+} from 'lucide-react';
+import { useInvoiceStore } from '../../stores/invoiceStore';
+import { invoiceFormSchema, InvoiceFormData } from '../../schemas/invoiceSchemas';
+import { useAuth } from '../../contexts/AuthContext';
+import { invoiceApi, InvoiceApiPayload } from '../../services/invoiceApi';
+import { invoiceService } from '../../services/invoiceService';
+import { supabase } from '../../lib/supabase';
+
+interface LineItem {
+  id: string;
+  name: string;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  image?: string;
+}
+
+const InvoiceCreateModern: React.FC = () => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { userData, merchantData } = useAuth();
+  const { createInvoice, mockWallets } = useInvoiceStore();
+  const [activeSection, setActiveSection] = useState('details');
+  const [loading, setLoading] = useState(false);
+  const [verifiedWallets, setVerifiedWallets] = useState<any[]>([]);
+  const [createdInvoice, setCreatedInvoice] = useState<any>(null);
+  const [lineItems, setLineItems] = useState<LineItem[]>([]);
+  const [showContactPicker, setShowContactPicker] = useState(false);
+
+  const form = useForm({
+    resolver: zodResolver(invoiceFormSchema),
+    defaultValues: {
+      is_simple_amount: true,
+      currency_mode: 'crypto',
+      crypto_asset: 'USDC',
+      chain: 'BASE',
+      price_lock_secs: 900,
+      min_confirmations: 1,
+      allow_partial: false,
+      tip_suggestions: [0, 10, 15],
+      tax_inclusive: false,
+      fee_payer: 'merchant',
+      restricted_jurisdictions: false,
+      line_items: [],
+      customer_email: '',
+      customer_name: '',
+      customer_cc_emails: '',
+      billing_address: {
+        street: '',
+        city: '',
+        state: '',
+        postal_code: '',
+        country: ''
+      },
+      settlement_wallet_id: '',
+      due_date: '',
+      notes: '',
+      tags: '',
+      webhook_url: '',
+      notification_email: '',
+      send_email: true,
+      title: 'Electronic purchasing',
+      description: '',
+      simple_amount: 0
+    }
+  });
+
+  const sidebarSections = [
+    { id: 'details', icon: Grid3X3, label: 'Invoice Detail' },
+    { id: 'customer', icon: User, label: 'Billed to' },
+    { id: 'products', icon: FileText, label: 'Product' }
+  ];
+
+  // Calculate totals
+  const subtotal = lineItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+  const taxRate = 0.10; // 10% tax
+  const taxAmount = subtotal * taxRate;
+  const total = subtotal + taxAmount;
+
+  const addLineItem = () => {
+    const newItem: LineItem = {
+      id: Date.now().toString(),
+      name: '',
+      description: '',
+      quantity: 1,
+      unit_price: 0
+    };
+    setLineItems([...lineItems, newItem]);
+  };
+
+  const removeLineItem = (id: string) => {
+    setLineItems(lineItems.filter(item => item.id !== id));
+  };
+
+  const updateLineItem = (id: string, field: keyof LineItem, value: any) => {
+    setLineItems(lineItems.map(item => 
+      item.id === id ? { ...item, [field]: value } : item
+    ));
+  };
+
+  // Load verified wallets from database
+  const loadVerifiedWallets = async () => {
+    if (!userData || !merchantData) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('wallet_addresses')
+        .select(`
+          address_id,
+          blockchain,
+          address,
+          is_verified,
+          verified_at,
+          merchant_wallets!inner(merchant_id)
+        `)
+        .eq('merchant_wallets.merchant_id', merchantData.merchant_id)
+        .eq('is_verified', true)
+        .eq('blockchain', 'Base')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      setVerifiedWallets(data || []);
+      
+      // Auto-select first verified wallet if available
+      if (data && data.length > 0 && !form.watch('settlement_wallet_id')) {
+        form.setValue('settlement_wallet_id', data[0].address_id);
+      }
+    } catch (err: any) {
+      console.error('Error loading verified wallets:', err);
+    }
+  };
+
+  // Load existing draft data if editing
+  useEffect(() => {
+    const editId = searchParams.get('edit');
+    if (editId) {
+      loadDraftData(editId);
+    }
+  }, [searchParams]);
+
+  const loadDraftData = async (draftId: string) => {
+    try {
+      const { data: draft, error } = await supabase
+        .from('standalone_invoices')
+        .select('*')
+        .eq('id', draftId)
+        .single();
+
+      if (error) {
+        console.error('Error loading draft:', error);
+        return;
+      }
+
+      if (draft) {
+        // Populate form with draft data
+        form.reset({
+          title: draft.title || '',
+          description: draft.description || '',
+          notes: draft.notes || '',
+          customer_email: draft.customer_email || '',
+          customer_name: draft.customer_name || '',
+          customer_cc_emails: Array.isArray(draft.customer_cc_emails) ? draft.customer_cc_emails.join(', ') : '',
+          billing_address: typeof draft.billing_address === 'string' ? JSON.parse(draft.billing_address) : draft.billing_address,
+          crypto_asset: draft.crypto_currency || 'USDC',
+          chain: draft.crypto_chain || 'BASE',
+          due_date: draft.due_date ? new Date(draft.due_date).toISOString().split('T')[0] : '',
+          settlement_wallet_id: draft.settlement_wallet_id || '',
+          simple_amount: parseFloat(draft.simple_amount) || 0,
+          send_email: draft.send_email || true,
+          webhook_url: draft.webhook_url || '',
+          notification_email: draft.notification_email || '',
+          tags: Array.isArray(draft.tags) ? draft.tags.join(', ') : '',
+          price_lock_secs: draft.price_lock_secs || 900,
+          min_confirmations: draft.min_confirmations || 1,
+          allow_partial: draft.allow_partial || false,
+          tip_suggestions: draft.tip_suggestions || [0, 10, 15],
+          tax_inclusive: draft.tax_inclusive || false,
+          fee_payer: draft.fee_payer || 'merchant',
+          restricted_jurisdictions: draft.restricted_jurisdictions || false,
+          currency_mode: 'crypto',
+          is_simple_amount: draft.is_simple_amount || true
+        });
+
+        // Load line items if they exist
+        if (draft.line_items && Array.isArray(draft.line_items) && draft.line_items.length > 0) {
+          setLineItems(draft.line_items.map((item: any) => ({
+            id: item.id || Date.now().toString(),
+            name: item.name || '',
+            description: item.description || '',
+            quantity: item.quantity || 1,
+            unit_price: item.unit_price || 0
+          })));
+        }
+      }
+    } catch (error) {
+      console.error('Error loading draft data:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (userData && merchantData) {
+      loadVerifiedWallets();
+    }
+  }, [userData, merchantData]);
+
+  const handleFormSubmit = async (data: InvoiceFormData, isDraft: boolean = false) => {
+    try {
+      setLoading(true);
+      
+      // Use the actual lineItems state, not form data
+      const subtotal = lineItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+      const taxAmount = subtotal * 0.1; // 10% tax
+      const total = subtotal + taxAmount;
+      
+      // Custom validation based on isDraft flag
+      if (!isDraft) {
+        // For sent invoices, require amount > 0 or line items with total > 0
+        const hasSimpleAmount = data.simple_amount && data.simple_amount > 0;
+        const hasLineItemsWithTotal = lineItems.length > 0 && total > 0;
+        
+        if (!hasSimpleAmount && !hasLineItemsWithTotal) {
+          alert('Please add an amount or line items with prices before sending the invoice.');
+          setLoading(false);
+          return;
+        }
+      }
+      
+      // Process comma-separated strings for arrays
+      const processedCCEmails = data.customer_cc_emails ? 
+        data.customer_cc_emails.split(',').map((email: string) => email.trim()).filter((email: string) => email) : [];
+      
+      const processedTags = data.tags ? 
+        data.tags.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag) : [];
+
+      const invoiceData = {
+        // Basic info
+        title: data.title || 'Invoice',
+        description: data.description || '',
+        notes: data.notes || '',
+        
+        // Customer info
+        customer_email: data.customer_email || '',
+        customer_name: data.customer_name || '',
+        customer_cc_emails: processedCCEmails,
+        billing_address: data.billing_address,
+        
+        // Amount structure
+        is_simple_amount: lineItems.length === 0,
+        simple_amount: lineItems.length > 0 ? total : (data.simple_amount || 0),
+        line_items: lineItems.length > 0 ? lineItems.map(item => ({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          unit_price: item.unit_price
+        })) : [],
+        
+        // Amount calculations
+        subtotal: lineItems.length > 0 ? subtotal : 0,
+        tax_amount: lineItems.length > 0 ? taxAmount : 0,
+        discount_amount: 0,
+        total_amount: lineItems.length > 0 ? total : (data.simple_amount || 0),
+        
+        // Currency and payment
+        currency_mode: 'crypto' as const,
+        crypto_currency: data.crypto_asset || 'USDC',
+        crypto_chain: 'BASE' as const,
+        price_lock_secs: data.price_lock_secs || 900,
+        min_confirmations: data.min_confirmations || 1,
+        allow_partial: data.allow_partial || false,
+        
+        // Payment preferences
+        tip_suggestions: data.tip_suggestions || [0, 10, 15],
+        tax_inclusive: data.tax_inclusive || false,
+        fee_payer: data.fee_payer || 'merchant',
+        
+        // Settlement
+        settlement_wallet_id: data.settlement_wallet_id || (verifiedWallets.length > 0 ? verifiedWallets[0].address_id : ''),
+        
+        // Timing
+        due_date: data.due_date,
+        
+        // Notifications
+        webhook_url: data.webhook_url || '',
+        notification_email: data.notification_email || '',
+        send_email: data.send_email !== false,
+        
+        // Metadata
+        tags: processedTags,
+        status: (isDraft ? 'draft' : 'sent') as 'draft' | 'sent'
+      };
+
+      console.log('Submitting invoice:', isDraft ? 'as draft' : 'to send');
+      
+      let result;
+      if (isDraft) {
+        // Save draft directly to database
+        result = await invoiceService.saveDraft(
+          invoiceData, 
+          merchantData?.merchant_id || '', 
+          userData?.user_id || ''
+        );
+        console.log('Draft saved to database:', result);
+        alert('Draft saved successfully!');
+      } else {
+        // Send invoice via API (creates payment infrastructure)
+        result = await invoiceService.sendInvoice(invoiceData);
+        console.log('Invoice sent via API:', result);
+        setCreatedInvoice(result);
+        navigate(`/invoices/${result.id}`);
+      }
+      
+    } catch (error: any) {
+      console.error('Error with invoice:', error);
+      alert(`Error ${isDraft ? 'saving draft' : 'sending invoice'}: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveAsDraft = () => {
+    if (loading) return; // Prevent double clicks
+    
+    console.log('Save as Draft clicked');
+    console.log('Form errors:', JSON.stringify(form.formState.errors, null, 2));
+    console.log('Form values:', JSON.stringify(form.getValues(), null, 2));
+    
+    // For drafts, bypass form validation and submit directly
+    const formData = form.getValues();
+    console.log('Form submitted for draft:', formData);
+    onSubmit(formData as any, true);
+  };
+
+  const handleCreateLink = () => {
+    console.log('Create Invoice Link clicked');
+    console.log('Form errors:', JSON.stringify(form.formState.errors, null, 2));
+    console.log('Form values:', JSON.stringify(form.getValues(), null, 2));
+    form.handleSubmit((data) => {
+      console.log('Form data before submission:', data);
+      console.log('Line items:', lineItems);
+      console.log('Calculated totals:', { subtotal, taxAmount, total });
+      console.log('Is draft:', false);
+      console.log('Simple amount from form:', data.simple_amount);
+      
+      // Create invoice without sending email
+      const modifiedData = { ...data, send_email: false };
+      submitInvoice(modifiedData, false);
+    }, (errors) => {
+      console.log('Form validation errors:', JSON.stringify(errors, null, 2));
+    })();
+  };
+
+  const handleSendInvoice = () => {
+    console.log('Send Invoice clicked');
+    console.log('Form errors:', JSON.stringify(form.formState.errors, null, 2));
+    console.log('Form values:', JSON.stringify(form.getValues(), null, 2));
+    form.handleSubmit((data) => {
+      console.log('Form data before submission:', data);
+      console.log('Line items:', lineItems);
+      console.log('Calculated totals:', { subtotal, taxAmount, total });
+      console.log('Is draft:', false);
+      console.log('Simple amount from form:', data.simple_amount);
+      
+      // Debug the invoice data being sent
+      const invoiceDataToSend = {
+        // Amount structure
+        is_simple_amount: lineItems.length === 0,
+        simple_amount: lineItems.length > 0 ? total : (data.simple_amount || 0),
+        line_items: lineItems.length > 0 ? lineItems.map(item => ({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          unit_price: item.unit_price
+        })) : [],
+        
+        // Amount calculations
+        subtotal: lineItems.length > 0 ? subtotal : 0,
+        tax_amount: lineItems.length > 0 ? taxAmount : 0,
+        discount_amount: 0,
+        total_amount: lineItems.length > 0 ? total : (data.simple_amount || 0),
+      };
+      
+      console.log('Invoice data being sent to service:', invoiceDataToSend);
+      submitInvoice(data, false);
+    }, (errors) => {
+      console.log('Form validation errors:', JSON.stringify(errors, null, 2));
+    })();
+  };
+
+  const handlePreviewPDF = () => {
+    if (createdInvoice?.id) {
+      // Generate PDF URL - this would typically be an API endpoint
+      const pdfUrl = `${process.env.REACT_APP_API_URL || 'https://okurutest.up.railway.app'}/dashboard-invoices/${createdInvoice.id}/pdf`;
+      window.open(pdfUrl, '_blank');
+    }
+  };
+
+  const handleViewPaymentPage = () => {
+    if (createdInvoice?.public_id) {
+      // Open the public payment page
+      const paymentUrl = `${process.env.REACT_APP_API_URL || 'https://okurutest.up.railway.app'}/pay/${createdInvoice.public_id}`;
+      window.open(paymentUrl, '_blank');
+    }
+  };
+
+  const handleSendEmail = async () => {
+    if (createdInvoice?.id) {
+      try {
+        // Call API to send email
+        const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://okurutest.up.railway.app'}/dashboard-invoices/${createdInvoice.id}/send-email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${await supabase.auth.getSession().then(s => s.data.session?.access_token)}`
+          }
+        });
+        
+        if (response.ok) {
+          alert('Invoice email sent successfully!');
+        } else {
+          throw new Error('Failed to send email');
+        }
+      } catch (error) {
+        console.error('Error sending email:', error);
+        alert('Failed to send invoice email. Please try again.');
+      }
+    }
+  };
+
+  const onSubmit = async (data: any, isDraft: boolean) => {
+    try {
+      if (isDraft) {
+        // Save draft directly to database
+        const result = await invoiceService.saveDraft(
+          {
+            // Basic info
+            title: data.title || 'Invoice',
+            description: data.description || '',
+            notes: data.notes || '',
+            
+            // Customer info
+            customer_email: data.customer_email || '',
+            customer_name: data.customer_name || '',
+            customer_cc_emails: data.customer_cc_emails ? data.customer_cc_emails.split(',').map((email: string) => email.trim()).filter((email: string) => email) : [],
+            billing_address: data.billing_address,
+            
+            // Amount structure
+            is_simple_amount: lineItems.length === 0,
+            simple_amount: lineItems.length > 0 ? total : (data.simple_amount || 0),
+            line_items: lineItems.length > 0 ? lineItems.map(item => ({
+              id: item.id,
+              name: item.name,
+              quantity: item.quantity,
+              unit_price: item.unit_price
+            })) : [],
+            
+            // Amount calculations
+            subtotal: lineItems.length > 0 ? subtotal : 0,
+            tax_amount: lineItems.length > 0 ? taxAmount : 0,
+            discount_amount: 0,
+            total_amount: lineItems.length > 0 ? total : (data.simple_amount || 0),
+            
+            // Currency and payment
+            currency_mode: 'crypto' as const,
+            crypto_currency: data.crypto_asset || 'USDC',
+            crypto_chain: 'BASE' as const,
+            price_lock_secs: data.price_lock_secs || 900,
+            min_confirmations: data.min_confirmations || 1,
+        
+        // Create a styled notification with the payment link
+        const notification = document.createElement('div');
+        notification.innerHTML = `
+          <div style="
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            padding: 20px 24px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            z-index: 9999;
+            font-weight: 500;
+            max-width: 400px;
+            border: 1px solid rgba(255,255,255,0.2);
+          ">
+            <div style="display: flex; align-items: center; margin-bottom: 12px;">
+              <span style="font-size: 18px; margin-right: 8px;">✅</span>
+              <strong>Invoice Created Successfully!</strong>
+            </div>
+            <div style="margin-bottom: 12px; font-size: 14px; opacity: 0.9;">
+              Share this payment link with your customer:
+            </div>
+            <div style="
+              background: rgba(255,255,255,0.15);
+              padding: 10px;
+              border-radius: 6px;
+              font-family: monospace;
+              font-size: 12px;
+              word-break: break-all;
+              margin-bottom: 12px;
+              border: 1px solid rgba(255,255,255,0.2);
+            ">
+              ${paymentUrl}
+            </div>
+            <button onclick="
+              navigator.clipboard.writeText('${paymentUrl}');
+              this.innerHTML = '✅ Copied!';
+              setTimeout(() => this.innerHTML = '📋 Copy Link', 2000);
+            " style="
+              background: rgba(255,255,255,0.2);
+              border: 1px solid rgba(255,255,255,0.3);
+              color: white;
+              padding: 8px 16px;
+              border-radius: 6px;
+              cursor: pointer;
+              font-size: 12px;
+              font-weight: 500;
+            ">📋 Copy Link</button>
+  const renderInvoicePreview = () => {
+    const formData = form.getValues();
+    const isReadyToSend = formData.title && formData.customer_email && ((formData.simple_amount && formData.simple_amount > 0) || lineItems.length > 0);
+    
+    return (
+    <div className="bg-white rounded-lg shadow-sm border p-6 h-full">
+      {!isReadyToSend && (
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <div className="flex items-center gap-2 text-amber-800 text-sm font-medium mb-1">
+            <span>⚠️</span>
+            <span>Required to send invoice:</span>
+          </div>
+          <ul className="text-sm text-amber-700 ml-6 space-y-1">
+            {!formData.title && <li>• Invoice title</li>}
+            {!formData.customer_email && <li>• Customer email</li>}
+            {!((formData.simple_amount && formData.simple_amount > 0) || lineItems.length > 0) && <li>• Invoice amount or line items</li>}
+          </ul>
+        </div>
+      )}
+      
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
+            <span className="text-white font-bold text-lg">
+              {merchantData?.name?.charAt(0) || 'O'}
+            </span>
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">{merchantData?.name || 'Okuru'}</h2>
+            <p className="text-sm text-gray-600">{merchantData?.business_email || 'merchant@okuru.com'}</p>
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-2xl font-bold text-gray-900">INVOICE</div>
+          <div className="text-sm text-gray-600">INV-{new Date().getFullYear()}-{Date.now().toString().slice(-6)}</div>
+          <div className="text-sm text-gray-600">{new Date().toLocaleDateString()}</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-8 mb-8">
+        <div className="space-y-4">
+          <div>
+            <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Bill To</div>
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="font-semibold text-gray-900">{form.watch('customer_name') || 'Customer Name'}</div>
+              <div className="text-sm text-gray-600 mt-1">{form.watch('customer_email') || 'customer@email.com'}</div>
+              {form.watch('billing_address.street') && (
+                <div className="text-sm text-gray-600 mt-2">
+                  <div>{form.watch('billing_address.street')}</div>
+                  <div>
+                    {form.watch('billing_address.city')}, {form.watch('billing_address.state')} {form.watch('billing_address.postal_code')}
+                  </div>
+                  {form.watch('billing_address.country') && (
+                    <div>{form.watch('billing_address.country')}</div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="space-y-4">
+          <div>
+            <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Invoice Details</div>
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Subject:</span>
+                <span className="text-sm font-medium">{form.watch('title') || 'Electronic purchasing'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Due Date:</span>
+                <span className="text-sm font-medium">
+                  {form.watch('due_date') ? 
+                    new Date(form.watch('due_date') as string).toLocaleDateString('en-US', { 
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric' 
+                    }) : 
+                    '30 days from issue'
+                  }
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Network:</span>
+                <span className="text-sm font-medium">{form.watch('chain') || 'BASE'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Stablecoin:</span>
+                <span className="text-sm font-medium">{form.watch('crypto_asset') || 'USDC'}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="border-t pt-4">
+        <div className="grid grid-cols-4 gap-4 text-sm text-gray-500 mb-3">
+          <div>ITEM</div>
+          <div className="text-center">QTY</div>
+          <div className="text-right">UNIT PRICE</div>
+          <div className="text-right">AMOUNT</div>
+        </div>
+
+        {lineItems.map((item) => (
+          <div key={item.id} className="grid grid-cols-4 gap-4 py-2 border-b">
+            <div>
+              <div className="font-medium text-sm">{item.name || 'Product or service name'}</div>
+              <div className="text-xs text-gray-500">{item.description}</div>
+            </div>
+            <div className="text-center">{item.quantity}</div>
+            <div className="text-right">${item.unit_price.toFixed(2)}</div>
+            <div className="text-right">${(item.quantity * item.unit_price).toFixed(2)}</div>
+          </div>
+        ))}
+
+        <div className="mt-8 bg-gray-50 p-6 rounded-lg">
+          <div className="space-y-3">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Subtotal</span>
+              <span className="font-medium">${subtotal.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Tax (10%)</span>
+              <span className="font-medium">${taxAmount.toFixed(2)}</span>
+            </div>
+            <div className="border-t border-gray-200 pt-3">
+              <div className="flex justify-between text-lg font-bold">
+                <span>Total Amount</span>
+                <span className="text-blue-600">${total.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+          
+        </div>
+
+
+      </div>
+    </div>
+  );
+  };
+
+  const renderDetailsSection = () => (
+    <div className="space-y-6">
+      <div>
+        <Label htmlFor="title">Invoice Title/Subject</Label>
+        <Input
+          id="title"
+          {...form.register('title')}
+          placeholder="Enter invoice title or subject"
+          className="mt-1"
+        />
+      </div>
+      
+      <div>
+        <Label htmlFor="description">Description (Optional)</Label>
+        <Input
+          id="description"
+          {...form.register('description')}
+          placeholder="Brief description of the invoice"
+          className="mt-1"
+        />
+      </div>
+      
+      <div>
+        <Label htmlFor="due_date">Due Date</Label>
+        <Input
+          id="due_date"
+          type="date"
+          {...form.register('due_date')}
+          className="mt-1"
+        />
+      </div>
+
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="chain">Network</Label>
+          <Select value={form.watch('chain') || 'BASE'} onValueChange={(value) => form.setValue('chain', value as any)}>
+            <SelectTrigger className="mt-1">
+              <SelectValue placeholder="Select network" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="BASE">Base</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="crypto_asset">Stablecoin</Label>
+          <Select value={form.watch('crypto_asset') || 'USDC'} onValueChange={(value) => form.setValue('crypto_asset', value as any)}>
+            <SelectTrigger className="mt-1">
+              <SelectValue placeholder="Select stablecoin" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="USDC">USDC</SelectItem>
+              <SelectItem value="USDT">USDT</SelectItem>
+              <SelectItem value="DAI">DAI</SelectItem>
+              <SelectItem value="USDbC">USDbC</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    </div>
+  );
+
+  const handleSelectContact = (contact: any) => {
+    form.setValue('customer_name', contact.name);
+    form.setValue('customer_email', contact.email);
+    if (contact.billing_address) {
+      form.setValue('billing_address', contact.billing_address);
+    }
+    setShowContactPicker(false);
+  };
+
+  const renderCustomerSection = () => (
+    <div className="space-y-6">
+      {showContactPicker ? (
+        <div className="border rounded-lg p-4">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-medium">Select a Contact</h3>
+            <Button variant="ghost" size="sm" onClick={() => setShowContactPicker(false)}>
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+          <SavedContacts 
+            onSelectContact={handleSelectContact}
+            showSelectMode={true}
+          />
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center gap-3 p-4 border rounded-lg">
+            <div className="flex-1">
+              <Input
+                {...form.register('customer_name')}
+                placeholder="Customer Name"
+                className="border-0 p-0 text-base font-medium"
+              />
+              <Input
+                {...form.register('customer_email')}
+                type="email"
+                placeholder="customer@email.com"
+                className="border-0 p-0 text-sm text-gray-500 mt-1"
+              />
+            </div>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => setShowContactPicker(true)}
+              title="Select from saved contacts"
+            >
+              <User className="w-4 h-4" />
+            </Button>
+          </div>
+        </>
+      )}
+
+      <div className="space-y-4">
+        <div>
+          <Label htmlFor="customer_cc_emails">CC Emails (comma-separated)</Label>
+          <Input
+            id="customer_cc_emails"
+            {...form.register('customer_cc_emails')}
+            placeholder="email1@example.com, email2@example.com"
+            className="mt-1"
+          />
+        </div>
+        
+        <div>
+          <Label>Billing Address</Label>
+          <div className="space-y-3 mt-2">
+            <Input {...form.register('billing_address.street')} placeholder="Street Address" />
+            <div className="grid grid-cols-2 gap-3">
+              <Input {...form.register('billing_address.city')} placeholder="City" />
+              <Input {...form.register('billing_address.state')} placeholder="State" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Input {...form.register('billing_address.postal_code')} placeholder="Postal Code" />
+              <Input {...form.register('billing_address.country')} placeholder="Country" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderProductsSection = () => (
+    <div className="space-y-6">
+      <div className="mb-4">
+        <Label className="text-base font-medium">Products & Services</Label>
+        <p className="text-sm text-gray-600 mt-1">Add items with descriptions and pricing. The amount field should contain the unit price per item.</p>
+      </div>
+
+      <div className="space-y-4">
+        {lineItems.map((item, index) => (
+          <div key={item.id} className="p-4 border rounded-lg space-y-4">
+            <div className="flex items-start gap-4">
+              <div className="flex-1 space-y-3">
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">Item Name</Label>
+                  <Input
+                    value={item.name}
+                    onChange={(e) => updateLineItem(item.id, 'name', e.target.value)}
+                    placeholder="Product or service name"
+                    className="font-medium mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">Unit Price (Amount per item)</Label>
+                  <Input
+                    value={item.unit_price === 0 ? '' : item.unit_price}
+                    onChange={(e) => updateLineItem(item.id, 'unit_price', e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
+                    placeholder="0.00"
+                    type="number"
+                    step="0.01"
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 items-end">
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">Qty</Label>
+                  <Input
+                    value={item.quantity}
+                    onChange={(e) => updateLineItem(item.id, 'quantity', parseInt(e.target.value) || 1)}
+                    type="number"
+                    min="1"
+                    className="text-center w-16 mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">Tax</Label>
+                  <Select value="10%" onValueChange={() => {}}>
+                    <SelectTrigger className="w-20 mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0%">0%</SelectItem>
+                      <SelectItem value="10%">10%</SelectItem>
+                      <SelectItem value="15%">15%</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeLineItem(item.id)}
+                  className="text-red-500 hover:text-red-700 mb-1"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        ))}
+
+        <Button
+          variant="ghost"
+          onClick={addLineItem}
+          className="w-full border-2 border-dashed border-gray-300 hover:border-gray-400"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Add New Line
+        </Button>
+      </div>
+
+
+    </div>
+  );
+
+  const renderCurrentSection = () => {
+    switch (activeSection) {
+      case 'details':
+        return renderDetailsSection();
+      case 'customer':
+        return renderCustomerSection();
+      case 'products':
+        return renderProductsSection();
+      case 'settings':
+        return <div className="text-gray-500">Settings section coming soon...</div>;
+      case 'timing':
+        return <div className="text-gray-500">Timing section coming soon...</div>;
+      case 'notifications':
+        return <div className="text-gray-500">Notifications section coming soon...</div>;
+      case 'help':
+        return <div className="text-gray-500">Help section coming soon...</div>;
+      default:
+        return renderDetailsSection();
+    }
+  };
+
+  return (
+    <div className="container mx-auto py-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" onClick={() => navigate('/invoices')}>
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <div className="flex items-center gap-2">
+              <span className="text-gray-600">Invoices</span>
+              <span className="text-gray-400">/</span>
+              <span className="font-medium">Create Invoice</span>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <Input placeholder="Search..." className="pl-10 w-64" />
+            </div>
+            <Button variant="outline" onClick={handleSaveAsDraft} disabled={loading}>
+              Save as Draft
+            </Button>
+            <Button variant="outline" onClick={handleCreateLink} disabled={loading} className="bg-green-600 hover:bg-green-700 text-white">
+              Create Invoice Link
+            </Button>
+            <Button onClick={handleSendInvoice} disabled={loading} className="bg-blue-600 hover:bg-blue-700">
+              Send Invoice
+            </Button>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="grid grid-cols-12 gap-6 h-[calc(100vh-120px)]">
+          {/* Left Sidebar */}
+          <div className="col-span-1 bg-white rounded-lg shadow-sm border p-4">
+            <div className="space-y-2">
+              {sidebarSections.map((section) => {
+                const Icon = section.icon;
+                return (
+                  <button
+                    key={section.id}
+                    onClick={() => setActiveSection(section.id)}
+                    className={`w-full p-3 rounded-lg flex flex-col items-center gap-2 text-xs transition-colors ${
+                      activeSection === section.id
+                        ? 'bg-blue-50 text-blue-600 border border-blue-200'
+                        : 'text-gray-500 hover:bg-gray-50'
+                    }`}
+                  >
+                    <Icon className="w-5 h-5" />
+                    <span className="text-center leading-tight">{section.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Form Section */}
+          <div className="col-span-5 bg-white rounded-lg shadow-sm border p-6 overflow-y-auto">
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold capitalize">{activeSection.replace('_', ' ')}</h2>
+              <p className="text-gray-500 text-sm mt-1">
+                {activeSection === 'details' && 'Configure invoice basic information'}
+                {activeSection === 'customer' && 'Set customer billing information'}
+                {activeSection === 'products' && 'Add products and line items'}
+                {activeSection === 'settings' && 'Configure advanced settings'}
+              </p>
+            </div>
+            
+            {renderCurrentSection()}
+          </div>
+
+          {/* Preview Section */}
+          <div className="col-span-6 overflow-y-auto">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="font-medium">Preview</h3>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => handlePreviewPDF()}
+                  disabled={!createdInvoice}
+                >
+                  <FileText className="w-4 h-4 mr-1" />
+                  PDF
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => handleViewPaymentPage()}
+                  disabled={!createdInvoice}
+                >
+                  <Mail className="w-4 h-4 mr-1" />
+                  Payment Page
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => handleSendEmail()}
+                  disabled={!createdInvoice}
+                >
+                  <Send className="w-4 h-4 mr-1" />
+                  Email
+                </Button>
+              </div>
+            </div>
+            {renderInvoicePreview()}
+          </div>
+        </div>
+    </div>
+  );
+};
+
+export default InvoiceCreateModern;

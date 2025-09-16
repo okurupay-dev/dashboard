@@ -150,20 +150,20 @@ const InvoiceCreate: React.FC = () => {
         
         // Payment configuration
         currency_mode: "crypto" as const,
-        crypto_asset: data.crypto_asset || 'USDC',
-        chain: "BASE" as const,
+        crypto_currency: data.crypto_asset || 'USDC',
+        crypto_chain: "BASE" as const,
         price_lock_secs: data.price_lock_secs || 900,
         min_confirmations: data.min_confirmations || 1,
         allow_partial: data.allow_partial || false,
         
         // Customer details
-        customer_email: data.customer_email,
+        customer_email: data.customer_email || '',
         customer_name: data.customer_name,
         customer_cc_emails: processedCCEmails,
         billing_address: data.billing_address?.street ? data.billing_address : undefined,
         
         // Settlement & metadata
-        settlement_wallet_id: data.settlement_wallet_id,
+        settlement_wallet_id: data.settlement_wallet_id || (verifiedWallets.length > 0 ? verifiedWallets[0].address_id : ''),
         fee_payer: "merchant",
         due_date: data.due_date,
         notes: data.notes,
@@ -174,10 +174,6 @@ const InvoiceCreate: React.FC = () => {
         notification_email: data.notification_email,
         send_email: data.send_email !== false,
         
-        // Policy
-        terms_conditions: data.terms_url,
-        refund_policy: data.refund_policy_url,
-        
         // Status
         status: (isDraft ? 'draft' : 'sent') as 'draft' | 'sent'
       };
@@ -187,8 +183,8 @@ const InvoiceCreate: React.FC = () => {
       console.log('Required fields check:', {
         customer_email: !!payload.customer_email,
         settlement_wallet_id: !!payload.settlement_wallet_id,
-        crypto_asset: !!payload.crypto_asset,
-        chain: !!payload.chain,
+        crypto_currency: !!payload.crypto_currency,
+        crypto_chain: !!payload.crypto_chain,
         simple_amount: payload.simple_amount
       });
 

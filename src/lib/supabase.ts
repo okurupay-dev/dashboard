@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL!
-const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY!
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || 'https://sjrnpnajbrxqlgttdiiu.supabase.co'
+const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNqcm5wbmFqYnJ4cWxndHRkaWl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxNDE4OTcsImV4cCI6MjA3MDcxNzg5N30.oLMXQTyzQNa2ccg8-A9pr1KGn-DMgUec7_8vRG6kbrg'
 
 // Create a single instance to avoid multiple client warnings
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {

@@ -70,6 +70,7 @@
     ]
   },
   "devDependencies": {
+    "@pmmmwh/react-refresh-webpack-plugin": "^0.6.1",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
     "ajv-keywords": "^3.5.2",
@@ -77,6 +78,7 @@
     "postcss": "^8.4.31",
     "process": "^0.11.10",
     "react-app-rewired": "^2.2.1",
+    "react-refresh": "^0.17.0",
     "schema-utils": "^3.3.0",
     "stream-browserify": "^3.0.0",
     "svix": "^1.15.0",

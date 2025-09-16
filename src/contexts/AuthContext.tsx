@@ -25,7 +25,7 @@ export const useAuth = () => {
   return context
 }
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [userData, setUserData] = useState<User | null>(null)
   const [merchantData, setMerchantData] = useState<Merchant | null>(null)

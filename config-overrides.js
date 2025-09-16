@@ -26,21 +26,27 @@ module.exports = function override(config, env) {
   // Ignore source map warnings for node_modules
   config.ignoreWarnings = [/Failed to parse source map/];
 
-  // Fix React Refresh runtime import issues by allowing node_modules imports
+  // Fix React Refresh runtime import issues
   if (env === 'development') {
-    // Allow imports from node_modules for React Refresh
-    config.resolve.symlinks = false;
+    // Disable React Fast Refresh to avoid import issues
+    config.plugins = config.plugins.filter(
+      plugin => plugin.constructor.name !== 'ReactRefreshPlugin'
+    );
     
-    // Update module rules to allow React Refresh runtime imports
+    // Remove React Refresh babel plugin
     const oneOfRule = config.module.rules.find(rule => rule.oneOf);
     if (oneOfRule) {
-      const tsRule = oneOfRule.oneOf.find(rule => 
-        rule.test && rule.test.toString().includes('tsx?')
-      );
-      if (tsRule && tsRule.include) {
-        // Allow React Refresh runtime to be processed
-        tsRule.include = [tsRule.include, /node_modules[/\\]react-refresh/];
-      }
+      oneOfRule.oneOf.forEach(rule => {
+        if (rule.use && Array.isArray(rule.use)) {
+          rule.use.forEach(use => {
+            if (use.loader && use.loader.includes('babel-loader') && use.options && use.options.plugins) {
+              use.options.plugins = use.options.plugins.filter(
+                plugin => !plugin.toString().includes('react-refresh')
+              );
+            }
+          });
+        }
+      });
     }
   }
 

@@ -577,7 +577,7 @@ const Settings: React.FC = () => {
         </Card>
 
         {/* Documents Section */}
-        <Card>
+        <Card className="xl:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <FileText className="w-5 h-5" />
@@ -600,10 +600,6 @@ const Settings: React.FC = () => {
                       <p className="text-sm text-gray-600 mb-3 flex-1">
                         Terms and conditions for merchant services, payment processing, and platform usage.
                       </p>
-                      <div className="flex items-center text-xs text-gray-500 space-x-4 mt-auto">
-                        <span>Signed: {new Date().toLocaleDateString()}</span>
-                        <span>Version: 2.1</span>
-                      </div>
                     </div>
                     <button 
                       className="ml-4 p-2 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-md transition-colors flex-shrink-0"
@@ -625,10 +621,6 @@ const Settings: React.FC = () => {
                       <p className="text-sm text-gray-600 mb-3 flex-1">
                         Important disclosures regarding cryptocurrency transactions, risks, and regulatory compliance.
                       </p>
-                      <div className="flex items-center text-xs text-gray-500 space-x-4 mt-auto">
-                        <span>Signed: {new Date().toLocaleDateString()}</span>
-                        <span>Version: 1.3</span>
-                      </div>
                     </div>
                     <button 
                       className="ml-4 p-2 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-md transition-colors flex-shrink-0"
@@ -650,10 +642,6 @@ const Settings: React.FC = () => {
                       <p className="text-sm text-gray-600 mb-3 flex-1">
                         How we collect, use, and protect your personal and business information.
                       </p>
-                      <div className="flex items-center text-xs text-gray-500 space-x-4 mt-auto">
-                        <span>Effective: {new Date().toLocaleDateString()}</span>
-                        <span>Version: 3.0</span>
-                      </div>
                     </div>
                     <button 
                       className="ml-4 p-2 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-md transition-colors flex-shrink-0"
@@ -675,10 +663,6 @@ const Settings: React.FC = () => {
                       <p className="text-sm text-gray-600 mb-3 flex-1">
                         General terms governing your use of the Okurupay platform and services.
                       </p>
-                      <div className="flex items-center text-xs text-gray-500 space-x-4 mt-auto">
-                        <span>Effective: {new Date().toLocaleDateString()}</span>
-                        <span>Version: 2.5</span>
-                      </div>
                     </div>
                     <button 
                       className="ml-4 p-2 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-md transition-colors flex-shrink-0"

@@ -74,6 +74,8 @@ const Taxes: React.FC = () => {
       
       setLoading(true);
       try {
+        console.log('Fetching tax settings for merchant:', merchantData.merchant_id);
+        
         // Fetch tax settings
         const { data: taxData, error: taxError } = await supabase
           .from('tax_settings')
@@ -82,30 +84,56 @@ const Taxes: React.FC = () => {
           .single();
 
         if (taxData && !taxError) {
+          console.log('Found existing tax settings:', taxData);
           setTaxSettings(taxData);
           setNewTaxRate((taxData.tax_rate * 100).toString()); // Convert to percentage
           setNewTaxName(taxData.tax_name);
+          setTaxEnabled(taxData.is_enabled);
+        } else if (taxError?.code === 'PGRST116') {
+          // No tax settings found, use defaults
+          console.log('No tax settings found, using defaults');
+        } else {
+          console.error('Error fetching tax settings:', taxError);
         }
 
         // Fetch transaction data for revenue calculations
+        console.log('Fetching transaction data for merchant:', merchantData.merchant_id);
         const { data: transactions, error: transError } = await supabase
           .from('transactions')
-          .select('amount_fiat, fee, tip, status')
+          .select('amount_fiat, okuru_fee_fiat, status')
           .eq('merchant_id', merchantData.merchant_id)
           .eq('status', 'completed');
 
         if (transactions && !transError) {
-          const totalRevenue = transactions.reduce((sum, tx) => sum + (tx.amount_fiat || 0), 0);
+          console.log(`Found ${transactions.length} completed transactions`);
+          
+          // Calculate net revenue (what merchant actually receives after Okuru fees)
+          const totalGrossRevenue = transactions.reduce((sum, tx) => sum + (tx.amount_fiat || 0), 0);
+          const totalOkuruFees = transactions.reduce((sum, tx) => sum + (tx.okuru_fee_fiat || 0), 0);
+          const totalNetRevenue = totalGrossRevenue - totalOkuruFees;
+          
           const transactionCount = transactions.length;
           const taxRate = taxData?.tax_rate || 0;
-          const totalTaxCollected = totalRevenue * taxRate;
+          
+          // Tax should be calculated on net revenue (what merchant actually receives)
+          const totalTaxOwed = totalNetRevenue * taxRate;
+          
+          console.log('Revenue calculation:', {
+            grossRevenue: totalGrossRevenue,
+            okuruFees: totalOkuruFees,
+            netRevenue: totalNetRevenue,
+            taxRate: taxRate,
+            taxOwed: totalTaxOwed
+          });
           
           setTransactionData({
-            total_revenue: totalRevenue,
-            total_tax_collected: totalTaxCollected,
-            tax_liability: totalTaxCollected,
+            total_revenue: totalNetRevenue, // Show net revenue (what merchant keeps)
+            total_tax_collected: totalTaxOwed,
+            tax_liability: totalTaxOwed,
             transaction_count: transactionCount
           });
+        } else {
+          console.log('No transaction data found or error:', transError);
         }
       } catch (error) {
         console.error('Error fetching tax data:', error);
@@ -138,47 +166,115 @@ const Taxes: React.FC = () => {
   };
 
   const handleSaveTaxSettings = async () => {
-    if (!merchantData?.merchant_id) return;
+    if (!merchantData?.merchant_id || !userData?.user_id) {
+      console.error('Missing merchant or user data');
+      alert('Unable to save settings. Please refresh and try again.');
+      return;
+    }
+    
+    // Validate tax rate
+    const taxRateNum = parseFloat(newTaxRate);
+    if (isNaN(taxRateNum) || taxRateNum < 0 || taxRateNum > 100) {
+      alert('Please enter a valid tax rate between 0 and 100');
+      return;
+    }
+    
+    if (!newTaxName.trim()) {
+      alert('Please enter a tax name');
+      return;
+    }
     
     try {
-      const taxRateDecimal = parseFloat(newTaxRate) / 100; // Convert percentage to decimal
-      const updatedSettings = {
-        ...taxSettings,
-        tax_rate: taxRateDecimal,
-        tax_name: newTaxName,
-        updated_at: new Date().toISOString()
-      };
+      const taxRateDecimal = taxRateNum / 100; // Convert percentage to decimal (0-1)
       
-      // Save to database
-      const { error } = await supabase
+      console.log('Saving tax settings:', {
+        merchant_id: merchantData.merchant_id,
+        tax_name: newTaxName.trim(),
+        tax_rate: taxRateDecimal,
+        is_enabled: taxEnabled,
+        created_by: userData.user_id
+      });
+      
+      // Try to update existing record first, then insert if not found
+      let data, error;
+      
+      // First, try to update existing record
+      const { data: updateData, error: updateError } = await supabase
         .from('tax_settings')
-        .upsert({
-          merchant_id: merchantData.merchant_id,
-          tax_name: newTaxName,
+        .update({
+          tax_name: newTaxName.trim(),
           tax_rate: taxRateDecimal,
-          is_enabled: taxSettings.is_enabled,
-          auto_calculate: taxSettings.auto_calculate,
-          applies_to_products: taxSettings.applies_to_products,
-          applies_to_services: taxSettings.applies_to_services,
-          updated_at: new Date().toISOString(),
-          created_by: userData?.user_id
-        });
+          is_enabled: taxEnabled,
+          auto_calculate: true,
+          applies_to_products: true,
+          applies_to_services: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('merchant_id', merchantData.merchant_id)
+        .select()
+        .single();
+
+      if (updateError && updateError.code === 'PGRST116') {
+        // No existing record found, insert new one
+        const { data: insertData, error: insertError } = await supabase
+          .from('tax_settings')
+          .insert({
+            merchant_id: merchantData.merchant_id,
+            tax_name: newTaxName.trim(),
+            tax_rate: taxRateDecimal,
+            is_enabled: taxEnabled,
+            auto_calculate: true,
+            applies_to_products: true,
+            applies_to_services: true,
+            created_by: userData.user_id
+          })
+          .select()
+          .single();
+        
+        data = insertData;
+        error = insertError;
+      } else {
+        data = updateData;
+        error = updateError;
+      }
 
       if (error) {
-        console.error('Error saving tax settings:', error);
-        alert('Failed to save tax settings. Please try again.');
+        console.error('Database error saving tax settings:', error);
+        alert(`Failed to save tax settings: ${error.message}`);
         return;
       }
       
+      console.log('Tax settings saved successfully:', data);
+      
+      // Update local state with saved data
+      const updatedSettings = {
+        tax_id: data.tax_id,
+        merchant_id: data.merchant_id,
+        tax_rate: data.tax_rate,
+        tax_name: data.tax_name,
+        is_enabled: data.is_enabled,
+        auto_calculate: data.auto_calculate,
+        applies_to_products: data.applies_to_products,
+        applies_to_services: data.applies_to_services,
+        created_at: data.created_at,
+        updated_at: data.updated_at
+      };
+      
       setTaxSettings(updatedSettings);
       
-      // Recalculate tax liability based on new rate
+      // Recalculate tax liability based on new rate and current net revenue
       const newTaxLiability = transactionData.total_revenue * taxRateDecimal;
       setTransactionData(prev => ({
         ...prev,
         tax_liability: newTaxLiability,
         total_tax_collected: newTaxLiability
       }));
+      
+      console.log('Tax recalculated:', {
+        netRevenue: transactionData.total_revenue,
+        newTaxRate: taxRateDecimal,
+        newTaxLiability: newTaxLiability
+      });
       
       alert('Tax settings saved successfully!');
     } catch (error) {
@@ -208,256 +304,237 @@ const Taxes: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Tax Management</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Taxes</h1>
           <p className="text-gray-600">
-            Configure tax settings and track tax liability for your transactions
+            Simple tax tracking for your business
           </p>
         </div>
       </div>
 
-      {/* Tax Toggle Card */}
+      {/* Tax Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Revenue</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  ${transactionData.total_revenue.toLocaleString()}
+                </p>
+              </div>
+              <DollarSign className="h-8 w-8 text-green-600" />
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              From {transactionData.transaction_count} transactions
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Tax Collected</p>
+                <p className="text-2xl font-bold text-blue-900">
+                  ${transactionData.total_tax_collected.toLocaleString()}
+                </p>
+              </div>
+              <Calculator className="h-8 w-8 text-blue-600" />
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              At {(taxSettings.tax_rate * 100).toFixed(1)}% rate
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Amount to Set Aside</p>
+                <p className="text-2xl font-bold text-orange-900">
+                  ${transactionData.tax_liability.toLocaleString()}
+                </p>
+              </div>
+              <TrendingUp className="h-8 w-8 text-orange-600" />
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              For tax payments
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Simple Tax Settings */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <Calculator className="h-6 w-6 text-blue-600" />
+              <Settings className="h-6 w-6 text-blue-600" />
               <div>
-                <CardTitle>Tax Management</CardTitle>
+                <CardTitle>Tax Settings</CardTitle>
                 <p className="text-sm text-gray-600 mt-1">
-                  Enable automatic tax calculation and tracking
+                  Configure your tax rate and preferences
                 </p>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <span className="text-sm font-medium">
-                  {taxEnabled ? 'Enabled' : 'Disabled'}
-                </span>
-                <Switch
-                  checked={taxEnabled}
-                  onCheckedChange={handleTaxToggle}
-                />
-              </div>
-              {taxEnabled && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsExpanded(!isExpanded)}
-                  className="p-2"
-                >
-                  {isExpanded ? (
-                    <ChevronUp className="h-4 w-4" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4" />
-                  )}
-                </Button>
-              )}
+            <div className="flex items-center space-x-2">
+              <span className="text-sm font-medium">
+                {taxEnabled ? 'On' : 'Off'}
+              </span>
+              <Switch
+                checked={taxEnabled}
+                onCheckedChange={handleTaxToggle}
+              />
             </div>
           </div>
         </CardHeader>
 
-        {taxEnabled && isExpanded && (
+        {taxEnabled && (
           <CardContent className="space-y-6">
-            {/* Tax Configuration */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold flex items-center">
-                  <Settings className="h-5 w-5 mr-2" />
-                  Tax Configuration
-                </h3>
-                
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Tax Name
-                    </label>
-                    <input
-                      type="text"
-                      value={newTaxName}
-                      onChange={(e) => setNewTaxName(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="e.g., Sales Tax, VAT"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Tax Rate (%)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="100"
-                      value={newTaxRate}
-                      onChange={(e) => setNewTaxRate(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="8.5"
-                    />
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      checked={taxSettings.auto_calculate}
-                      onCheckedChange={(checked: boolean) => 
-                        setTaxSettings(prev => ({ ...prev, auto_calculate: checked }))
-                      }
-                    />
-                    <span className="text-sm font-medium">Auto-calculate tax on transactions</span>
-                  </div>
-                  
-                  <Button onClick={handleSaveTaxSettings} className="w-full">
-                    Save Tax Settings
-                  </Button>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Tax Rate (%)
+                </label>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="50"
+                  value={newTaxRate}
+                  onChange={(e) => setNewTaxRate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="8.5"
+                />
+                <p className="text-xs text-gray-500 mt-1">Enter your local tax rate</p>
               </div>
-
-              {/* Current Settings Display */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Current Settings</h3>
-                <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">Tax Name:</span>
-                    <Badge variant="secondary">{taxSettings.tax_name}</Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">Tax Rate:</span>
-                    <Badge variant="secondary">{taxSettings.tax_rate}%</Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">Auto Calculate:</span>
-                    <Badge variant={taxSettings.auto_calculate ? "default" : "secondary"}>
-                      {taxSettings.auto_calculate ? "Yes" : "No"}
-                    </Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">Status:</span>
-                    <Badge variant={taxSettings.is_enabled ? "default" : "secondary"}>
-                      {taxSettings.is_enabled ? "Active" : "Inactive"}
-                    </Badge>
-                  </div>
-                </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Tax Name
+                </label>
+                <input
+                  type="text"
+                  value={newTaxName}
+                  onChange={(e) => setNewTaxName(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Sales Tax"
+                />
+                <p className="text-xs text-gray-500 mt-1">What to call this tax</p>
               </div>
             </div>
-
-            {/* Tax Analytics */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        ${transactionData.total_revenue.toLocaleString()}
-                      </p>
-                    </div>
-                    <DollarSign className="h-8 w-8 text-green-600" />
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    From {transactionData.transaction_count} transactions
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Tax Collected</p>
-                      <p className="text-2xl font-bold text-blue-900">
-                        ${transactionData.total_tax_collected.toLocaleString()}
-                      </p>
-                    </div>
-                    <Calculator className="h-8 w-8 text-blue-600" />
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    At {taxSettings.tax_rate}% rate
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Tax Liability</p>
-                      <p className="text-2xl font-bold text-orange-900">
-                        ${transactionData.tax_liability.toLocaleString()}
-                      </p>
-                    </div>
-                    <TrendingUp className="h-8 w-8 text-orange-600" />
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    Amount to hold for taxes
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Tax Calculator */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Calculator className="h-5 w-5 mr-2" />
-                  Tax Calculator
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Transaction Amount ($)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="100.00"
-                      onChange={(e) => {
-                        const amount = parseFloat(e.target.value) || 0;
-                        const taxAmount = calculateTaxAmount(amount);
-                        const nextSibling = e.target.parentElement?.nextElementSibling?.querySelector('input') as HTMLInputElement;
-                        if (nextSibling) {
-                          nextSibling.value = taxAmount.toFixed(2);
-                        }
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Tax Amount ($)
-                    </label>
-                    <input
-                      type="text"
-                      readOnly
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-                      placeholder="0.00"
-                    />
-                  </div>
+            
+            <Button onClick={handleSaveTaxSettings} className="w-full">
+              Save Settings
+            </Button>
+            
+            {/* Show Current Saved Settings */}
+            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+              <h4 className="text-sm font-medium text-gray-900 mb-3">Current Saved Settings</h4>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Tax Name:</span>
+                  <span className="font-medium">{taxSettings.tax_name}</span>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Tax Rate:</span>
+                  <span className="font-medium">{(taxSettings.tax_rate * 100).toFixed(1)}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Status:</span>
+                  <Badge variant={taxSettings.is_enabled ? "default" : "secondary"}>
+                    {taxSettings.is_enabled ? "Active" : "Inactive"}
+                  </Badge>
+                </div>
+                {taxSettings.updated_at && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Last Updated:</span>
+                    <span className="text-xs text-gray-500">
+                      {new Date(taxSettings.updated_at).toLocaleString()}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
           </CardContent>
         )}
       </Card>
 
-      {/* Information Card */}
+      {/* Quick Tax Calculator */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Calculator className="h-5 w-5 mr-2" />
+            Quick Tax Calculator
+          </CardTitle>
+          <p className="text-sm text-gray-600">Calculate tax for any amount</p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Amount ($)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="100.00"
+                onChange={(e) => {
+                  const amount = parseFloat(e.target.value) || 0;
+                  const taxAmount = calculateTaxAmount(amount);
+                  const totalAmount = amount + taxAmount;
+                  const taxInput = e.target.parentElement?.nextElementSibling?.querySelector('input') as HTMLInputElement;
+                  const totalInput = e.target.parentElement?.nextElementSibling?.nextElementSibling?.querySelector('input') as HTMLInputElement;
+                  if (taxInput) taxInput.value = taxAmount.toFixed(2);
+                  if (totalInput) totalInput.value = totalAmount.toFixed(2);
+                }}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Tax Amount ($)
+              </label>
+              <input
+                type="text"
+                readOnly
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                placeholder="0.00"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Total with Tax ($)
+              </label>
+              <input
+                type="text"
+                readOnly
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 font-medium"
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Simple Info */}
       <Card>
         <CardContent className="p-6">
           <div className="flex items-start space-x-3">
             <div className="flex-shrink-0">
               <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                <span className="text-blue-600 text-sm font-medium">i</span>
+                <span className="text-blue-600 text-sm font-medium">💡</span>
               </div>
             </div>
             <div>
-              <h3 className="text-sm font-medium text-gray-900">Tax Management Information</h3>
+              <h3 className="text-sm font-medium text-gray-900">How it works</h3>
               <div className="mt-2 text-sm text-gray-600 space-y-1">
-                <p>• Enable tax management to automatically calculate and track taxes on your transactions</p>
-                <p>• For non-custodial processes, you can view tax amounts without automatic collection</p>
-                <p>• Tax liability shows the amount you should hold aside for tax payments</p>
-                <p>• Consult with a tax professional for specific tax requirements in your jurisdiction</p>
+                <p>• Turn on tax tracking to see how much tax you've collected</p>
+                <p>• Set your local tax rate (like 8.5% for sales tax)</p>
+                <p>• The "Amount to Set Aside" shows what to save for tax payments</p>
+                <p>• Always check with a tax professional for your specific situation</p>
               </div>
             </div>
           </div>

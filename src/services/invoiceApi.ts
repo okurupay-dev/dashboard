@@ -3,38 +3,63 @@ import { supabase } from '../lib/supabase';
 const API_BASE_URL = 'https://okurutest.up.railway.app';
 
 export interface InvoiceApiPayload {
+  // Basic invoice info
   title?: string;
   description?: string;
-  is_simple_amount: boolean;
-  simple_amount?: number;
-  line_items?: any[];
-  currency_mode: 'crypto';
-  crypto_asset: string;
-  chain: 'BASE';
+  notes?: string;
+  
+  // Customer details
   customer_email: string;
   customer_name?: string;
   customer_cc_emails?: string[];
   billing_address?: {
-    street: string;
-    city: string;
-    state: string;
-    postal_code: string;
-    country: string;
+    street?: string;
+    city?: string;
+    state?: string;
+    postal_code?: string;
+    country?: string;
   };
-  settlement_wallet_id: string;
-  fee_payer: string;
+  
+  // Amount structure
+  is_simple_amount: boolean;
+  simple_amount?: number;
+  line_items?: any[];
+  subtotal?: number;
+  tax_amount?: number;
+  discount_amount?: number;
+  total_amount?: number;
+  
+  // Crypto payment settings
+  currency_mode: 'crypto';
+  crypto_currency: string;  // Changed from crypto_asset
+  crypto_chain: string;     // Changed from chain
   price_lock_secs?: number;
   min_confirmations?: number;
   allow_partial?: boolean;
-  terms_conditions?: string;
-  refund_policy?: string;
+  
+  // Payment preferences
+  tip_suggestions?: number[];
+  tax_inclusive?: boolean;
+  fee_payer?: string;
+  
+  // Settlement
+  settlement_wallet_id?: string;
+  
+  // Timing
   due_date?: string;
-  notes?: string;
+  expires_at?: string;
+  
+  // Metadata
   tags?: string[];
   webhook_url?: string;
   notification_email?: string;
   send_email?: boolean;
+  
+  // Status
   status: 'draft' | 'sent';
+  
+  // Additional API fields
+  chain?: string;
 }
 
 export interface Invoice {
@@ -48,11 +73,11 @@ export interface Invoice {
   customer_name?: string;
   customer_cc_emails?: string[];
   billing_address?: {
-    street: string;
-    city: string;
-    state: string;
-    postal_code: string;
-    country: string;
+    street?: string;
+    city?: string;
+    state?: string;
+    postal_code?: string;
+    country?: string;
   };
   crypto_asset: string;
   chain: string;
@@ -116,16 +141,22 @@ class InvoiceApiService {
     });
 
     if (!response.ok) {
-      // Try to get the error message from the response
+      // Clone the response to avoid "body stream already read" error
+      const responseClone = response.clone();
+      
       try {
         const errorData = await response.json();
         console.error('API Error Response:', errorData);
         throw new Error(`HTTP error! status: ${response.status}, message: ${JSON.stringify(errorData)}`);
       } catch (e) {
-        // If we can't parse the JSON, just get the text
-        const errorText = await response.text();
-        console.error('API Error Response (text):', errorText);
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+        // If we can't parse the JSON, use the cloned response for text
+        try {
+          const errorText = await responseClone.text();
+          console.error('API Error Response (text):', errorText);
+          throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+        } catch (textError) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
       }
     }
 

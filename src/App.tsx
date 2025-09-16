@@ -6,8 +6,10 @@ import Dashboard from './components/dashboard/Dashboard';
 import Transactions from './components/transactions/Transactions';
 import Invoices from './components/invoices/Invoices';
 import InvoiceCreate from './components/invoices/InvoiceCreate';
+import InvoiceCreateModern from './components/invoices/InvoiceCreateModern';
 import InvoiceDetail from './components/invoices/InvoiceDetail';
 import PublicInvoice from './components/invoices/PublicInvoice';
+import InvoicePayment from './components/invoices/InvoicePayment';
 import Analytics from './components/analytics/Analytics';
 import Reports from './components/reports/Reports';
 import Taxes from './components/taxes/Taxes';
@@ -34,6 +36,7 @@ function App() {
           <Route path="/accept-invitation" element={<AcceptInvitation />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/invoice/:publicId" element={<PublicInvoice />} />
+          <Route path="/pay/:publicId" element={<InvoicePayment />} />
           
           {/* Protected routes */}
           <Route path="/" element={
@@ -44,7 +47,7 @@ function App() {
             <Route index element={<Dashboard />} />
             <Route path="transactions" element={<Transactions />} />
             <Route path="invoices" element={<Invoices />} />
-            <Route path="invoices/new" element={<InvoiceCreate />} />
+            <Route path="/invoices/create" element={<InvoiceCreateModern />} />
             <Route path="invoices/:id" element={<InvoiceDetail />} />
             <Route path="terminals" element={<Terminals />} />
             <Route path="terminals/virtual" element={<VirtualTerminals />} />

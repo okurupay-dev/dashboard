@@ -263,52 +263,48 @@ const Terminals: React.FC = () => {
   return (
     <div className="container mx-auto py-6">
       {/* Header */}
-      <div className="bg-white py-6 mb-8">
-        <div className="max-w-7xl mx-auto px-8">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Terminals</h1>
-              <p className="text-gray-600">Manage your physical and virtual terminals</p>
-            </div>
-            <div className="flex items-center space-x-4">
-              {/* Network Status */}
-              <div className="text-right">
-                <div className="text-sm text-gray-500">Network Status</div>
-                <div className="flex items-center">
-                  <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                  <span className="text-sm font-medium text-green-600">Online</span>
-                </div>
+      <div className="mb-8">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Terminals</h1>
+            <p className="text-gray-600">Manage your physical and virtual terminals</p>
+          </div>
+          <div className="flex items-center space-x-4">
+            {/* Network Status */}
+            <div className="text-right">
+              <div className="text-sm text-gray-500">Network Status</div>
+              <div className="flex items-center">
+                <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                <span className="text-sm font-medium text-green-600">Online</span>
               </div>
-              
-              {/* Refresh Button */}
-              <button
-                onClick={() => window.location.reload()}
-                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                </svg>
-                Refresh
-              </button>
             </div>
+            
+            {/* Refresh Button */}
+            <button
+              onClick={() => window.location.reload()}
+              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+              </svg>
+              Refresh
+            </button>
           </div>
         </div>
       </div>
 
       {/* Terminals Table */}
-      <div className="max-w-7xl mx-auto px-8">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">All Terminals</h2>
-          </div>
-          
-          <TerminalsTable
-            terminals={terminals}
-            onSelectTerminal={handleTerminalSelect}
-            onDisableTerminal={handleDisableTerminal}
-            selectedTerminalId={selectedTerminal?.id || null}
-          />
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">All Terminals</h2>
         </div>
+        
+        <TerminalsTable
+          terminals={terminals}
+          onSelectTerminal={handleTerminalSelect}
+          onDisableTerminal={handleDisableTerminal}
+          selectedTerminalId={selectedTerminal?.id || null}
+        />
       </div>
     </div>
   );
