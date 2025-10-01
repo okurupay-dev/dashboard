@@ -99,8 +99,7 @@ const Dashboard = () => {
           status: tx.status,
           location: tx.locations?.name || 'Unknown',
           terminalId: tx.terminals?.name || 'Unknown',
-          automationTriggered: tx.automation_triggered || false,
-          automationType: tx.automation_type || undefined
+          type: tx.transaction_type || 'PH Terminal' // Use the database column directly
         })) || [];
 
         // All 10 processable assets from ETH and Base networks

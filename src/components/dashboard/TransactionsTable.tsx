@@ -10,8 +10,7 @@ interface Transaction {
   status: 'completed' | 'pending' | 'failed';
   location: string;
   terminalId: string;
-  automationTriggered: boolean;
-  automationType?: string;
+  type: 'VT Terminal' | 'PH Terminal' | 'Invoice';
 }
 
 interface TransactionsTableProps {
@@ -32,11 +31,11 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactions }) =
               <th className="px-4 py-3">Transaction ID</th>
               <th className="px-4 py-3">Date</th>
               <th className="px-4 py-3">Amount</th>
-              <th className="px-4 py-3">Crypto</th>
+              <th className="px-4 py-3">Stablecoin</th>
               <th className="px-4 py-3">Location</th>
               <th className="px-4 py-3">Terminal ID</th>
               <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Automation</th>
+              <th className="px-4 py-3">Type</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -54,14 +53,9 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactions }) =
                   </Badge>
                 </td>
                 <td className="px-4 py-3 text-sm">
-                  {transaction.automationTriggered ? (
-                    <div className="flex items-center" title={transaction.automationType}>
-                      <span className="h-2 w-2 bg-green-500 rounded-full mr-1"></span>
-                      <span className="text-xs text-gray-600">{transaction.automationType}</span>
-                    </div>
-                  ) : (
-                    <span className="text-xs text-gray-400">None</span>
-                  )}
+                  <Badge variant="outline" className="text-xs">
+                    {transaction.type}
+                  </Badge>
                 </td>
               </tr>
             ))}
