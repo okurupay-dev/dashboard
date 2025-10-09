@@ -16,7 +16,7 @@ import {
   Calculator,
   Package,
   Wallet,
-  Home, Activity, DollarSign, Monitor, UserCheck, Menu, Search
+  Home, Activity, DollarSign, Monitor, UserCheck, Menu, Search, Store
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useWalletStatus } from '../../hooks/useWalletStatus';
@@ -143,6 +143,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       title: 'Operations',
       icon: Monitor,
       items: [
+        { path: '/storefronts', label: 'Storefronts', icon: Store, showIndicator: false, isSubItem: false },
         { path: '/invoices', label: 'Invoices', icon: FileText, showIndicator: false, isSubItem: false },
         { path: '/staff', label: 'Staff', icon: Users, showIndicator: false, isSubItem: false },
         { path: '/terminals', label: 'Terminals', icon: Monitor, showIndicator: false, isSubItem: false },
@@ -351,6 +352,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
             <h1 className="text-2xl font-bold text-gray-800 tracking-tight">
               {currentPath === '/' ? 'Dashboard' : ''}
               {currentPath === '/transactions' ? 'Transactions' : ''}
+              {currentPath === '/storefronts' ? 'Storefronts' : ''}
+              {currentPath.startsWith('/storefronts/') ? 'Storefront' : ''}
               {currentPath === '/invoices' ? 'Invoices' : ''}
               {currentPath === '/products' ? 'Products' : ''}
               {currentPath === '/wallets' ? 'Wallets' : ''}

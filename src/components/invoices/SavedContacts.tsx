@@ -29,9 +29,10 @@ interface Contact {
 interface SavedContactsProps {
   onSelectContact?: (contact: Contact) => void;
   showSelectMode?: boolean;
+  onClose?: () => void;
 }
 
-const SavedContacts: React.FC<SavedContactsProps> = ({ onSelectContact, showSelectMode = false }) => {
+const SavedContacts: React.FC<SavedContactsProps> = ({ onSelectContact, showSelectMode = false, onClose }) => {
   const { userData } = useAuth();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
@@ -219,13 +220,20 @@ const SavedContacts: React.FC<SavedContactsProps> = ({ onSelectContact, showSele
             }
           </p>
         </div>
-        <Button 
-          onClick={() => setShowAddForm(true)}
-          className="bg-blue-600 hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Contact
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            onClick={() => setShowAddForm(true)}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Contact
+          </Button>
+          {onClose && (
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Search - Only show if there are contacts */}

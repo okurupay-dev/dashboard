@@ -37,6 +37,22 @@ CREATE TABLE public.automations (
   CONSTRAINT automations_pkey PRIMARY KEY (automation_id),
   CONSTRAINT automations_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id)
 );
+CREATE TABLE public.contacts (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  merchant_id uuid NOT NULL,
+  name character varying NOT NULL,
+  email character varying NOT NULL,
+  phone character varying,
+  company character varying,
+  billing_address jsonb,
+  notes text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  created_by uuid,
+  CONSTRAINT contacts_pkey PRIMARY KEY (id),
+  CONSTRAINT contacts_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
+  CONSTRAINT contacts_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(user_id)
+);
 CREATE TABLE public.fee_collections (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
   chain_id integer NOT NULL,
@@ -401,6 +417,72 @@ CREATE TABLE public.products (
   CONSTRAINT products_parent_product_id_fkey FOREIGN KEY (parent_product_id) REFERENCES public.products(product_id),
   CONSTRAINT products_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id)
 );
+CREATE TABLE public.report_exports (
+  export_id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  merchant_id uuid NOT NULL,
+  template_id uuid,
+  schedule_id uuid,
+  name character varying NOT NULL,
+  export_type character varying NOT NULL CHECK (export_type::text = ANY (ARRAY['quick'::character varying::text, 'custom'::character varying::text, 'scheduled'::character varying::text, 'template'::character varying::text])),
+  format character varying NOT NULL CHECK (format::text = ANY (ARRAY['csv'::character varying::text, 'xlsx'::character varying::text, 'json'::character varying::text, 'pdf'::character varying::text])),
+  status character varying DEFAULT 'pending'::character varying CHECK (status::text = ANY (ARRAY['pending'::character varying::text, 'processing'::character varying::text, 'completed'::character varying::text, 'failed'::character varying::text, 'expired'::character varying::text])),
+  filters jsonb DEFAULT '{}'::jsonb,
+  columns jsonb DEFAULT '[]'::jsonb,
+  record_count integer DEFAULT 0,
+  file_size_kb integer,
+  file_path text,
+  download_count integer DEFAULT 0,
+  error_message text,
+  expires_at timestamp with time zone,
+  created_by uuid NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  last_downloaded_at timestamp with time zone,
+  CONSTRAINT report_exports_pkey PRIMARY KEY (export_id),
+  CONSTRAINT report_exports_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
+  CONSTRAINT report_exports_template_id_fkey FOREIGN KEY (template_id) REFERENCES public.report_templates(template_id),
+  CONSTRAINT report_exports_schedule_id_fkey FOREIGN KEY (schedule_id) REFERENCES public.scheduled_reports(schedule_id),
+  CONSTRAINT report_exports_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(user_id)
+);
+CREATE TABLE public.report_templates (
+  template_id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  merchant_id uuid NOT NULL,
+  name character varying NOT NULL,
+  report_type character varying NOT NULL CHECK (report_type::text = ANY (ARRAY['transactions'::character varying::text, 'invoices'::character varying::text, 'revenue'::character varying::text, 'custom'::character varying::text])),
+  filters jsonb NOT NULL DEFAULT '{}'::jsonb,
+  columns jsonb NOT NULL DEFAULT '[]'::jsonb,
+  sorting jsonb DEFAULT '{"field": "created_at", "direction": "desc"}'::jsonb,
+  grouping jsonb DEFAULT '{}'::jsonb,
+  aggregations jsonb DEFAULT '[]'::jsonb,
+  is_public boolean DEFAULT false,
+  created_by uuid NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT report_templates_pkey PRIMARY KEY (template_id),
+  CONSTRAINT report_templates_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(user_id),
+  CONSTRAINT report_templates_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id)
+);
+CREATE TABLE public.scheduled_reports (
+  schedule_id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  merchant_id uuid NOT NULL,
+  template_id uuid,
+  name character varying NOT NULL,
+  description text,
+  schedule_type character varying NOT NULL CHECK (schedule_type::text = ANY (ARRAY['daily'::character varying::text, 'weekly'::character varying::text, 'monthly'::character varying::text, 'quarterly'::character varying::text])),
+  schedule_config jsonb NOT NULL DEFAULT '{}'::jsonb,
+  export_format character varying DEFAULT 'csv'::character varying CHECK (export_format::text = ANY (ARRAY['csv'::character varying::text, 'xlsx'::character varying::text, 'json'::character varying::text, 'pdf'::character varying::text])),
+  email_recipients jsonb DEFAULT '[]'::jsonb,
+  is_active boolean DEFAULT true,
+  last_run_at timestamp with time zone,
+  next_run_at timestamp with time zone,
+  created_by uuid NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT scheduled_reports_pkey PRIMARY KEY (schedule_id),
+  CONSTRAINT scheduled_reports_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
+  CONSTRAINT scheduled_reports_template_id_fkey FOREIGN KEY (template_id) REFERENCES public.report_templates(template_id),
+  CONSTRAINT scheduled_reports_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(user_id)
+);
 CREATE TABLE public.staff_permissions (
   permission_id uuid NOT NULL DEFAULT uuid_generate_v4(),
   merchant_id uuid NOT NULL,
@@ -486,6 +568,73 @@ CREATE TABLE public.standalone_invoices (
   CONSTRAINT standalone_invoices_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(user_id),
   CONSTRAINT standalone_invoices_settlement_wallet_fkey FOREIGN KEY (settlement_wallet_id) REFERENCES public.merchant_wallets(wallet_id)
 );
+CREATE TABLE public.storefront_orders (
+  order_id uuid NOT NULL DEFAULT gen_random_uuid(),
+  storefront_id uuid NOT NULL,
+  merchant_id uuid NOT NULL,
+  product_id uuid NOT NULL,
+  order_number character varying NOT NULL UNIQUE,
+  quantity integer NOT NULL DEFAULT 1,
+  unit_price numeric NOT NULL,
+  total_amount numeric NOT NULL,
+  customer_email character varying,
+  customer_name character varying,
+  crypto_asset character varying NOT NULL,
+  chain character varying DEFAULT 'BASE'::character varying,
+  payment_address character varying,
+  qr_code_data text,
+  status character varying DEFAULT 'pending'::character varying CHECK (status::text = ANY (ARRAY['pending'::character varying, 'confirmed'::character varying, 'failed'::character varying, 'refunded'::character varying, 'cancelled'::character varying, 'expired'::character varying]::text[])),
+  blockchain_tx_hash character varying,
+  confirmation_count integer DEFAULT 0,
+  confirmed_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  expires_at timestamp with time zone,
+  CONSTRAINT storefront_orders_pkey PRIMARY KEY (order_id),
+  CONSTRAINT storefront_orders_storefront_id_fkey FOREIGN KEY (storefront_id) REFERENCES public.storefronts(storefront_id),
+  CONSTRAINT storefront_orders_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
+  CONSTRAINT storefront_orders_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(product_id)
+);
+CREATE TABLE public.storefront_products (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  storefront_id uuid NOT NULL,
+  product_id uuid NOT NULL,
+  display_order integer DEFAULT 0,
+  is_featured boolean DEFAULT false,
+  added_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT storefront_products_pkey PRIMARY KEY (id),
+  CONSTRAINT storefront_products_storefront_id_fkey FOREIGN KEY (storefront_id) REFERENCES public.storefronts(storefront_id),
+  CONSTRAINT storefront_products_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(product_id)
+);
+CREATE TABLE public.storefronts (
+  storefront_id uuid NOT NULL DEFAULT gen_random_uuid(),
+  merchant_id uuid NOT NULL UNIQUE,
+  created_by uuid NOT NULL,
+  slug character varying NOT NULL UNIQUE,
+  description text,
+  tagline character varying,
+  theme character varying DEFAULT 'light'::character varying CHECK (theme::text = ANY (ARRAY['light'::character varying, 'dark'::character varying]::text[])),
+  banner_url text,
+  primary_color character varying DEFAULT '#3B82F6'::character varying,
+  wallet_id uuid,
+  status character varying DEFAULT 'draft'::character varying CHECK (status::text = ANY (ARRAY['draft'::character varying, 'published'::character varying, 'unpublished'::character varying]::text[])),
+  published_at timestamp with time zone,
+  unpublished_at timestamp with time zone,
+  refund_policy text,
+  terms text,
+  social_links jsonb DEFAULT '{}'::jsonb,
+  meta_title character varying,
+  meta_description text,
+  og_image_url text,
+  allow_coupons boolean DEFAULT false,
+  respect_inventory boolean DEFAULT false,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT storefronts_pkey PRIMARY KEY (storefront_id),
+  CONSTRAINT storefronts_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
+  CONSTRAINT storefronts_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(user_id),
+  CONSTRAINT storefronts_wallet_id_fkey FOREIGN KEY (wallet_id) REFERENCES public.merchant_wallets(wallet_id)
+);
 CREATE TABLE public.tax_calculations (
   calculation_id uuid NOT NULL DEFAULT uuid_generate_v4(),
   transaction_id uuid,
@@ -518,8 +667,7 @@ CREATE TABLE public.tax_settings (
   created_by uuid,
   CONSTRAINT tax_settings_pkey PRIMARY KEY (tax_id),
   CONSTRAINT tax_settings_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
-  CONSTRAINT tax_settings_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(user_id),
-  CONSTRAINT tax_settings_merchant_id_unique UNIQUE (merchant_id)
+  CONSTRAINT tax_settings_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(user_id)
 );
 CREATE TABLE public.terminal_audit_log (
   audit_id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -694,6 +842,7 @@ CREATE TABLE public.transactions (
   token_address character varying,
   receiver_address character varying,
   chain_id integer NOT NULL,
+  transaction_type character varying DEFAULT 'PH Terminal'::character varying CHECK (transaction_type::text = ANY (ARRAY['VT Terminal'::character varying, 'PH Terminal'::character varying, 'Invoice'::character varying]::text[])),
   CONSTRAINT transactions_pkey PRIMARY KEY (transaction_id),
   CONSTRAINT transactions_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
   CONSTRAINT transactions_location_id_fkey FOREIGN KEY (location_id) REFERENCES public.locations(location_id),
@@ -790,96 +939,6 @@ CREATE TABLE public.virtual_terminal_settings_audit (
   CONSTRAINT virtual_terminal_settings_audit_pkey PRIMARY KEY (audit_id),
   CONSTRAINT virtual_terminal_settings_audit_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
   CONSTRAINT virtual_terminal_settings_audit_changed_by_fkey FOREIGN KEY (changed_by) REFERENCES public.users(user_id)
-);
-CREATE TABLE public.contacts (
-  id uuid NOT NULL DEFAULT uuid_generate_v4(),
-  merchant_id uuid NOT NULL,
-  name character varying NOT NULL,
-  email character varying NOT NULL,
-  phone character varying,
-  company character varying,
-  billing_address jsonb,
-  notes text,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
-  created_by uuid,
-  CONSTRAINT contacts_pkey PRIMARY KEY (id),
-  CONSTRAINT contacts_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
-  CONSTRAINT contacts_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(user_id),
-  CONSTRAINT contacts_merchant_email_unique UNIQUE (merchant_id, email)
-);
-
--- Report Templates: Save custom report configurations
-CREATE TABLE public.report_templates (
-  template_id uuid NOT NULL DEFAULT uuid_generate_v4(),
-  merchant_id uuid NOT NULL,
-  name character varying NOT NULL,
-  description text,
-  report_type character varying NOT NULL CHECK (report_type::text = ANY (ARRAY['transactions'::character varying, 'invoices'::character varying, 'revenue'::character varying, 'custom'::character varying]::text[])),
-  filters jsonb NOT NULL DEFAULT '{}', -- Store filter configuration (status, date ranges, etc.)
-  columns jsonb NOT NULL DEFAULT '[]', -- Store selected columns
-  sorting jsonb DEFAULT '{"field": "created_at", "direction": "desc"}',
-  grouping jsonb DEFAULT '{}', -- Store grouping configuration
-  aggregations jsonb DEFAULT '[]', -- Store aggregation functions
-  is_public boolean DEFAULT false, -- Allow sharing within merchant
-  created_by uuid NOT NULL,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT report_templates_pkey PRIMARY KEY (template_id),
-  CONSTRAINT report_templates_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
-  CONSTRAINT report_templates_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(user_id)
-);
-
--- Scheduled Reports: Automated report generation
-CREATE TABLE public.scheduled_reports (
-  schedule_id uuid NOT NULL DEFAULT uuid_generate_v4(),
-  merchant_id uuid NOT NULL,
-  template_id uuid, -- Optional: use saved template
-  name character varying NOT NULL,
-  description text,
-  schedule_type character varying NOT NULL CHECK (schedule_type::text = ANY (ARRAY['daily'::character varying, 'weekly'::character varying, 'monthly'::character varying, 'quarterly'::character varying]::text[])),
-  schedule_config jsonb NOT NULL DEFAULT '{}', -- Store cron-like config (day of week, time, etc.)
-  export_format character varying DEFAULT 'csv' CHECK (export_format::text = ANY (ARRAY['csv'::character varying, 'xlsx'::character varying, 'json'::character varying, 'pdf'::character varying]::text[])),
-  email_recipients jsonb DEFAULT '[]', -- Array of email addresses
-  is_active boolean DEFAULT true,
-  last_run_at timestamp with time zone,
-  next_run_at timestamp with time zone,
-  created_by uuid NOT NULL,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT scheduled_reports_pkey PRIMARY KEY (schedule_id),
-  CONSTRAINT scheduled_reports_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
-  CONSTRAINT scheduled_reports_template_id_fkey FOREIGN KEY (template_id) REFERENCES public.report_templates(template_id),
-  CONSTRAINT scheduled_reports_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(user_id)
-);
-
--- Export History: Track all export jobs and downloads
-CREATE TABLE public.report_exports (
-  export_id uuid NOT NULL DEFAULT uuid_generate_v4(),
-  merchant_id uuid NOT NULL,
-  template_id uuid, -- Optional: if generated from template
-  schedule_id uuid, -- Optional: if generated from scheduled report
-  name character varying NOT NULL,
-  export_type character varying NOT NULL CHECK (export_type::text = ANY (ARRAY['quick'::character varying, 'custom'::character varying, 'scheduled'::character varying, 'template'::character varying]::text[])),
-  format character varying NOT NULL CHECK (format::text = ANY (ARRAY['csv'::character varying, 'xlsx'::character varying, 'json'::character varying, 'pdf'::character varying]::text[])),
-  status character varying DEFAULT 'pending' CHECK (status::text = ANY (ARRAY['pending'::character varying, 'processing'::character varying, 'completed'::character varying, 'failed'::character varying, 'expired'::character varying]::text[])),
-  filters jsonb DEFAULT '{}', -- Store the filters used for this export
-  columns jsonb DEFAULT '[]', -- Store the columns included
-  record_count integer DEFAULT 0, -- Number of records exported
-  file_size_kb integer, -- File size in KB
-  file_path text, -- Storage path or URL for the exported file
-  download_count integer DEFAULT 0, -- Track how many times downloaded
-  error_message text, -- Store error details if failed
-  expires_at timestamp with time zone, -- Auto-cleanup old exports
-  created_by uuid NOT NULL,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
-  last_downloaded_at timestamp with time zone,
-  CONSTRAINT report_exports_pkey PRIMARY KEY (export_id),
-  CONSTRAINT report_exports_merchant_id_fkey FOREIGN KEY (merchant_id) REFERENCES public.merchants(merchant_id),
-  CONSTRAINT report_exports_template_id_fkey FOREIGN KEY (template_id) REFERENCES public.report_templates(template_id),
-  CONSTRAINT report_exports_schedule_id_fkey FOREIGN KEY (schedule_id) REFERENCES public.scheduled_reports(schedule_id),
-  CONSTRAINT report_exports_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(user_id)
 );
 CREATE TABLE public.wallet_addresses (
   address_id uuid NOT NULL DEFAULT uuid_generate_v4(),

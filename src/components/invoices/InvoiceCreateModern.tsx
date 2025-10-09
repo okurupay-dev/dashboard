@@ -67,6 +67,10 @@ const InvoiceCreateModern: React.FC<InvoiceCreateModernProps> = ({ onSubmit }) =
   const [showContactPicker, setShowContactPicker] = useState(false);
   const [showLinkNotification, setShowLinkNotification] = useState(false);
   const [paymentLink, setPaymentLink] = useState('');
+  const [isPublished, setIsPublished] = useState(false);
+  const [publishedInvoice, setPublishedInvoice] = useState<any>(null);
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [simpleQuantity, setSimpleQuantity] = useState(1);
 
   // Default onSubmit implementation if not provided
   const defaultOnSubmit = async (data: any, isDraft: boolean) => {
@@ -95,40 +99,110 @@ const InvoiceCreateModern: React.FC<InvoiceCreateModernProps> = ({ onSubmit }) =
         return result;
       } else {
         // Send invoice using API
+        const subtotal = calculateSubtotal();
+        const isUsingLineItems = lineItems.length > 0;
+        
         const invoiceData: InvoiceApiPayload = {
-          title: data.title,
-          description: data.description,
+          // Required basic fields
+          title: data.title || 'Invoice',
+          description: data.description || '',
           customer_email: data.customer_email,
-          customer_name: data.customer_name,
-          simple_amount: data.simple_amount || 0,
-          crypto_currency: data.crypto_asset || 'USDC',
-          crypto_chain: 'BASE',
-          send_email: data.send_email !== false,
-          is_simple_amount: true,
+          customer_name: data.customer_name || '',
+          
+          // Merchant context (critical for backend)
+          merchant_id: merchantData?.merchant_id,
+          created_by: userData?.auth_user_id,
+          
+          // Amount and payment fields
+          simple_amount: isUsingLineItems ? subtotal : (data.simple_amount || 0),
+          crypto_asset: data.crypto_asset || 'USDC',
+          chain: 'BASE',
           currency_mode: 'crypto',
+          is_simple_amount: !isUsingLineItems,
           status: 'sent',
-          // Required fields for API
-          subtotal: data.simple_amount || 0,
+          
+          // Financial calculations
+          subtotal: subtotal,
           tax_amount: 0,
           discount_amount: 0,
-          total_amount: data.simple_amount || 0,
-          // Additional required fields
-          chain: 'BASE',
-          notes: data.notes || '',
-          tags: data.tags ? data.tags.split(',').map((t: string) => t.trim()) : [],
-          webhook_url: data.webhook_url || '',
-          notification_email: data.notification_email || ''
+          total_amount: subtotal,
+          
+          // Line items if using them
+          line_items: isUsingLineItems ? lineItems.map(item => ({
+            id: item.id,
+            name: item.name,
+            description: item.description || item.name,
+            quantity: item.quantity,
+            unit_price: item.unit_price
+          })) : [],
+          
+          // Email and notifications
+          send_email: true,
+          
+          // Payment configuration - No price lock needed for stablecoins
+          price_lock_secs: data.due_date ? 
+            Math.max(86400, Math.floor((new Date(data.due_date).getTime() - Date.now()) / 1000)) : // Use due date or minimum 1 day
+            2592000, // Default 30 days for stablecoins (no volatility)
+          min_confirmations: 1,
+          allow_partial: false,
+          
+          // Optional fields
+          due_date: data.due_date || undefined,
+          settlement_wallet_id: data.settlement_wallet_id || undefined,
+          notes: '',
+          tags: [],
+          webhook_url: '',
+          notification_email: '',
+          
+          // Blockchain fields (backend will populate)
+          settlement_status: 'pending',
+          confirmation_count: 0
         };
+        
+        // Debug merchant data
+        console.log('🏪 Merchant Data:', merchantData);
+        console.log('👤 User Data:', userData);
+        
+        // Debug payload before sending
+        console.log('📤 Sending invoice payload:', JSON.stringify(invoiceData, null, 2));
         
         const result = await invoiceApi.createInvoice(invoiceData);
         console.log('Invoice created:', result);
+        console.log('🔍 Result structure:', JSON.stringify(result, null, 2));
         
-        if (!data.send_email) {
-          // Return result for link generation
-          return result;
-        } else {
-          navigate('/invoices');
-        }
+        // Set success state and show copy link
+        setIsPublished(true);
+        setPublishedInvoice(result);
+        
+        // Handle different response structures
+        const resultAny = result as any;
+        const publicUrl = result.public_url || resultAny.invoice?.public_url || resultAny.publicUrl || 
+                         (result.public_id ? `https://pay.okurupay.com/pay/${result.public_id}` : '');
+        
+        // Try multiple ways to get invoice number
+        const invoiceNumber = result.invoice_number || 
+                             resultAny.invoice?.invoice_number || 
+                             result.id || 
+                             `INV-${Date.now()}` || // Fallback
+                             'N/A';
+        
+        const amount = result.total_amount || resultAny.invoice?.total_amount || invoiceData.total_amount;
+        
+        setPaymentLink(publicUrl);
+        
+        // Store the extracted values for the success screen
+        setPublishedInvoice({
+          ...result,
+          invoice_number: invoiceNumber,
+          total_amount: amount,
+          public_url: publicUrl
+        });
+        
+        console.log('🔗 Setting payment link:', publicUrl);
+        console.log('📋 Invoice number:', invoiceNumber);
+        console.log('💰 Amount:', amount);
+        console.log('🔍 Full API response for debugging:', result);
+        
         return result;
       }
     } catch (error) {
@@ -168,11 +242,6 @@ const InvoiceCreateModern: React.FC<InvoiceCreateModernProps> = ({ onSubmit }) =
       },
       settlement_wallet_id: '',
       due_date: '',
-      notes: '',
-      tags: '',
-      webhook_url: '',
-      notification_email: '',
-      send_email: true,
       title: 'Electronic purchasing',
       description: '',
       simple_amount: 0
@@ -215,7 +284,6 @@ const InvoiceCreateModern: React.FC<InvoiceCreateModernProps> = ({ onSubmit }) =
           simple_amount: data.simple_amount || 0,
           crypto_asset: data.crypto_currency || 'USDC',
           chain: data.crypto_chain || 'BASE',
-          notes: data.notes || '',
           due_date: data.due_date || '',
           // ... other fields
         });
@@ -273,6 +341,13 @@ const InvoiceCreateModern: React.FC<InvoiceCreateModernProps> = ({ onSubmit }) =
     setLineItems(lineItems.filter(item => item.id !== id));
   };
 
+  const calculateSubtotal = () => {
+    if (lineItems.length === 0) {
+      return (form.watch('simple_amount') || 0) * simpleQuantity;
+    }
+    return lineItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+  };
+
   const handleSaveAsDraft = () => {
     console.log('Save as Draft clicked');
     form.handleSubmit((data) => {
@@ -282,34 +357,46 @@ const InvoiceCreateModern: React.FC<InvoiceCreateModernProps> = ({ onSubmit }) =
     })();
   };
 
-  const handleCreateLink = () => {
-    console.log('Create Invoice Link clicked');
+  const handlePublish = () => {
+    console.log('Publish Invoice clicked');
     form.handleSubmit((data) => {
-      // Create invoice without sending email and show link notification
+      // Create invoice and set status to 'sent' (published)
       const modifiedData = { ...data, send_email: false };
       
-      // Create invoice and handle link creation
+      // Create invoice and handle publishing
       handleSubmit(modifiedData, false).then((result: any) => {
         if (result?.public_id) {
-          const link = `${window.location.origin}/pay/${result.public_id}`;
+          const link = `${window.location.origin}/invoice/${result.public_id}`;
           setPaymentLink(link);
-          setShowLinkNotification(true);
+          setPublishedInvoice(result);
+          setIsPublished(true);
         }
       }).catch((error: any) => {
-        console.error('Error creating invoice link:', error);
+        console.error('Error publishing invoice:', error);
       });
     }, (errors) => {
       console.log('Form validation errors:', JSON.stringify(errors, null, 2));
     })();
   };
 
-  const handleSendInvoice = () => {
-    console.log('Send Invoice clicked');
-    form.handleSubmit((data) => {
-      handleSubmit(data, false);
-    }, (errors) => {
-      console.log('Form validation errors:', JSON.stringify(errors, null, 2));
-    })();
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(paymentLink);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy link:', err);
+    }
+  };
+
+  const handleCreateAnother = () => {
+    // Reset form and states
+    setIsPublished(false);
+    setPublishedInvoice(null);
+    setPaymentLink('');
+    setCopySuccess(false);
+    form.reset();
+    setLineItems([]);
   };
 
   const sidebarSections = [
@@ -387,139 +474,379 @@ const InvoiceCreateModern: React.FC<InvoiceCreateModernProps> = ({ onSubmit }) =
           </div>
           
           <div className="flex items-center gap-3">
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <Input placeholder="Search..." className="pl-10 w-64" />
-            </div>
-            <Button variant="outline" onClick={handleSaveAsDraft} disabled={loading}>
-              Save as Draft
-            </Button>
-            <Button variant="outline" onClick={handleCreateLink} disabled={loading} className="bg-green-600 hover:bg-green-700 text-white">
-              Create Invoice Link
-            </Button>
-            <Button onClick={handleSendInvoice} disabled={loading} className="bg-blue-600 hover:bg-blue-700">
-              Send Invoice
-            </Button>
+            {!isPublished ? (
+              <>
+                <Button variant="outline" onClick={handleSaveAsDraft} disabled={loading}>
+                  <Save className="w-4 h-4 mr-2" />
+                  Save as Draft
+                </Button>
+                <Button onClick={handlePublish} disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white">
+                  <Send className="w-4 h-4 mr-2" />
+                  Publish Invoice
+                </Button>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 bg-green-50 text-green-700 px-3 py-2 rounded-lg">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="text-sm font-medium">Invoice Published</span>
+                </div>
+                <Button variant="outline" onClick={handleCopyLink} className="flex items-center gap-2">
+                  {copySuccess ? (
+                    <>
+                      <div className="w-4 h-4 text-green-600">✓</div>
+                      <span>Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      <span>Copy Link</span>
+                    </>
+                  )}
+                </Button>
+                <Button onClick={handleCreateAnother} className="bg-blue-600 hover:bg-blue-700 text-white">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Another
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>
       {/* Main Content */}
       <div className="flex-1 max-w-4xl mx-auto p-8">
-        <form onSubmit={form.handleSubmit((data) => (onSubmit || defaultOnSubmit)(data, false))} className="space-y-8">
-            {/* Invoice Details Section */}
-            <div className="bg-white rounded-lg border p-6">
-              <h3 className="text-lg font-semibold mb-4 flex items-center">
-                <FileText className="h-5 w-5 mr-2 text-blue-600" />
-                Invoice Details
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <Label htmlFor="title">Invoice Title</Label>
-                  <Input
-                    id="title"
-                    {...form.register('title')}
-                    placeholder="Enter invoice title"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="simple_amount">Amount (USD)</Label>
-                  <Input
-                    id="simple_amount"
-                    type="number"
-                    step="0.01"
-                    {...form.register('simple_amount', { valueAsNumber: true })}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    {...form.register('description')}
-                    placeholder="Enter invoice description"
-                    rows={3}
-                  />
+        {isPublished ? (
+          /* Success State - Invoice Published */
+          <div className="max-w-2xl mx-auto">
+            <div className="bg-white rounded-lg border p-8 text-center">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Send className="w-8 h-8 text-green-600" />
+              </div>
+              
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Invoice Published Successfully!</h2>
+              <p className="text-gray-600 mb-6">Your invoice has been created and is ready to be shared with your customer.</p>
+              
+              <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                <div className="flex items-center justify-between">
+                  <div className="text-left">
+                    <p className="text-sm font-medium text-gray-700">Invoice Link</p>
+                    <p className="text-xs text-gray-500 break-all">{paymentLink}</p>
+                  </div>
+                  <Button onClick={handleCopyLink} variant="outline" size="sm">
+                    {copySuccess ? (
+                      <>
+                        <div className="w-4 h-4 text-green-600 mr-2">✓</div>
+                        Copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4 mr-2" />
+                        Copy
+                      </>
+                    )}
+                  </Button>
                 </div>
               </div>
-            </div>
 
-            {/* Customer Information Section */}
-            <div className="bg-white rounded-lg border p-6">
-              <h3 className="text-lg font-semibold mb-4 flex items-center">
-                <User className="h-5 w-5 mr-2 text-green-600" />
-                Customer Information
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <Label htmlFor="customer_name">Customer Name</Label>
-                  <Input
-                    id="customer_name"
-                    {...form.register('customer_name')}
-                    placeholder="Enter customer name"
-                  />
+              {publishedInvoice && (
+                <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
+                  <div className="bg-blue-50 p-3 rounded-lg">
+                    <p className="font-medium text-blue-900">Invoice Number</p>
+                    <p className="text-blue-700">{publishedInvoice.invoice_number || publishedInvoice.id || 'Generated'}</p>
+                  </div>
+                  <div className="bg-blue-50 p-3 rounded-lg">
+                    <p className="font-medium text-blue-900">Amount</p>
+                    <p className="text-blue-700">${publishedInvoice.total_amount}</p>
+                  </div>
                 </div>
-                <div>
-                  <Label htmlFor="customer_email">Customer Email</Label>
-                  <Input
-                    id="customer_email"
-                    type="email"
-                    {...form.register('customer_email')}
-                    placeholder="customer@email.com"
-                  />
-                </div>
+              )}
+
+              <div className="flex gap-3 justify-center">
+                <Button onClick={() => window.open(paymentLink, '_blank')} variant="outline">
+                  <Eye className="w-4 h-4 mr-2" />
+                  Preview Invoice
+                </Button>
+                <Button onClick={handleCreateAnother} className="bg-blue-600 hover:bg-blue-700 text-white">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Another Invoice
+                </Button>
               </div>
             </div>
-
-            {/* Payment Settings Section */}
-            <div className="bg-white rounded-lg border p-6">
-              <h3 className="text-lg font-semibold mb-4 flex items-center">
-                <DollarSign className="h-5 w-5 mr-2 text-purple-600" />
-                Payment Settings
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <Label htmlFor="crypto_asset">Cryptocurrency</Label>
-                  <Select value={form.watch('crypto_asset') || 'USDC'} onValueChange={(value) => form.setValue('crypto_asset', value as 'USDC' | 'USDT' | 'DAI' | 'USDbC')}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select cryptocurrency" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="USDC">USDC</SelectItem>
-                      <SelectItem value="USDT">USDT</SelectItem>
-                      <SelectItem value="DAI">DAI</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="notes">Notes (Optional)</Label>
-                  <Textarea
-                    id="notes"
-                    {...form.register('notes')}
-                    placeholder="Internal notes (optional)"
-                    rows={2}
-                  />
+          </div>
+        ) : (
+          <form onSubmit={form.handleSubmit((data) => (onSubmit || defaultOnSubmit)(data, false))} className="space-y-8">
+            {/* Invoice Header - Like a Real Invoice */}
+            <div className="bg-white rounded-lg border shadow-sm">
+              {/* Invoice Header */}
+              <div className="border-b bg-gray-50 px-6 py-4 rounded-t-lg">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h1 className="text-2xl font-bold text-gray-900">INVOICE</h1>
+                    <p className="text-sm text-gray-600 mt-1">Create a new invoice</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm text-gray-600">Invoice #</div>
+                    <div className="font-mono text-lg font-semibold">
+                      {`INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Invoice Preview */}
-            <div className="bg-gray-50 rounded-lg border p-6">
-              <h3 className="text-lg font-semibold mb-4 flex items-center">
-                <Eye className="h-5 w-5 mr-2 text-gray-600" />
-                Preview
-              </h3>
-              <div className="bg-white rounded-lg p-4 border">
-                <h4 className="font-medium text-lg">{form.watch('title') || 'Invoice Title'}</h4>
-                <p className="text-sm text-gray-600 mt-1">{form.watch('description') || 'Invoice description'}</p>
-                <div className="mt-3 pt-3 border-t">
-                  <div className="flex justify-between">
-                    <span>Amount:</span>
-                    <span className="font-medium">${form.watch('simple_amount') || '0.00'} USDC</span>
+              {/* Invoice Body */}
+              <div className="p-6 space-y-8">
+                {/* Bill To & Invoice Details */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* Bill To Section */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Bill To:</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="customer_name">Customer Name *</Label>
+                        <Input
+                          id="customer_name"
+                          {...form.register('customer_name')}
+                          placeholder="Customer or Company Name"
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="customer_email">Email Address *</Label>
+                        <Input
+                          id="customer_email"
+                          type="email"
+                          {...form.register('customer_email')}
+                          placeholder="customer@email.com"
+                          className="mt-1"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowContactPicker(true)}
+                        className="w-full"
+                      >
+                        <Search className="h-4 w-4 mr-2" />
+                        Use Saved Contact
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Invoice Details */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Invoice Details:</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="title">Invoice Title/Description *</Label>
+                        <Input
+                          id="title"
+                          {...form.register('title')}
+                          placeholder="e.g., Web Development Services"
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="due_date">Due Date</Label>
+                        <Input
+                          id="due_date"
+                          type="date"
+                          {...form.register('due_date')}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="crypto_asset">Payment Currency</Label>
+                        <Select value={form.watch('crypto_asset') || 'USDC'} onValueChange={(value) => form.setValue('crypto_asset', value as 'USDC' | 'USDT' | 'DAI' | 'USDbC')}>
+                          <SelectTrigger className="mt-1">
+                            <SelectValue placeholder="Select cryptocurrency" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="USDC">USDC</SelectItem>
+                            <SelectItem value="USDT">USDT</SelectItem>
+                            <SelectItem value="DAI">DAI</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Invoice Items Section */}
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Invoice Items:</h3>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addLineItem}
+                      className="flex items-center gap-2"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add Item
+                    </Button>
+                  </div>
+                  
+                  <div className="border rounded-lg overflow-hidden">
+                    {/* Table Header */}
+                    <div className="bg-gray-50 border-b">
+                      <div className="grid grid-cols-12 gap-4 px-4 py-3 text-sm font-medium text-gray-700">
+                        <div className="col-span-5">Description</div>
+                        <div className="col-span-2 text-center">Quantity</div>
+                        <div className="col-span-2 text-right">Rate</div>
+                        <div className="col-span-2 text-right">Amount</div>
+                        <div className="col-span-1"></div>
+                      </div>
+                    </div>
+                    
+                    {/* Line Items */}
+                    {lineItems.length === 0 ? (
+                      <div className="bg-white">
+                        <div className="grid grid-cols-12 gap-4 px-4 py-4 items-center">
+                          <div className="col-span-5">
+                            <Textarea
+                              {...form.register('description')}
+                              placeholder="Describe the service or product..."
+                              rows={2}
+                              className="resize-none border-0 p-0 focus:ring-0 text-sm"
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <Input
+                              type="number"
+                              value={simpleQuantity}
+                              min="1"
+                              className="text-center text-sm"
+                              onChange={(e) => {
+                                const quantity = parseInt(e.target.value) || 1;
+                                setSimpleQuantity(quantity);
+                              }}
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">$</span>
+                              <Input
+                                id="simple_amount"
+                                type="number"
+                                step="0.01"
+                                {...form.register('simple_amount', { valueAsNumber: true })}
+                                placeholder="0.00"
+                                className="pl-8 text-right text-sm"
+                              />
+                            </div>
+                          </div>
+                          <div className="col-span-2 text-right">
+                            <div className="font-semibold text-sm">
+                              ${((form.watch('simple_amount') || 0) * simpleQuantity).toFixed(2)}
+                            </div>
+                          </div>
+                          <div className="col-span-1"></div>
+                        </div>
+                      </div>
+                    ) : (
+                      lineItems.map((item, index) => (
+                        <div key={item.id} className="bg-white border-b last:border-b-0">
+                          <div className="grid grid-cols-12 gap-4 px-4 py-4 items-center">
+                            <div className="col-span-5">
+                              <Textarea
+                                value={item.name}
+                                onChange={(e) => updateLineItem(item.id, 'name', e.target.value)}
+                                placeholder="Describe the service or product..."
+                                rows={2}
+                                className="resize-none border-0 p-0 focus:ring-0 text-sm w-full"
+                              />
+                            </div>
+                            <div className="col-span-2">
+                              <Input
+                                type="number"
+                                value={item.quantity}
+                                onChange={(e) => updateLineItem(item.id, 'quantity', parseInt(e.target.value) || 1)}
+                                min="1"
+                                className="text-center text-sm"
+                              />
+                            </div>
+                            <div className="col-span-2">
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">$</span>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  value={item.unit_price}
+                                  onChange={(e) => updateLineItem(item.id, 'unit_price', parseFloat(e.target.value) || 0)}
+                                  placeholder="0.00"
+                                  className="pl-8 text-right text-sm"
+                                />
+                              </div>
+                            </div>
+                            <div className="col-span-2 text-right">
+                              <div className="font-semibold text-sm">
+                                ${(item.quantity * item.unit_price).toFixed(2)}
+                              </div>
+                            </div>
+                            <div className="col-span-1 flex justify-center">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeLineItem(item.id)}
+                                className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Invoice Summary */}
+                <div className="flex justify-end">
+                  <div className="w-full max-w-sm">
+                    <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Subtotal:</span>
+                        <span>${calculateSubtotal().toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span>Tax:</span>
+                        <span>$0.00</span>
+                      </div>
+                      <div className="border-t pt-2">
+                        <div className="flex justify-between font-bold text-lg">
+                          <span>Total:</span>
+                          <span>${calculateSubtotal().toFixed(2)} {form.watch('crypto_asset') || 'USDC'}</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-        </form>
+
+
+            {/* Saved Contacts Modal */}
+            {showContactPicker && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+                  <SavedContacts
+                    showSelectMode={true}
+                    onSelectContact={(contact) => {
+                      form.setValue('customer_name', contact.name);
+                      form.setValue('customer_email', contact.email);
+                      setShowContactPicker(false);
+                    }}
+                    onClose={() => setShowContactPicker(false)}
+                  />
+                </div>
+              </div>
+            )}
+
+          </form>
+        )}
       </div>
     </div>
   );

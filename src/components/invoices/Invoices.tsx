@@ -52,8 +52,15 @@ const Invoices: React.FC = () => {
         if (error) throw error;
         data = drafts || [];
       } else {
-        // For other tabs, use API
-        data = await invoiceApi.listInvoices(params);
+        // For overview tab, query standalone_invoices directly
+        const { data: allInvoices, error } = await supabase
+          .from('standalone_invoices')
+          .select('*')
+          .neq('status', 'draft') // Show sent/paid invoices (not drafts)
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        data = allInvoices || [];
       }
       
       // Ensure data is an array before filtering
@@ -100,6 +107,54 @@ const Invoices: React.FC = () => {
     }
   };
 
+  // Get display text for status
+  const getStatusDisplayText = (status: string) => {
+    switch (status) {
+      case 'sent': return 'Published';
+      case 'draft': return 'Draft';
+      case 'paid': return 'Paid';
+      case 'expired': return 'Expired';
+      case 'canceled': return 'Canceled';
+      case 'cancelled': return 'Canceled';
+      case 'voided': return 'Voided';
+      default: return status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+    }
+  };
+
+  // Check if invoice is expired based on due_date OR expires_at
+  const isInvoiceExpired = (invoice: Invoice) => {
+    if (invoice.status === 'paid' || invoice.status === 'canceled' || invoice.status === 'voided') {
+      return false;
+    }
+    
+    const now = new Date();
+    
+    // Check expires_at first (payment window), then due_date (payment deadline)
+    if (invoice.expires_at) {
+      const expiresAt = new Date(invoice.expires_at);
+      if (expiresAt < now && (invoice.status === 'sent' || invoice.status === 'viewed')) {
+        return true;
+      }
+    }
+    
+    if (invoice.due_date) {
+      const dueDate = new Date(invoice.due_date);
+      if (dueDate < now && (invoice.status === 'sent' || invoice.status === 'viewed')) {
+        return true;
+      }
+    }
+    
+    return false;
+  };
+
+  // Get effective status (considering expiration)
+  const getEffectiveStatus = (invoice: Invoice) => {
+    if (isInvoiceExpired(invoice)) {
+      return 'expired';
+    }
+    return invoice.status;
+  };
+
   const handleSendInvoice = async (id: string) => {
     try {
       await invoiceApi.updateInvoiceStatus(id, 'sent');
@@ -111,18 +166,6 @@ const Invoices: React.FC = () => {
     }
   };
 
-  const handleCancelInvoice = async (id: string, invoice: any) => {
-    if (window.confirm(`Are you sure you want to cancel invoice ${invoice.invoice_number}?`)) {
-      try {
-        await invoiceApi.updateInvoiceStatus(id, 'canceled');
-        alert('Invoice canceled successfully!');
-        loadInvoices(); // Refresh the list
-      } catch (error) {
-        console.error('Error canceling invoice:', error);
-        alert('Failed to cancel invoice. Please try again.');
-      }
-    }
-  };
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<any>(null);
@@ -215,11 +258,67 @@ const Invoices: React.FC = () => {
   };
 
   const handleCopyPayLink = (invoice: Invoice) => {
-    if (invoice.public_url) {
-      navigator.clipboard.writeText(invoice.public_url);
-      alert(`Pay link copied to clipboard: ${invoice.public_url}`);
+    console.log('🔍 Invoice object:', invoice);
+    console.log('🔗 Public URL field:', invoice.public_url);
+    console.log('🔗 Alternative fields:', {
+      publicUrl: (invoice as any).publicUrl,
+      public_id: invoice.public_id,
+      invoice_number: invoice.invoice_number
+    });
+    
+    // Try multiple possible URL fields
+    const publicUrl = invoice.public_url || 
+                     (invoice as any).publicUrl || 
+                     (invoice.public_id ? `https://pay.okurupay.com/pay/${invoice.public_id}` : null);
+    
+    if (publicUrl) {
+      navigator.clipboard.writeText(publicUrl);
+      alert(`Pay link copied to clipboard: ${publicUrl}`);
     } else {
-      alert('Public URL not available for this invoice');
+      alert('Public URL not available for this invoice. Please check the console for debugging info.');
+    }
+  };
+
+
+  const handleCancelInvoice = async (invoiceId: string, invoice: Invoice) => {
+    if (window.confirm(`Are you sure you want to cancel this invoice? This action cannot be undone.`)) {
+      try {
+        // Update invoice status to cancelled
+        const { error } = await supabase
+          .from('standalone_invoices')
+          .update({ status: 'cancelled' })
+          .eq('id', invoiceId);
+        
+        if (error) throw error;
+        
+        // Reload invoices
+        loadInvoices();
+        alert('Invoice cancelled successfully');
+      } catch (error) {
+        console.error('Error cancelling invoice:', error);
+        alert('Failed to cancel invoice');
+      }
+    }
+  };
+
+  const handleVoidInvoice = async (invoiceId: string, invoice: Invoice) => {
+    if (window.confirm(`Are you sure you want to void this invoice? This action cannot be undone.`)) {
+      try {
+        // Update invoice status to voided
+        const { error } = await supabase
+          .from('standalone_invoices')
+          .update({ status: 'voided' })
+          .eq('id', invoiceId);
+        
+        if (error) throw error;
+        
+        // Reload invoices
+        loadInvoices();
+        alert('Invoice voided successfully');
+      } catch (error) {
+        console.error('Error voiding invoice:', error);
+        alert('Failed to void invoice');
+      }
     }
   };
 
@@ -469,8 +568,8 @@ const Invoices: React.FC = () => {
                       )}
                     </td>
                     <td className="py-3 px-4">
-                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(invoice.status as InvoiceStatus)}`}>
-                        {invoice.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(getEffectiveStatus(invoice) as InvoiceStatus)}`}>
+                        {getStatusDisplayText(getEffectiveStatus(invoice))}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-gray-600 text-sm">
@@ -517,18 +616,19 @@ const Invoices: React.FC = () => {
                               <Copy className="h-3 w-3" />
                             </Button>
 
-                            {(invoice.status === 'sent' || invoice.status === 'viewed') && (
+
+                            {/* Show different actions based on status */}
+                            {getEffectiveStatus(invoice) === 'expired' ? (
                               <Button 
                                 size="sm" 
                                 variant="outline"
-                                onClick={() => handleResendInvoice(invoice.id)}
-                                title="Resend Invoice"
+                                onClick={() => handleVoidInvoice(invoice.id, invoice)}
+                                title="Void Expired Invoice"
+                                className="text-red-600 hover:text-red-700"
                               >
-                                <Send className="h-3 w-3" />
+                                <Trash2 className="h-3 w-3" />
                               </Button>
-                            )}
-
-                            {invoice.status === 'sent' && (
+                            ) : invoice.status === 'sent' && (
                               <Button 
                                 size="sm" 
                                 variant="outline"

@@ -566,17 +566,32 @@ const Reports: React.FC = () => {
             `${billingAddress.city || ''}, ${billingAddress.state || ''}, ${billingAddress.country || ''}`.replace(/^,\s*|,\s*$/g, '') : 
             'N/A';
             
+          // Sanitize strings to ensure valid UTF-8
+          const sanitizeString = (str: any): string => {
+            if (!str) return '';
+            return String(str)
+              .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '') // Remove control characters
+              .replace(/[^\x00-\x7F]/g, (char) => {
+                // Replace non-ASCII characters that might cause issues
+                try {
+                  return encodeURIComponent(char).replace(/%/g, '_');
+                } catch {
+                  return '_';
+                }
+              });
+          };
+            
           return [
-            invoice.id,
-            invoice.invoice_number,
+            sanitizeString(invoice.id),
+            sanitizeString(invoice.invoice_number),
             `$${parseFloat(invoice.total_amount?.toString() || '0').toFixed(2)}`,
-            invoice.crypto_chain || 'Base',
-            invoice.status,
+            sanitizeString(invoice.crypto_chain || 'Base'),
+            sanitizeString(invoice.status),
             new Date(invoice.created_at).toLocaleDateString(),
-            invoice.customer_email || '',
-            invoice.customer_name || '',
-            location,
-            invoice.payment_tx_hash || 'N/A'
+            sanitizeString(invoice.customer_email || ''),
+            sanitizeString(invoice.customer_name || ''),
+            sanitizeString(location),
+            sanitizeString(invoice.payment_tx_hash || 'N/A')
           ];
         });
 
@@ -593,10 +608,8 @@ const Reports: React.FC = () => {
           
         console.log('📄 CSV Content Preview:', csvContent.substring(0, 200) + '...');
           
-        // Create blob with proper MIME type and BOM for Excel compatibility
-        const BOM = '\uFEFF';
-        const csvWithBOM = BOM + csvContent;
-        const blob = new Blob([csvWithBOM], { 
+        // Create blob with proper MIME type without BOM to avoid UTF-8 issues
+        const blob = new Blob([csvContent], { 
           type: 'text/csv;charset=utf-8;' 
         });
           
@@ -646,7 +659,7 @@ const Reports: React.FC = () => {
                       download_url: downloadUrl,
                       file_size: Math.round(blob.size / 1024),
                       filename,
-                      csvContent: csvWithBOM
+                      csvContent: csvContent
                     }
                   : job
               ));
@@ -662,7 +675,7 @@ const Reports: React.FC = () => {
                     download_url: downloadUrl,
                     file_size: Math.round(blob.size / 1024),
                     filename,
-                    csvContent: csvWithBOM
+                    csvContent: csvContent
                   }
                 : job
             ));
@@ -993,8 +1006,23 @@ const Reports: React.FC = () => {
               {exportJobs.length > 0 ? (
                 <div className="space-y-4">
                   {exportJobs.map(job => {
-                    const filters = job.filters ? JSON.parse(job.filters) : {};
-                    const columns = job.columns ? JSON.parse(job.columns) : [];
+                    let filters = {};
+                    let columns = [];
+                    
+                    // Safely parse JSON fields to avoid UTF-8 issues
+                    try {
+                      filters = job.filters ? JSON.parse(job.filters) : {};
+                    } catch (error) {
+                      console.warn('Failed to parse filters JSON:', error);
+                      filters = {};
+                    }
+                    
+                    try {
+                      columns = job.columns ? JSON.parse(job.columns) : [];
+                    } catch (error) {
+                      console.warn('Failed to parse columns JSON:', error);
+                      columns = [];
+                    }
                     
                     return (
                       <div key={job.export_id} className="border rounded-lg p-4 space-y-3">
@@ -1050,17 +1078,17 @@ const Reports: React.FC = () => {
                           
                           <div className="bg-gray-50 p-3 rounded">
                             <p className="font-medium text-gray-700 mb-1">Date Range</p>
-                            {filters.dateRange ? (
-                              <p>{filters.dateRange === 'today' ? 'Today' : 
-                                   filters.dateRange === 'week' ? 'This Week' :
-                                   filters.dateRange === 'month' ? 'This Month' :
-                                   filters.dateRange === 'custom' ? 'Custom Range' : 'All Time'}</p>
+                            {(filters as any).dateRange ? (
+                              <p>{(filters as any).dateRange === 'today' ? 'Today' : 
+                                   (filters as any).dateRange === 'week' ? 'This Week' :
+                                   (filters as any).dateRange === 'month' ? 'This Month' :
+                                   (filters as any).dateRange === 'custom' ? 'Custom Range' : 'All Time'}</p>
                             ) : (
                               <p>All Time</p>
                             )}
-                            {filters.startDate && filters.endDate && (
+                            {(filters as any).startDate && (filters as any).endDate && (
                               <p className="text-gray-500 text-xs">
-                                {new Date(filters.startDate).toLocaleDateString()} - {new Date(filters.endDate).toLocaleDateString()}
+                                {new Date((filters as any).startDate).toLocaleDateString()} - {new Date((filters as any).endDate).toLocaleDateString()}
                               </p>
                             )}
                           </div>
@@ -1077,18 +1105,18 @@ const Reports: React.FC = () => {
                         </div>
                         
                         {/* Additional Filters */}
-                        {(filters.status || filters.minAmount || filters.maxAmount) && (
+                        {((filters as any).status || (filters as any).minAmount || (filters as any).maxAmount) && (
                           <div className="bg-blue-50 p-3 rounded">
                             <p className="font-medium text-gray-700 mb-2">Applied Filters</p>
                             <div className="flex flex-wrap gap-2">
-                              {filters.status && (
-                                <Badge variant="secondary">Status: {filters.status}</Badge>
+                              {(filters as any).status && (
+                                <Badge variant="secondary">Status: {(filters as any).status}</Badge>
                               )}
-                              {filters.minAmount && (
-                                <Badge variant="secondary">Min: ${filters.minAmount}</Badge>
+                              {(filters as any).minAmount && (
+                                <Badge variant="secondary">Min: ${(filters as any).minAmount}</Badge>
                               )}
-                              {filters.maxAmount && (
-                                <Badge variant="secondary">Max: ${filters.maxAmount}</Badge>
+                              {(filters as any).maxAmount && (
+                                <Badge variant="secondary">Max: ${(filters as any).maxAmount}</Badge>
                               )}
                             </div>
                           </div>

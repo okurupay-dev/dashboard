@@ -26,6 +26,18 @@
       Learn how to configure a non-root public URL by running `npm run build`.
     -->
     <title>Okuru Dashboard</title>
+    
+    <!-- Suppress browser extension errors -->
+    <script>
+      // Prevent Cardano wallet extension errors from breaking the app
+      window.addEventListener('error', function(e) {
+        if (e.filename && e.filename.includes('chrome-extension://') && 
+            e.message && e.message.includes('REQUEST_ID')) {
+          e.preventDefault();
+          console.warn('Cardano wallet extension error suppressed');
+        }
+      });
+    </script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>

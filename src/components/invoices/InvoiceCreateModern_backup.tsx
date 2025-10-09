@@ -95,11 +95,6 @@ const InvoiceCreateModern: React.FC<InvoiceCreateModernProps> = ({ onSubmit }) =
       },
       settlement_wallet_id: '',
       due_date: '',
-      notes: '',
-      tags: '',
-      webhook_url: '',
-      notification_email: '',
-      send_email: true,
       title: 'Electronic purchasing',
       description: '',
       simple_amount: 0
@@ -142,7 +137,6 @@ const InvoiceCreateModern: React.FC<InvoiceCreateModernProps> = ({ onSubmit }) =
           simple_amount: data.simple_amount || 0,
           crypto_asset: data.crypto_currency || 'USDC',
           chain: data.crypto_chain || 'BASE',
-          notes: data.notes || '',
           due_date: data.due_date || '',
           // ... other fields
         });
@@ -387,14 +381,6 @@ const InvoiceCreateModern: React.FC<InvoiceCreateModernProps> = ({ onSubmit }) =
                 />
               </div>
 
-              <div>
-                <Label htmlFor="notes">Notes</Label>
-                <Textarea
-                  {...form.register('notes')}
-                  placeholder="Internal notes (optional)"
-                  rows={2}
-                />
-              </div>
             </div>
           )}
 

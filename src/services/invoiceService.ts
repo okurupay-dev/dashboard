@@ -151,6 +151,9 @@ class InvoiceService {
       // Convert to API payload format
       const apiPayload: InvoiceApiPayload = {
         ...invoiceData,
+        crypto_asset: invoiceData.crypto_currency || 'USDC',
+        chain: invoiceData.crypto_chain || 'BASE',
+        currency_mode: 'crypto',
         status: 'sent'
       };
 
@@ -196,8 +199,8 @@ class InvoiceService {
         discount_amount: draft.discount_amount,
         total_amount: draft.total_amount,
         currency_mode: draft.currency_mode,
-        crypto_currency: draft.crypto_currency,
-        crypto_chain: draft.crypto_chain,
+        crypto_asset: draft.crypto_currency || 'USDC',
+        chain: draft.crypto_chain || 'BASE',
         price_lock_secs: draft.price_lock_secs,
         min_confirmations: draft.min_confirmations,
         allow_partial: draft.allow_partial,

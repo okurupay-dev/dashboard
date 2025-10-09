@@ -47,12 +47,7 @@ const InvoiceCreate: React.FC = () => {
         country: ''
       },
       settlement_wallet_id: '',
-      due_date: '',
-      notes: '',
-      tags: '',
-      webhook_url: '',
-      notification_email: '',
-      send_email: true
+      due_date: ''
     }
   });
 
@@ -129,10 +124,7 @@ const InvoiceCreate: React.FC = () => {
       
       // Process comma-separated strings for arrays
       const processedCCEmails = data.customer_cc_emails ? 
-        data.customer_cc_emails.split(',').map(email => email.trim()).filter(email => email) : [];
-      
-      const processedTags = data.tags ? 
-        data.tags.split(',').map(tag => tag.trim()).filter(tag => tag) : [];
+        data.customer_cc_emails.split(',').map((email: string) => email.trim()).filter((email: string) => email) : [];
 
       // Debug wallet information
       console.log('Available verified wallets:', verifiedWallets);
@@ -150,8 +142,8 @@ const InvoiceCreate: React.FC = () => {
         
         // Payment configuration
         currency_mode: "crypto" as const,
-        crypto_currency: data.crypto_asset || 'USDC',
-        crypto_chain: "BASE" as const,
+        crypto_asset: data.crypto_asset || 'USDC',
+        chain: "BASE" as const,
         price_lock_secs: data.price_lock_secs || 900,
         min_confirmations: data.min_confirmations || 1,
         allow_partial: data.allow_partial || false,
@@ -166,13 +158,6 @@ const InvoiceCreate: React.FC = () => {
         settlement_wallet_id: data.settlement_wallet_id || (verifiedWallets.length > 0 ? verifiedWallets[0].address_id : ''),
         fee_payer: "merchant",
         due_date: data.due_date,
-        notes: data.notes,
-        tags: processedTags,
-        
-        // Notifications
-        webhook_url: data.webhook_url,
-        notification_email: data.notification_email,
-        send_email: data.send_email !== false,
         
         // Status
         status: (isDraft ? 'draft' : 'sent') as 'draft' | 'sent'
@@ -183,8 +168,8 @@ const InvoiceCreate: React.FC = () => {
       console.log('Required fields check:', {
         customer_email: !!payload.customer_email,
         settlement_wallet_id: !!payload.settlement_wallet_id,
-        crypto_currency: !!payload.crypto_currency,
-        crypto_chain: !!payload.crypto_chain,
+        crypto_asset: !!payload.crypto_asset,
+        chain: !!payload.chain,
         simple_amount: payload.simple_amount
       });
 
@@ -625,65 +610,6 @@ const InvoiceCreate: React.FC = () => {
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Internal Notes (Optional)
-                    </label>
-                    <textarea
-                      {...register('notes')}
-                      rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Internal notes for this invoice..."
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Tags (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      {...register('tags')}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="tag1, tag2, tag3"
-                    />
-                    <p className="text-sm text-gray-500 mt-1">Separate tags with commas</p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Webhook URL (Optional)
-                    </label>
-                    <input
-                      type="url"
-                      {...register('webhook_url')}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="https://your-site.com/webhook"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Notification Email (Optional)
-                    </label>
-                    <input
-                      type="email"
-                      {...register('notification_email')}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="notifications@yourcompany.com"
-                    />
-                  </div>
-
-                  <div className="flex items-center">
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        {...register('send_email')}
-                        className="mr-2"
-                      />
-                      Send email to customer automatically
-                    </label>
-                  </div>
                 </div>
               )}
 
@@ -754,12 +680,6 @@ const InvoiceCreate: React.FC = () => {
                         <div className="flex justify-between">
                           <span className="font-medium">Description:</span>
                           <span className="text-right max-w-xs truncate">{watchedValues.description}</span>
-                        </div>
-                      )}
-                      {watchedValues.tags && (
-                        <div className="flex justify-between">
-                          <span className="font-medium">Tags:</span>
-                          <span className="text-right">{watchedValues.tags.split(',').map(tag => tag.trim()).join(', ')}</span>
                         </div>
                       )}
                   </div>

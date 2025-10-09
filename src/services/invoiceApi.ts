@@ -2,11 +2,45 @@ import { supabase } from '../lib/supabase';
 
 const API_BASE_URL = 'https://okurutest.up.railway.app';
 
+// Utility function to sanitize strings and prevent UTF-8 encoding issues
+const sanitizeString = (str: any): string => {
+  if (!str) return '';
+  return String(str)
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '') // Remove control characters
+    .replace(/[\uFEFF\uFFFE\uFFFF]/g, '') // Remove BOM and other problematic Unicode characters
+    .trim();
+};
+
+// Utility function to sanitize entire payload
+const sanitizePayload = (payload: any): any => {
+  if (typeof payload === 'string') {
+    return sanitizeString(payload);
+  }
+  
+  if (Array.isArray(payload)) {
+    return payload.map(item => sanitizePayload(item));
+  }
+  
+  if (payload && typeof payload === 'object') {
+    const sanitized: any = {};
+    for (const [key, value] of Object.entries(payload)) {
+      sanitized[key] = sanitizePayload(value);
+    }
+    return sanitized;
+  }
+  
+  return payload;
+};
+
 export interface InvoiceApiPayload {
   // Basic invoice info
   title?: string;
   description?: string;
   notes?: string;
+  
+  // Merchant context
+  merchant_id?: string;
+  created_by?: string;
   
   // Customer details
   customer_email: string;
@@ -31,8 +65,8 @@ export interface InvoiceApiPayload {
   
   // Crypto payment settings
   currency_mode: 'crypto';
-  crypto_currency: string;  // Changed from crypto_asset
-  crypto_chain: string;     // Changed from chain
+  crypto_asset: string;     // Backend expects crypto_asset
+  chain: string;            // Backend expects chain
   price_lock_secs?: number;
   min_confirmations?: number;
   allow_partial?: boolean;
@@ -55,11 +89,20 @@ export interface InvoiceApiPayload {
   notification_email?: string;
   send_email?: boolean;
   
+  // Blockchain integration (new fields from your schema)
+  payment_address?: string;
+  qr_code_data?: string;
+  blockchain_tx_hash?: string;
+  confirmation_count?: number;
+  
+  // Settlement & processing (new fields from your schema)
+  settlement_status?: 'pending' | 'processing' | 'completed';
+  settlement_tx_hash?: string;
+  gas_fee_paid?: number;
+  net_amount?: number;
+  
   // Status
   status: 'draft' | 'sent';
-  
-  // Additional API fields
-  chain?: string;
 }
 
 export interface Invoice {
@@ -93,12 +136,6 @@ export interface Invoice {
   allow_partial?: boolean;
   expires_at?: string;
   due_date?: string;
-  notes?: string;
-  tags?: string[];
-  webhook_url?: string;
-  notification_email?: string;
-  send_email?: boolean;
-  payment_address?: string;
   qr_code_data?: string;
   blockchain_tx_hash?: string;
   confirmation_count?: number;
@@ -106,12 +143,23 @@ export interface Invoice {
   settlement_tx_hash?: string;
   gas_fee_paid?: number;
   net_amount?: number;
+  settlement_wallet_id?: string;
+  fee_payer?: string;
+  is_simple_amount?: boolean;
+  line_items?: Array<{
+    id?: string;
+    name: string;
+    description?: string;
+    quantity: number;
+    unit_price: number;
+    tax_rate?: number;
+  }>;
   created_at: string;
   updated_at: string;
   public_url?: string;
   // Legacy fields for compatibility
   fiat_currency?: string;
-  amount_fiat?: number;
+  notes?: string;
 }
 
 class InvoiceApiService {
@@ -129,7 +177,10 @@ class InvoiceApiService {
   async createInvoice(payload: InvoiceApiPayload): Promise<Invoice> {
     const token = await this.getAuthToken();
     
-    console.log('Sending invoice payload:', payload);
+    // Sanitize payload to prevent UTF-8 encoding issues
+    const sanitizedPayload = sanitizePayload(payload);
+    
+    console.log('📤 Sending invoice payload:', JSON.stringify(sanitizedPayload, null, 2));
     
     const response = await fetch(`${API_BASE_URL}/dashboard-invoices`, {
       method: 'POST',
@@ -137,7 +188,7 @@ class InvoiceApiService {
         'Content-Type': 'application/json',
         ...(token && { 'Authorization': `Bearer ${token}` })
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(sanitizedPayload)
     });
 
     if (!response.ok) {
@@ -172,10 +223,10 @@ class InvoiceApiService {
     const token = await this.getAuthToken();
     const searchParams = new URLSearchParams();
     
-    if (params?.status) searchParams.append('status', params.status);
+    if (params?.status) searchParams.append('status', sanitizeString(params.status));
     if (params?.limit) searchParams.append('limit', params.limit.toString());
     if (params?.offset) searchParams.append('offset', params.offset.toString());
-    if (params?.search) searchParams.append('search', params.search);
+    if (params?.search) searchParams.append('search', sanitizeString(params.search));
 
     const response = await fetch(`${API_BASE_URL}/dashboard-invoices?${searchParams}`, {
       headers: {
@@ -195,7 +246,7 @@ class InvoiceApiService {
   async getInvoice(id: string): Promise<Invoice> {
     const token = await this.getAuthToken();
     
-    const response = await fetch(`${API_BASE_URL}/dashboard-invoices/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/dashboard-invoices/${sanitizeString(id)}`, {
       headers: {
         ...(token && { 'Authorization': `Bearer ${token}` })
       }
@@ -211,13 +262,13 @@ class InvoiceApiService {
   async updateInvoiceStatus(id: string, status: string): Promise<Invoice> {
     const token = await this.getAuthToken();
     
-    const response = await fetch(`${API_BASE_URL}/dashboard-invoices/${id}/status`, {
+    const response = await fetch(`${API_BASE_URL}/dashboard-invoices/${sanitizeString(id)}/status`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         ...(token && { 'Authorization': `Bearer ${token}` })
       },
-      body: JSON.stringify({ status })
+      body: JSON.stringify({ status: sanitizeString(status) })
     });
 
     if (!response.ok) {
@@ -230,7 +281,7 @@ class InvoiceApiService {
   async deleteInvoice(id: string): Promise<void> {
     const token = await this.getAuthToken();
     
-    const response = await fetch(`${API_BASE_URL}/dashboard-invoices/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/dashboard-invoices/${sanitizeString(id)}`, {
       method: 'DELETE',
       headers: {
         ...(token && { 'Authorization': `Bearer ${token}` })
@@ -245,7 +296,7 @@ class InvoiceApiService {
   async generatePaymentAddress(id: string): Promise<{ payment_address: string }> {
     const token = await this.getAuthToken();
     
-    const response = await fetch(`${API_BASE_URL}/dashboard-invoices/${id}/generate-payment-address`, {
+    const response = await fetch(`${API_BASE_URL}/dashboard-invoices/${sanitizeString(id)}/generate-payment-address`, {
       method: 'POST',
       headers: {
         ...(token && { 'Authorization': `Bearer ${token}` })
@@ -262,7 +313,7 @@ class InvoiceApiService {
   async getQRCode(id: string): Promise<{ qr_code_data: string }> {
     const token = await this.getAuthToken();
     
-    const response = await fetch(`${API_BASE_URL}/dashboard-invoices/${id}/qr-code`, {
+    const response = await fetch(`${API_BASE_URL}/dashboard-invoices/${sanitizeString(id)}/qr-code`, {
       headers: {
         ...(token && { 'Authorization': `Bearer ${token}` })
       }
@@ -276,7 +327,7 @@ class InvoiceApiService {
   }
 
   async getPublicInvoice(publicId: string): Promise<Invoice> {
-    const response = await fetch(`${API_BASE_URL}/pay/${publicId}`);
+    const response = await fetch(`${API_BASE_URL}/pay/${sanitizeString(publicId)}`);
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);

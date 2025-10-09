@@ -3,6 +3,36 @@ import { useAuth } from '../../contexts/AuthContext';
 // Base API configuration
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://api.okurupay.com';
 
+// Utility function to sanitize strings and prevent UTF-8 encoding issues
+const sanitizeString = (str: any): string => {
+  if (!str) return '';
+  return String(str)
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '') // Remove control characters
+    .replace(/[\uFEFF\uFFFE\uFFFF]/g, '') // Remove BOM and other problematic Unicode characters
+    .trim();
+};
+
+// Utility function to sanitize entire payload
+const sanitizePayload = (payload: any): any => {
+  if (typeof payload === 'string') {
+    return sanitizeString(payload);
+  }
+  
+  if (Array.isArray(payload)) {
+    return payload.map(item => sanitizePayload(item));
+  }
+  
+  if (payload && typeof payload === 'object') {
+    const sanitized: any = {};
+    for (const [key, value] of Object.entries(payload)) {
+      sanitized[key] = sanitizePayload(value);
+    }
+    return sanitized;
+  }
+  
+  return payload;
+};
+
 // Interface for API requests with user context
 interface UserContext {
   userId: string;
@@ -100,20 +130,20 @@ export const transactionService = {
   create: async (userContext: UserContext, transactionData: any) => {
     return apiRequest('/transactions', userContext, {
       method: 'POST',
-      body: JSON.stringify(transactionData)
+      body: JSON.stringify(sanitizePayload(transactionData))
     });
   },
 
   // Get transaction details
   getById: async (userContext: UserContext, transactionId: string) => {
-    return apiRequest(`/transactions/${transactionId}`, userContext);
+    return apiRequest(`/transactions/${sanitizeString(transactionId)}`, userContext);
   },
 
   // Update transaction
   update: async (userContext: UserContext, transactionId: string, updateData: any) => {
-    return apiRequest(`/transactions/${transactionId}`, userContext, {
+    return apiRequest(`/transactions/${sanitizeString(transactionId)}`, userContext, {
       method: 'PUT',
-      body: JSON.stringify(updateData)
+      body: JSON.stringify(sanitizePayload(updateData))
     });
   }
 };
@@ -124,23 +154,23 @@ export const staffService = {
   create: async (userContext: UserContext, staffData: any) => {
     return apiRequest('/staff', userContext, {
       method: 'POST',
-      body: JSON.stringify(staffData)
+      body: JSON.stringify(sanitizePayload(staffData))
     });
   },
 
   // Update staff member
   update: async (userContext: UserContext, staffId: string, updateData: any) => {
-    return apiRequest(`/staff/${staffId}`, userContext, {
+    return apiRequest(`/staff/${sanitizeString(staffId)}`, userContext, {
       method: 'PUT',
-      body: JSON.stringify(updateData)
+      body: JSON.stringify(sanitizePayload(updateData))
     });
   },
 
   // Assign PIN to staff member
   assignPin: async (userContext: UserContext, staffId: string, pin: string) => {
-    return apiRequest(`/staff/${staffId}/pin`, userContext, {
+    return apiRequest(`/staff/${sanitizeString(staffId)}/pin`, userContext, {
       method: 'POST',
-      body: JSON.stringify({ pin })
+      body: JSON.stringify({ pin: sanitizeString(pin) })
     });
   }
 };
@@ -149,14 +179,14 @@ export const staffService = {
 export const terminalService = {
   // Get terminal details
   getById: async (userContext: UserContext, terminalId: string) => {
-    return apiRequest(`/terminals/${terminalId}`, userContext);
+    return apiRequest(`/terminals/${sanitizeString(terminalId)}`, userContext);
   },
 
   // Update terminal settings
   update: async (userContext: UserContext, terminalId: string, updateData: any) => {
-    return apiRequest(`/terminals/${terminalId}`, userContext, {
+    return apiRequest(`/terminals/${sanitizeString(terminalId)}`, userContext, {
       method: 'PUT',
-      body: JSON.stringify(updateData)
+      body: JSON.stringify(sanitizePayload(updateData))
     });
   }
 };
@@ -167,21 +197,21 @@ export const automationService = {
   create: async (userContext: UserContext, automationData: any) => {
     return apiRequest('/automations', userContext, {
       method: 'POST',
-      body: JSON.stringify(automationData)
+      body: JSON.stringify(sanitizePayload(automationData))
     });
   },
 
   // Update automation rule
   update: async (userContext: UserContext, automationId: string, updateData: any) => {
-    return apiRequest(`/automations/${automationId}`, userContext, {
+    return apiRequest(`/automations/${sanitizeString(automationId)}`, userContext, {
       method: 'PUT',
-      body: JSON.stringify(updateData)
+      body: JSON.stringify(sanitizePayload(updateData))
     });
   },
 
   // Delete automation rule
   delete: async (userContext: UserContext, automationId: string) => {
-    return apiRequest(`/automations/${automationId}`, userContext, {
+    return apiRequest(`/automations/${sanitizeString(automationId)}`, userContext, {
       method: 'DELETE'
     });
   }

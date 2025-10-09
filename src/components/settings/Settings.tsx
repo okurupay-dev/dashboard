@@ -4,6 +4,7 @@ import { Button } from '../ui/button';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { FileText, ExternalLink } from 'lucide-react';
+import LogoUpload from './LogoUpload';
 
 interface UserProfile {
   name: string;
@@ -40,6 +41,8 @@ const Settings: React.FC = () => {
   const { userData } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [merchantId, setMerchantId] = useState<string>('');
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   
   // User preferences (editable)
   const [profile, setProfile] = useState<UserProfile>({
@@ -144,10 +147,13 @@ const Settings: React.FC = () => {
 
           // Get merchant data separately
           if (userData.merchant_id) {
+            setMerchantId(userData.merchant_id);
+            
             const { data: merchantData, error: merchantError } = await supabase
               .from('merchants')
               .select(`
                 name,
+                logo_url,
                 business_street,
                 business_city,
                 business_state,
@@ -174,6 +180,9 @@ const Settings: React.FC = () => {
                 businessPhone: merchantData.business_phone || '',
                 businessEmail: merchantData.business_email || ''
               });
+              
+              // Set logo URL
+              setLogoUrl(merchantData.logo_url || null);
             }
           }
         }
@@ -228,16 +237,22 @@ const Settings: React.FC = () => {
           });
 
         if (preferencesError) {
-          console.error('Error saving preferences:', preferencesError);
-          alert('Preferences saved locally but could not sync to database. Please contact support.');
-          return;
+          // Check if it's a table not found error
+          if (preferencesError.message?.includes('relation') || preferencesError.code === '42P01') {
+            console.log('User preferences table not found, preferences saved locally only');
+            alert('Preferences saved! (Note: User preferences table will be created in a future update)');
+          } else {
+            console.error('Error saving preferences:', preferencesError);
+            alert('Error saving preferences. Please try again.');
+            return;
+          }
+        } else {
+          alert('Preferences saved successfully!');
         }
       } catch (prefError) {
         console.log('User preferences table not found, preferences saved locally only');
-        alert('Preferences saved locally. Database sync will be available after setup.');
+        alert('Preferences saved! (Note: User preferences table will be created in a future update)');
       }
-
-      alert('Preferences saved successfully!');
     } catch (error) {
       console.error('Error saving preferences:', error);
       alert('Error saving preferences. Please try again.');
@@ -365,6 +380,15 @@ const Settings: React.FC = () => {
             <p className="text-sm text-gray-600">Business details managed by Okuru</p>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Logo Upload */}
+            {merchantId && (
+              <LogoUpload
+                currentLogoUrl={logoUrl}
+                merchantId={merchantId}
+                onLogoUpdated={(newUrl) => setLogoUrl(newUrl)}
+              />
+            )}
+            
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Business Name</label>
               <input

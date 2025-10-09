@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import DashboardLayout from './components/layout/DashboardLayout';
@@ -20,6 +20,9 @@ import Staff from './components/staff/Staff';
 import Wallets from './components/wallets/Wallets_clean';
 import Products from './components/products/Products';
 import Payroll from './components/payroll/Payroll';
+import Storefronts from './components/storefronts/Storefronts';
+import StorefrontBuilder from './components/storefronts/StorefrontBuilder';
+import PublicStorefront from './components/storefronts/PublicStorefront';
 import SupabaseSignIn from './components/auth/SupabaseSignIn';
 import AcceptInvitation from './components/auth/AcceptInvitation';
 import ResetPassword from './components/auth/ResetPassword';
@@ -27,6 +30,43 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 
 
 function App() {
+  // Handle browser extension errors (Cardano wallets, etc.)
+  useEffect(() => {
+    const handleExtensionErrors = (event: ErrorEvent) => {
+      // Suppress errors from browser extensions
+      if (event.filename && (
+        event.filename.includes('chrome-extension://') ||
+        event.filename.includes('moz-extension://') ||
+        event.filename.includes('safari-extension://') ||
+        event.message?.includes('REQUEST_ID') ||
+        event.message?.includes('cardano') ||
+        event.message?.includes('wallet')
+      )) {
+        console.warn('Browser extension error suppressed:', event.message);
+        event.preventDefault();
+        return true;
+      }
+    };
+
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      // Suppress promise rejections from browser extensions
+      if (event.reason?.message?.includes('REQUEST_ID') ||
+          event.reason?.message?.includes('cardano') ||
+          event.reason?.message?.includes('wallet')) {
+        console.warn('Browser extension promise rejection suppressed:', event.reason);
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener('error', handleExtensionErrors);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+    return () => {
+      window.removeEventListener('error', handleExtensionErrors);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
+  }, []);
+
   return (
     <AuthProvider>
       <Router>
@@ -37,6 +77,8 @@ function App() {
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/invoice/:publicId" element={<PublicInvoice />} />
           <Route path="/pay/:publicId" element={<InvoicePayment />} />
+          <Route path="/s/:slug" element={<PublicStorefront />} />
+          <Route path="/s/:slug/checkout/:productId" element={<PublicStorefront />} />
           
           {/* Protected routes */}
           <Route path="/" element={
@@ -46,6 +88,9 @@ function App() {
           }>
             <Route index element={<Dashboard />} />
             <Route path="transactions" element={<Transactions />} />
+            <Route path="storefronts" element={<Storefronts />} />
+            <Route path="storefronts/setup" element={<StorefrontBuilder />} />
+            <Route path="storefronts/create" element={<StorefrontBuilder />} />
             <Route path="invoices" element={<Invoices />} />
             <Route path="/invoices/create" element={<InvoiceCreateModern />} />
             <Route path="invoices/:id" element={<InvoiceDetail />} />
