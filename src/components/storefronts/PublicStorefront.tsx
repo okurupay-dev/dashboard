@@ -50,6 +50,7 @@ const PublicStorefront: React.FC = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [showContactDropdown, setShowContactDropdown] = useState(false);
 
   useEffect(() => {
     loadStorefront();
@@ -58,53 +59,24 @@ const PublicStorefront: React.FC = () => {
   const loadStorefront = async () => {
     try {
       setLoading(true);
-      // TODO: Replace with actual API call
-      // const response = await fetch(`/api/storefronts/public/${slug}`);
-      // const data = await response.json();
       
-      // Mock data for now
-      const mockStorefront: Storefront = {
-        storefront_id: '1',
-        merchant_id: '1',
-        name: 'Forex Knowledge Base',
-        slug: 'forex-knowledge-base',
-        description: 'Dubai-based Global Forex Trading Community.',
-        tagline: 'Master the markets with expert guidance',
-        theme: 'dark',
-        logo_url: 'https://via.placeholder.com/80',
-        primary_color: '#3B82F6',
-        contact_email: 'support@fkb.com',
-        social_links: {
-          instagram: 'https://instagram.com/fkb',
-          twitter: 'https://twitter.com/fkb',
-          tiktok: 'https://tiktok.com/@fkb',
-          website: 'https://fkb.com'
-        },
-        refund_policy: 'Full refund within 7 days if not satisfied.',
-        terms: 'By purchasing, you agree to our terms of service.',
-        products: [
-          {
-            product_id: '1',
-            name: 'Forex Knowledge Base Free',
-            description: 'FKB Free - Access to basic trading resources and community',
-            price: 0,
-            image_url: 'https://via.placeholder.com/400x300/ef4444/ffffff?text=FKB+Free',
-            features: ['Basic Knowledge', 'Community Access', 'Weekly Updates'],
-            is_active: true
-          },
-          {
-            product_id: '2',
-            name: 'Forex Knowledge Base Premium',
-            description: 'FKB Premium - Full access to all trading strategies and signals',
-            price: 149.00,
-            image_url: 'https://via.placeholder.com/400x300/10b981/ffffff?text=FKB+Premium',
-            features: ['Full Knowledge Base', 'Live Trading Signals', 'Priority Support', '1-on-1 Mentorship'],
-            is_active: true
-          }
-        ]
-      };
+      // Fetch storefront data from backend API
+      const response = await fetch(`https://okurutest.up.railway.app/storefronts/public/${slug}`);
       
-      setStorefront(mockStorefront);
+      if (!response.ok) {
+        if (response.status === 404) {
+          setNotFound(true);
+          return;
+        }
+        throw new Error('Failed to load storefront');
+      }
+      
+      const response_data = await response.json();
+      
+      // Backend wraps response in { success: true, data: {...} }
+      const data = response_data.data || response_data;
+      
+      setStorefront(data);
     } catch (error) {
       console.error('Error loading storefront:', error);
       setNotFound(true);
@@ -113,9 +85,38 @@ const PublicStorefront: React.FC = () => {
     }
   };
 
-  const handleBuyNow = (product: Product) => {
-    // Navigate to checkout page
-    navigate(`/s/${slug}/checkout/${product.product_id}`);
+  const handleBuyNow = async (product: Product) => {
+    try {
+      // Call checkout API
+      const response = await fetch(`https://okurutest.up.railway.app/storefronts/public/${slug}/checkout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          product_id: product.product_id,
+          quantity: 1,
+          customer_email: '', // Can add email input later
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create checkout');
+      }
+
+      const data = await response.json();
+      
+      // Redirect to payment page or show payment details
+      if (data.payment_url) {
+        window.location.href = data.payment_url;
+      } else {
+        // Show payment details modal
+        alert(`Order created! Payment details:\nAmount: $${product.price}\nOrder ID: ${data.order_id}`);
+      }
+    } catch (error) {
+      console.error('Error creating checkout:', error);
+      alert('Failed to create checkout. Please try again.');
+    }
   };
 
   const handleProductClick = (product: Product) => {
@@ -128,8 +129,56 @@ const PublicStorefront: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
-        <div className="text-white">Loading storefront...</div>
+      <div className="min-h-screen bg-gray-900 animate-pulse">
+        {/* Header Skeleton */}
+        <div className="pt-16 pb-12 px-6">
+          <div className="max-w-4xl mx-auto text-center">
+            {/* Logo Skeleton */}
+            <div className="w-24 h-24 mx-auto mb-6 rounded-3xl bg-gray-800 animate-pulse"></div>
+            
+            {/* Title Skeleton */}
+            <div className="h-10 w-48 mx-auto mb-3 bg-gray-800 rounded-lg"></div>
+            
+            {/* Description Skeleton */}
+            <div className="h-6 w-64 mx-auto mb-6 bg-gray-800 rounded-lg"></div>
+            
+            {/* Button Skeleton */}
+            <div className="h-10 w-40 mx-auto bg-gray-800 rounded-lg"></div>
+          </div>
+        </div>
+
+        {/* Products Section Skeleton */}
+        <div className="px-6 pb-16">
+          <div className="max-w-4xl mx-auto">
+            {/* Products Title Skeleton */}
+            <div className="h-8 w-32 mb-8 bg-gray-800 rounded-lg"></div>
+            
+            {/* Product Cards Skeleton */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[1, 2].map((i) => (
+                <div key={i} className="rounded-2xl overflow-hidden border border-gray-800 bg-gray-800/50">
+                  {/* Image Skeleton */}
+                  <div className="h-64 bg-gradient-to-br from-gray-700 to-gray-800 animate-pulse"></div>
+                  
+                  {/* Content Skeleton */}
+                  <div className="p-5 space-y-3">
+                    <div className="h-6 w-3/4 bg-gray-700 rounded"></div>
+                    <div className="h-4 w-full bg-gray-700 rounded"></div>
+                    <div className="h-4 w-2/3 bg-gray-700 rounded"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Loading Spinner Overlay */}
+        <div className="fixed inset-0 flex items-center justify-center pointer-events-none">
+          <div className="relative">
+            <div className="w-16 h-16 border-4 border-gray-700 border-t-blue-500 rounded-full animate-spin"></div>
+            <p className="text-gray-400 text-sm mt-4 text-center">Loading storefront...</p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -154,135 +203,156 @@ const PublicStorefront: React.FC = () => {
 
   return (
     <div className={`min-h-screen ${bgClass}`}>
-      {/* Header */}
-      <header className={`${cardBgClass} border-b ${borderClass}`}>
-        <div className="max-w-6xl mx-auto px-6 py-8">
-          <div className="flex flex-col items-center text-center">
-            {/* Logo */}
-            {storefront.logo_url && (
-              <div className="w-20 h-20 rounded-2xl overflow-hidden mb-4 bg-gray-700">
-                <img src={storefront.logo_url} alt={storefront.name} className="w-full h-full object-cover" />
-              </div>
-            )}
-            
-            {/* Store Name */}
-            <h1 className={`text-3xl font-bold ${textClass} mb-2`}>
-              {storefront.name}
-            </h1>
-            
-            {/* Description */}
-            {storefront.description && (
-              <p className={`${subtextClass} text-lg mb-4`}>
-                {storefront.description}
-              </p>
-            )}
-            
-            {/* Social Links */}
-            <div className="flex items-center gap-4">
-              {storefront.social_links?.instagram && (
-                <a href={storefront.social_links.instagram} target="_blank" rel="noopener noreferrer" 
-                   className={`${subtextClass} hover:text-blue-500 transition-colors`}>
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073z"/>
-                  </svg>
-                </a>
-              )}
-              {storefront.social_links?.website && (
-                <a href={storefront.social_links.website} target="_blank" rel="noopener noreferrer"
-                   className={`${subtextClass} hover:text-blue-500 transition-colors`}>
-                  <Globe className="w-5 h-5" />
-                </a>
-              )}
+      {/* Header - Whop Style */}
+      <div className="pt-16 pb-12 px-6">
+        <div className="max-w-4xl mx-auto text-center">
+          {/* Logo */}
+          {storefront.logo_url ? (
+            <div className="w-24 h-24 mx-auto mb-6 rounded-3xl overflow-hidden bg-gray-800 border border-gray-700">
+              <img 
+                src={storefront.logo_url} 
+                alt={storefront.name} 
+                className="w-full h-full object-cover"
+              />
             </div>
-            
-            {/* Contact Seller Button */}
-            {storefront.contact_email && (
+          ) : (
+            <div className="w-24 h-24 mx-auto mb-6 rounded-3xl bg-gray-800 border border-gray-700 flex items-center justify-center">
+              <Globe className="w-12 h-12 text-gray-500" />
+            </div>
+          )}
+          
+          {/* Store Name */}
+          <h1 className={`text-4xl font-bold mb-3 ${textClass}`}>
+            {storefront.name}
+          </h1>
+          
+          {/* Description */}
+          {storefront.description && (
+            <p className={`text-base mb-4 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+              {storefront.description}
+            </p>
+          )}
+          
+          
+          {/* Social Links */}
+          <div className="flex items-center justify-center gap-4 mb-6">
+            {storefront.social_links?.instagram && (
+              <a href={storefront.social_links.instagram} target="_blank" rel="noopener noreferrer" 
+                 className={`${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'} transition-colors`}>
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073z"/>
+                </svg>
+              </a>
+            )}
+            {storefront.social_links?.twitter && (
+              <a href={storefront.social_links.twitter} target="_blank" rel="noopener noreferrer"
+                 className={`${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'} transition-colors`}>
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z"/>
+                </svg>
+              </a>
+            )}
+          </div>
+          
+          {/* Contact Seller Dropdown */}
+          {storefront.contact_email && (
+            <div className="relative">
               <button
-                onClick={() => window.location.href = `mailto:${storefront.contact_email}`}
-                className={`mt-6 flex items-center gap-2 px-4 py-2 ${isDark ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} rounded-lg transition-colors`}
+                onClick={() => setShowContactDropdown(!showContactDropdown)}
+                className={`inline-flex items-center gap-2 px-6 py-2.5 ${isDark ? 'bg-gray-800 hover:bg-gray-700 border-gray-700 text-gray-200' : 'bg-white hover:bg-gray-50 border-gray-300 text-gray-900'} border rounded-lg transition-colors text-sm font-medium`}
               >
                 <Mail className="w-4 h-4" />
-                <span className="text-sm">Contact seller</span>
+                Contact seller
               </button>
-            )}
-          </div>
+              
+              {showContactDropdown && (
+                <div className={`absolute top-full mt-2 left-1/2 -translate-x-1/2 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border rounded-lg shadow-xl p-2 min-w-[200px] z-10`}>
+                  <a
+                    href={`mailto:${storefront.contact_email}`}
+                    className={`flex items-center gap-3 px-4 py-2.5 ${isDark ? 'hover:bg-gray-700 text-gray-200' : 'hover:bg-gray-50 text-gray-900'} rounded-lg transition-colors`}
+                  >
+                    <Mail className="w-4 h-4" />
+                    <span className="text-sm">Email</span>
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      </header>
+      </div>
 
-      {/* Products Section */}
-      <main className="max-w-6xl mx-auto px-6 py-12">
-        <h2 className={`text-2xl font-bold ${textClass} mb-8`}>Products</h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {storefront.products.filter(p => p.is_active).map((product) => (
-            <div
-              key={product.product_id}
-              onClick={() => handleProductClick(product)}
-              className={`${cardBgClass} rounded-xl overflow-hidden border ${borderClass} hover:shadow-xl transition-all cursor-pointer group`}
-            >
-              {/* Product Image */}
-              <div className="relative h-64 overflow-hidden">
-                {product.image_url ? (
-                  <img 
-                    src={product.image_url} 
-                    alt={product.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                    <ShoppingCart className="w-16 h-16 text-white opacity-50" />
+      {/* Products Section - Whop Style */}
+      <div className="px-6 pb-16">
+        <div className="max-w-4xl mx-auto">
+          <h2 className={`text-2xl font-bold mb-8 text-center ${textClass}`}>Products</h2>
+          
+          {!storefront.products || storefront.products.length === 0 ? (
+            <div className={`text-center py-16 border-2 border-dashed ${isDark ? 'border-gray-800' : 'border-gray-300'} rounded-2xl`}>
+              <ShoppingCart className={`w-12 h-12 mx-auto mb-4 ${isDark ? 'text-gray-700' : 'text-gray-400'}`} />
+              <p className={isDark ? 'text-gray-500' : 'text-gray-600'}>
+                No products available yet
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {storefront.products.filter(p => p.is_active).map((product) => (
+                <div
+                  key={product.product_id}
+                  onClick={() => handleProductClick(product)}
+                  className={`group rounded-2xl overflow-hidden border cursor-pointer transition-all hover:scale-[1.02] ${
+                    isDark ? 'border-gray-800 bg-gray-800/50' : 'border-gray-200 bg-white'
+                  }`}
+                >
+                  {/* Product Image with Gradient */}
+                  <div className="relative h-64 bg-gradient-to-br from-red-500 via-pink-500 to-orange-500 flex items-center justify-center overflow-hidden">
+                    {product.image_url ? (
+                      <img 
+                        src={product.image_url} 
+                        alt={product.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="text-white text-6xl font-bold opacity-20">
+                        {product.name.substring(0, 3).toUpperCase()}
+                      </div>
+                    )}
+                    
+                    {/* Price Badge */}
+                    <div className="absolute bottom-4 right-4">
+                      <div className="bg-blue-600 text-white px-4 py-1.5 rounded-full text-sm font-semibold shadow-lg">
+                        {product.price === 0 ? 'Free' : `$${Number(product.price).toFixed(2)}/month`}
+                      </div>
+                    </div>
                   </div>
-                )}
-                
-                {/* Price Badge */}
-                <div className="absolute top-4 right-4">
-                  <div className="bg-blue-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
-                    {product.price === 0 ? 'Free' : `$${product.price.toFixed(2)}/month`}
+                  
+                  {/* Product Info */}
+                  <div className="p-5">
+                    <h3 className={`text-lg font-bold mb-2 ${textClass}`}>
+                      {product.name}
+                    </h3>
+                    <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'} line-clamp-2`}>
+                      {product.description || 'No description'}
+                    </p>
+                    
                   </div>
                 </div>
-              </div>
-              
-              {/* Product Info */}
-              <div className="p-6">
-                <h3 className={`text-xl font-bold ${textClass} mb-2`}>
-                  {product.name}
-                </h3>
-                <p className={`${subtextClass} text-sm mb-4`}>
-                  {product.description}
-                </p>
-              </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
-      </main>
+      </div>
 
-      {/* Footer */}
-      <footer className={`${cardBgClass} border-t ${borderClass} mt-20`}>
-        <div className="max-w-6xl mx-auto px-6 py-8">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className={`text-sm ${subtextClass}`}>
-              Powered by <span className="font-semibold text-blue-600">OkuruPay</span>
-            </div>
-            <div className="flex gap-6">
-              {storefront.refund_policy && (
-                <button className={`text-sm ${subtextClass} hover:text-blue-500`}>
-                  Refund Policy
-                </button>
-              )}
-              {storefront.terms && (
-                <button className={`text-sm ${subtextClass} hover:text-blue-500`}>
-                  Terms
-                </button>
-              )}
-              {storefront.contact_email && (
-                <button className={`text-sm ${subtextClass} hover:text-blue-500`}>
-                  Contact
-                </button>
-              )}
-            </div>
-          </div>
+      {/* Floating Footer Badge */}
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+        <div className="flex justify-center">
+          <img 
+            src="/poweredby.png" 
+            alt="Powered by OkuruPay" 
+            className="h-8 opacity-80 hover:opacity-100 transition-opacity cursor-pointer"
+            onClick={() => window.open('https://okurupay.com', '_blank')}
+          />
         </div>
-      </footer>
+      </div>
 
       {/* Product Detail Modal */}
       {selectedProduct && (

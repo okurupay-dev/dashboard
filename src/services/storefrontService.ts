@@ -4,6 +4,7 @@ const API_BASE_URL = 'https://okurutest.up.railway.app';
 
 export interface StorefrontConfig {
   storefront_id?: string;
+  name?: string; // Store name (from storefronts table)
   slug: string;
   description?: string;
   tagline?: string;
@@ -24,7 +25,7 @@ export interface StorefrontConfig {
   product_count?: number;
   order_count?: number;
   total_revenue?: number;
-  merchant_name?: string;
+  merchant_name?: string; // Merchant name (from merchants table, read-only)
   merchant_logo?: string;
   contact_email?: string;
   settlement_address?: string;
@@ -87,24 +88,20 @@ export const storefrontService = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify({
-        slug: config.slug,
-        description: config.description,
-        tagline: config.tagline,
-        theme: config.theme,
-        primary_color: config.primary_color,
-        banner_url: config.banner_url,
-        wallet_id: config.wallet_id,
-        social_links: config.social_links,
-        refund_policy: config.refund_policy,
-        terms: config.terms,
-        selected_products: config.selected_products
-      })
+      body: JSON.stringify(config)
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to create storefront');
+      const errorText = await response.text();
+      let errorMessage = 'Failed to create storefront';
+      try {
+        const error = JSON.parse(errorText);
+        errorMessage = error.message || error.error || errorMessage;
+      } catch {
+        errorMessage = errorText || errorMessage;
+      }
+      console.error('Create storefront error:', errorMessage);
+      throw new Error(errorMessage);
     }
 
     const result = await response.json();
@@ -153,8 +150,16 @@ export const storefrontService = {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to update storefront');
+      const errorText = await response.text();
+      let errorMessage = 'Failed to update storefront';
+      try {
+        const error = JSON.parse(errorText);
+        errorMessage = error.message || error.error || errorMessage;
+      } catch {
+        errorMessage = errorText || errorMessage;
+      }
+      console.error('Update storefront error:', errorMessage);
+      throw new Error(errorMessage);
     }
 
     const result = await response.json();

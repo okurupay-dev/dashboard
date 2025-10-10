@@ -67,11 +67,14 @@ const StorefrontBuilder: React.FC = () => {
   });
 
   const [availableProducts, setAvailableProducts] = useState<DBProduct[]>([]);
+  const [existingStorefrontId, setExistingStorefrontId] = useState<string | null>(null);
+  const [storefrontStatus, setStorefrontStatus] = useState<'draft' | 'published' | 'unpublished'>('draft');
 
-  // Load products and merchant info from database
+  // Load products, merchant info, and existing storefront from database
   useEffect(() => {
     loadProducts();
     loadMerchantInfo();
+    loadExistingStorefront();
   }, []);
 
   const loadProducts = async () => {
@@ -83,6 +86,100 @@ const StorefrontBuilder: React.FC = () => {
       console.error('Error loading products:', error);
     } finally {
       setLoadingProducts(false);
+    }
+  };
+
+  const loadExistingStorefront = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Get user's merchant_id
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('merchant_id')
+        .eq('auth_user_id', user.id)
+        .single();
+
+      if (userError || !userData?.merchant_id) {
+        console.error('Error getting merchant_id:', userError);
+        return;
+      }
+
+      // Try to load from backend API first (proper architecture)
+      try {
+        const storefront = await storefrontService.getStorefront();
+        
+        if (storefront) {
+          console.log('✅ Loaded existing storefront from API:', storefront);
+          
+          // Store the storefront ID and status for updates
+          setExistingStorefrontId(storefront.storefront_id || null);
+          setStorefrontStatus(storefront.status || 'draft');
+          
+          // Populate form with existing data
+          setConfig({
+            name: storefront.merchant_name || storefront.name || '',
+            slug: storefront.slug || '',
+            description: storefront.description || '',
+            tagline: storefront.tagline || '',
+            theme: storefront.theme || 'dark',
+            primaryColor: storefront.primary_color || '#3B82F6',
+            contact_email: storefront.contact_email || '',
+            social_links: storefront.social_links || {},
+            selectedProducts: storefront.selected_products || [],
+            refund_policy: storefront.refund_policy || '',
+            terms: storefront.terms || ''
+          });
+          return;
+        }
+      } catch (apiError: any) {
+        console.warn('⚠️ Backend API failed, falling back to direct DB query:', apiError.message);
+      }
+
+      // Fallback: Query Supabase directly if backend API is broken
+      // TODO: Remove this once backend GET endpoint is fixed
+      const { data: storefronts, error: sfError } = await supabase
+        .from('storefronts')
+        .select('*')
+        .eq('merchant_id', userData.merchant_id);
+
+      if (sfError) {
+        console.log('Could not load storefront from database:', sfError);
+        return;
+      }
+
+      if (storefronts && storefronts.length > 0) {
+        const storefront = storefronts[0];
+        console.log('✅ Loaded existing storefront from database (fallback):', storefront);
+        
+        // Store the storefront ID and status for updates
+        setExistingStorefrontId(storefront.storefront_id || null);
+        setStorefrontStatus(storefront.status || 'draft');
+        
+        // Populate form with existing data
+        const loadedConfig = {
+          name: storefront.name || '',
+          slug: storefront.slug || '',
+          description: storefront.description || '',
+          tagline: storefront.tagline || '',
+          theme: storefront.theme || 'dark',
+          primaryColor: storefront.primary_color || '#3B82F6',
+          contact_email: storefront.contact_email || '',
+          social_links: typeof storefront.social_links === 'string' 
+            ? JSON.parse(storefront.social_links) 
+            : (storefront.social_links || {}),
+          selectedProducts: storefront.selected_products || [],
+          refund_policy: storefront.refund_policy || '',
+          terms: storefront.terms || ''
+        };
+        console.log('📝 Setting config with loaded data:', loadedConfig);
+        setConfig(loadedConfig);
+      } else {
+        console.log('No existing storefront found - will create new one');
+      }
+    } catch (error) {
+      console.error('Error loading existing storefront:', error);
     }
   };
 
@@ -109,7 +206,7 @@ const StorefrontBuilder: React.FC = () => {
       // Get merchant info from database
       const { data: merchant, error } = await supabase
         .from('merchants')
-        .select('name, logo_url')
+        .select('name, logo_url, business_email')
         .eq('merchant_id', userData.merchant_id)
         .single();
 
@@ -122,6 +219,11 @@ const StorefrontBuilder: React.FC = () => {
 
       if (merchant) {
         setMerchantName(merchant.name || '');
+        
+        // Auto-populate contact email from merchant business email
+        if (merchant.business_email && !config.contact_email) {
+          updateConfig({ contact_email: merchant.business_email });
+        }
         
         // Handle Supabase storage URLs - get fresh signed URL if needed
         if (merchant.logo_url) {
@@ -242,31 +344,25 @@ const StorefrontBuilder: React.FC = () => {
 
       let storefrontId: string;
       
-      try {
-        // Try to check if storefront exists
-        const existingStorefront = await storefrontService.getStorefront();
-        
-        if (existingStorefront?.storefront_id) {
-          // Update existing storefront
-          await storefrontService.updateStorefront(existingStorefront.storefront_id, storefrontData);
-          storefrontId = existingStorefront.storefront_id;
-        } else {
-          // Create new storefront
-          const newStorefront = await storefrontService.createStorefront(storefrontData);
-          storefrontId = newStorefront.storefront_id!;
-        }
-      } catch (checkError) {
-        // If checking fails (404 or 500), assume it doesn't exist and create new
-        console.log('Could not check existing storefront, creating new one:', checkError);
+      if (existingStorefrontId) {
+        // Update existing storefront
+        console.log('Updating existing storefront:', existingStorefrontId);
+        await storefrontService.updateStorefront(existingStorefrontId, storefrontData);
+        storefrontId = existingStorefrontId;
+      } else {
+        // Create new storefront
+        console.log('Creating new storefront');
         const newStorefront = await storefrontService.createStorefront(storefrontData);
         storefrontId = newStorefront.storefront_id!;
+        setExistingStorefrontId(storefrontId);
       }
 
       // Then publish it
       await storefrontService.publishStorefront(storefrontId);
+      setStorefrontStatus('published');
       
       alert('Storefront published! Your store is now live at /s/' + config.slug);
-      navigate('/storefronts');
+      // Don't navigate away - stay on builder so they can see "Visit Store" button
     } catch (error) {
       console.error('Error publishing storefront:', error);
       alert(error instanceof Error ? error.message : 'Failed to publish storefront. Please try again.');
@@ -322,22 +418,55 @@ const StorefrontBuilder: React.FC = () => {
             </button>
           </div>
 
+          {/* Save Button - Always visible */}
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50"
           >
             <Save className="h-4 w-4" />
             {isSaving ? 'Saving...' : 'Save'}
           </button>
 
-          <button
-            onClick={handlePublish}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-          >
-            <Globe className="h-4 w-4" />
-            Publish
-          </button>
+          {/* Publish/Unpublish/Visit Store Buttons - Based on status */}
+          {storefrontStatus === 'published' ? (
+            <>
+              <button
+                onClick={() => window.open(`/s/${config.slug}`, '_blank')}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              >
+                <Globe className="h-4 w-4" />
+                Visit Store
+              </button>
+              <button
+                onClick={async () => {
+                  if (existingStorefrontId) {
+                    try {
+                      await storefrontService.unpublishStorefront(existingStorefrontId);
+                      setStorefrontStatus('draft');
+                      alert('Storefront unpublished successfully!');
+                    } catch (error) {
+                      console.error('Error unpublishing:', error);
+                      alert('Failed to unpublish. Please try again.');
+                    }
+                  }
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                <Eye className="h-4 w-4" />
+                Unpublish
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={handlePublish}
+              disabled={isSaving}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50"
+            >
+              <Globe className="h-4 w-4" />
+              Publish
+            </button>
+          )}
         </div>
       </div>
 
@@ -584,21 +713,25 @@ const StorefrontBuilder: React.FC = () => {
             {/* Settings Tab */}
             {activeTab === 'settings' && (
               <>
-                {/* Contact Email */}
+                {/* Contact Email (Read-only - uses merchant email) */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Contact Email *
+                    Contact Email
                   </label>
-                  <input
-                    type="email"
-                    value={config.contact_email}
-                    onChange={(e) => updateConfig({ contact_email: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="support@example.com"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Required for customer support
-                  </p>
+                  <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                    <p className="text-sm text-gray-600 mb-2">
+                      Your store uses your business email from Settings
+                    </p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {config.contact_email || 'No email set'}
+                    </p>
+                    <button
+                      onClick={() => navigate('/settings')}
+                      className="text-sm text-blue-600 hover:text-blue-700 font-medium mt-2"
+                    >
+                      Update email in Settings →
+                    </button>
+                  </div>
                 </div>
 
                 {/* Social Links */}

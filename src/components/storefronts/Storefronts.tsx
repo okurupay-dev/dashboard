@@ -184,140 +184,110 @@ const Storefronts: React.FC = () => {
       {storefront && (
         <div className="max-w-2xl mx-auto">
           <Card className="overflow-hidden hover:shadow-lg transition-shadow">
-              {/* Banner/Preview */}
+              {/* Header with Gradient (no banner) */}
               <div className="h-32 bg-gradient-to-br from-blue-500 to-purple-600 relative">
-                {storefront.banner_url && (
-                  <img src={storefront.banner_url} alt="" className="w-full h-full object-cover" />
-                )}
-                <div className="absolute top-3 right-3">
+                <div className="absolute top-4 right-4">
                   {getStatusBadge(storefront.status || 'draft')}
                 </div>
               </div>
 
               {/* Content */}
-              <div className="p-5">
+              <div className="p-6">
                 {/* Logo & Name */}
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-4">
                     {storefront.merchant_logo ? (
-                      <img src={storefront.merchant_logo} alt="" className="w-10 h-10 rounded-lg object-cover" />
+                      <img src={storefront.merchant_logo} alt="" className="w-14 h-14 rounded-lg object-cover border-2 border-gray-200" />
                     ) : (
-                      <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center">
-                        <Store className="h-5 w-5 text-gray-500" />
+                      <div className="w-14 h-14 bg-gray-200 rounded-lg flex items-center justify-center border-2 border-gray-300">
+                        <Store className="h-7 w-7 text-gray-500" />
                       </div>
                     )}
                     <div>
-                      <h3 className="font-semibold text-gray-900">{storefront.merchant_name || 'My Store'}</h3>
-                      <p className="text-sm text-gray-500">/{storefront.slug}</p>
+                      <h3 className="text-xl font-semibold text-gray-900">{storefront.merchant_name || 'My Store'}</h3>
+                      <p className="text-sm text-gray-500">okurupay.com/s/{storefront.slug}</p>
                     </div>
                   </div>
                   
-                  {/* Actions Dropdown */}
-                  <div className="relative">
-                    <button
-                      onClick={() => setShowDropdown(!showDropdown)}
-                      className="p-1 hover:bg-gray-100 rounded"
-                    >
-                      <MoreVertical className="h-5 w-5 text-gray-500" />
-                    </button>
-                    
-                    {showDropdown && (
-                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
-                        <button
-                          onClick={handleEditStorefront}
-                          className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                        >
-                          <SettingsIcon className="h-4 w-4 mr-2" />
-                          Configure
-                        </button>
-                        <button
-                          onClick={() => handleViewStorefront(storefront.slug)}
-                          className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                        >
-                          <ExternalLink className="h-4 w-4 mr-2" />
-                          View Store
-                        </button>
-                        <button
-                          onClick={() => handleCopyLink(storefront.slug)}
-                          className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                        >
-                          <Copy className="h-4 w-4 mr-2" />
-                          Copy Link
-                        </button>
-                        <button
-                          onClick={() => handleDownloadQR(storefront.slug)}
-                          className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                        >
-                          <QrCode className="h-4 w-4 mr-2" />
-                          Download QR
-                        </button>
-                        <button
-                          onClick={handlePublishToggle}
-                          className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 border-t"
-                        >
-                          {storefront.status === 'published' ? (
-                            <>
-                              <EyeOff className="h-4 w-4 mr-2" />
-                              Unpublish
-                            </>
-                          ) : (
-                            <>
-                              <Eye className="h-4 w-4 mr-2" />
-                              Publish
-                            </>
-                          )}
-                        </button>
-                        <button
-                          onClick={handleDeleteStorefront}
-                          className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 border-t"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  {/* Edit Button */}
+                  <button
+                    onClick={handleEditStorefront}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    title="Edit Storefront"
+                  >
+                    <Edit className="h-5 w-5 text-gray-600" />
+                  </button>
                 </div>
 
                 {/* Description */}
                 {storefront.description && (
-                  <p className="text-sm text-gray-600 mb-4 line-clamp-2">{storefront.description}</p>
+                  <p className="text-sm text-gray-600 mb-6">{storefront.description}</p>
                 )}
 
                 {/* Stats */}
-                <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
                   <div className="text-center">
-                    <div className="text-lg font-semibold text-gray-900">{storefront.product_count || 0}</div>
-                    <div className="text-xs text-gray-500">Products</div>
+                    <div className="text-2xl font-bold text-gray-900">{storefront.product_count || 0}</div>
+                    <div className="text-xs text-gray-500 mt-1">Products</div>
+                  </div>
+                  <div className="text-center border-x border-gray-200">
+                    <div className="text-2xl font-bold text-gray-900">{storefront.order_count || 0}</div>
+                    <div className="text-xs text-gray-500 mt-1">Orders</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-lg font-semibold text-gray-900">{storefront.order_count || 0}</div>
-                    <div className="text-xs text-gray-500">Orders</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-lg font-semibold text-gray-900">
+                    <div className="text-2xl font-bold text-gray-900">
                       ${(storefront.total_revenue || 0).toLocaleString()}
                     </div>
-                    <div className="text-xs text-gray-500">Revenue</div>
+                    <div className="text-xs text-gray-500 mt-1">Revenue</div>
                   </div>
                 </div>
 
-                {/* Quick Actions */}
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleViewStorefront(storefront.slug)}
-                    className="flex-1 flex items-center justify-center px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
-                  >
-                    <Globe className="h-4 w-4 mr-1" />
-                    View
-                  </button>
-                  <button
-                    onClick={() => navigate(`/storefronts/${storefront.storefront_id}/orders`)}
-                    className="flex-1 flex items-center justify-center px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-sm"
-                  >
-                    <ShoppingBag className="h-4 w-4 mr-1" />
-                    Orders
-                  </button>
+                {/* Action Buttons */}
+                <div className="space-y-3">
+                  {/* Visit Store / Publish Toggle */}
+                  {storefront.status === 'published' ? (
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => handleViewStorefront(storefront.slug)}
+                        className="flex-1 flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                      >
+                        <ExternalLink className="h-5 w-5 mr-2" />
+                        Visit Store
+                      </button>
+                      <button
+                        onClick={handlePublishToggle}
+                        className="px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+                      >
+                        <EyeOff className="h-5 w-5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handlePublishToggle}
+                      className="w-full flex items-center justify-center px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                    >
+                      <Eye className="h-5 w-5 mr-2" />
+                      Publish Store
+                    </button>
+                  )}
+
+                  {/* Secondary Actions */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => navigate(`/storefronts/${storefront.storefront_id}/orders`)}
+                      className="flex items-center justify-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+                    >
+                      <ShoppingBag className="h-4 w-4 mr-2" />
+                      Orders
+                    </button>
+                    <button
+                      onClick={() => handleCopyLink(storefront.slug)}
+                      className="flex items-center justify-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+                    >
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copy Link
+                    </button>
+                  </div>
                 </div>
               </div>
             </Card>
