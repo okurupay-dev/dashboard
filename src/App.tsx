@@ -22,7 +22,6 @@ import Products from './components/products/Products';
 import Payroll from './components/payroll/Payroll';
 import Storefronts from './components/storefronts/Storefronts';
 import StorefrontBuilder from './components/storefronts/StorefrontBuilder';
-import PublicStorefront from './components/storefronts/PublicStorefront';
 import SupabaseSignIn from './components/auth/SupabaseSignIn';
 import AcceptInvitation from './components/auth/AcceptInvitation';
 import ResetPassword from './components/auth/ResetPassword';
@@ -77,8 +76,6 @@ function App() {
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/invoice/:publicId" element={<PublicInvoice />} />
           <Route path="/pay/:publicId" element={<InvoicePayment />} />
-          <Route path="/s/:slug" element={<PublicStorefront />} />
-          <Route path="/s/:slug/checkout/:productId" element={<PublicStorefront />} />
           
           {/* Protected routes */}
           <Route path="/" element={

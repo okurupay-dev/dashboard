@@ -41,7 +41,8 @@ export interface SimpleWallet {
   provider?: any;
 }
 
-// Mock wallet provider for development/demo
+// DEPRECATED: Mock wallet provider - DO NOT USE IN PRODUCTION
+// This class generates fake addresses and should be replaced with real wallet integration
 class SimpleWalletProvider {
   private wallet: SimpleWallet | null = null;
   private isInitialized = false;
@@ -55,21 +56,9 @@ class SimpleWalletProvider {
   }
 
   async connectWallet(): Promise<SimpleWallet> {
-    if (!this.isInitialized) {
-      await this.initialize();
-    }
-
-    // For demo purposes, generate a mock wallet address
-    // In production, this would integrate with your chosen wallet SDK
-    const mockAddress = this.generateMockAddress();
-    
-    this.wallet = {
-      address: mockAddress,
-      isConnected: true,
-      provider: { /* mock provider */ }
-    };
-
-    return this.wallet;
+    // CRITICAL: This generates FAKE addresses - DO NOT USE IN PRODUCTION
+    // Replace with real wallet SDK integration
+    throw new Error('SimpleWalletProvider is deprecated - use real wallet integration');
   }
 
   async disconnectWallet(): Promise<void> {
@@ -84,48 +73,17 @@ class SimpleWalletProvider {
     return this.wallet?.isConnected || false;
   }
 
-  // Generate addresses for all supported chains
+  // DEPRECATED: Generate addresses for all supported chains
   async deriveChainAddresses(): Promise<WalletAddress[]> {
-    if (!this.wallet) {
-      throw new Error("Wallet not connected");
-    }
-
-    // In a real implementation, you would derive different addresses per chain
-    // For demo purposes, we'll use the same address across EVM chains
-    const addresses: WalletAddress[] = [];
-
-    for (const chain of SUPPORTED_CHAINS) {
-      addresses.push({
-        chain_id: chain.chain_id,
-        address: this.wallet.address,
-        status: 'unverified',
-        version: 1
-      });
-    }
-
-    return addresses;
+    throw new Error('SimpleWalletProvider is deprecated - use real wallet integration');
   }
 
-  // Sign a message (mock implementation)
+  // DEPRECATED: Sign a message (mock implementation)
   async signMessage(message: string): Promise<string> {
-    if (!this.wallet) {
-      throw new Error("Wallet not connected");
-    }
-
-    // Mock signature - in production this would use the actual wallet provider
-    const mockSignature = `0x${Buffer.from(`signed:${message}:${Date.now()}`).toString('hex')}`;
-    return mockSignature;
+    throw new Error('SimpleWalletProvider is deprecated - use real wallet integration');
   }
 
-  // Generate a mock Ethereum address for demo
-  private generateMockAddress(): string {
-    const chars = '0123456789abcdef';
-    let address = '0x';
-    for (let i = 0; i < 40; i++) {
-      address += chars[Math.floor(Math.random() * chars.length)];
-    }
-    return address;
-  }
+  // DEPRECATED: Mock address generation removed
 }
 
 // Singleton instance

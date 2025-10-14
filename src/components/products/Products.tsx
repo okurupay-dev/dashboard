@@ -18,7 +18,8 @@ import {
   CheckCircle,
   Loader2,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  X
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
@@ -40,6 +41,8 @@ interface Product {
   tax_rate?: number;
   stock_quantity?: number;
   low_stock_threshold?: number;
+  image_url?: string;
+  image_urls?: string[]; // Support multiple images
   is_active: boolean;
   is_taxable?: boolean;
   track_inventory?: boolean;
@@ -68,13 +71,13 @@ const Products: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showAddModal, setShowAddModal] = useState(false);
-  
-  // Debug: Add console log to track modal state
-  console.log('🔍 showAddModal state:', showAddModal);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
   const [showOptionalFields, setShowOptionalFields] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [newProduct, setNewProduct] = useState({
     item_name: '',
     variation_name: '',
@@ -87,6 +90,10 @@ const Products: React.FC = () => {
     weight: '',
     tax_name: '',
     tax_rate: '',
+    image_url: '',
+    image_urls: [] as string[],
+    features: '',
+    stock_quantity: '',
     is_active: true,
     is_taxable: true,
     track_inventory: true,
@@ -127,59 +134,6 @@ const Products: React.FC = () => {
     }
   ]);
 
-  // Sample product data for demonstration
-  const sampleProducts: Product[] = [
-    {
-      product_id: '1',
-      merchant_id: merchantData?.merchant_id || '',
-      item_name: 'Premium Coffee Blend',
-      name: 'Premium Coffee Blend',
-      description: 'Artisan roasted coffee beans from Colombia',
-      sku: 'COFFEE-001',
-      barcode: '1234567890123',
-      price: 24.99,
-      cost: 12.50,
-      category: 'Beverages',
-      stock_quantity: 150,
-      low_stock_threshold: 20,
-      is_active: true,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    },
-    {
-      product_id: '2',
-      merchant_id: merchantData?.merchant_id || '',
-      item_name: 'Organic Tea Selection',
-      name: 'Organic Tea Selection',
-      description: 'Assorted organic tea bags',
-      sku: 'TEA-002',
-      price: 18.99,
-      cost: 9.25,
-      category: 'Beverages',
-      stock_quantity: 5,
-      low_stock_threshold: 10,
-      is_active: true,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    },
-    {
-      product_id: '3',
-      merchant_id: merchantData?.merchant_id || '',
-      item_name: 'Chocolate Croissant',
-      name: 'Chocolate Croissant',
-      description: 'Fresh baked pastry with chocolate filling',
-      sku: 'PASTRY-003',
-      price: 4.50,
-      cost: 2.25,
-      category: 'Bakery',
-      stock_quantity: 25,
-      low_stock_threshold: 5,
-      is_active: true,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }
-  ];
-
   // Load products from database
   useEffect(() => {
     loadProducts();
@@ -200,9 +154,9 @@ const Products: React.FC = () => {
         .order('created_at', { ascending: false });
 
       if (dbError) {
-        console.log('Products table not available, using sample data:', dbError);
-        // Use sample data if database table doesn't exist
-        setProducts(sampleProducts);
+        console.error('Products table error:', dbError);
+        setError('Failed to load products from database');
+        setProducts([]);
       } else {
         console.log(`✅ Loaded ${dbProducts?.length || 0} products from database`);
         setProducts(dbProducts || []);
@@ -210,10 +164,208 @@ const Products: React.FC = () => {
     } catch (error) {
       console.error('Error loading products:', error);
       setError('Failed to load products');
-      // Fallback to sample data
-      setProducts(sampleProducts);
+      setProducts([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Handle image upload to Supabase Storage (supports up to 3 images)
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !userData?.merchant_id) return;
+
+    // Check if already at max images
+    if (newProduct.image_urls.length >= 3) {
+      alert('Maximum 3 images allowed');
+      return;
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select a valid image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image size must be less than 5MB');
+      return;
+    }
+
+    try {
+      setUploadingImage(true);
+
+      // Create unique filename
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${userData.merchant_id}/${Date.now()}.${fileExt}`;
+
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('product-images')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) {
+        console.error('Upload error:', error);
+        alert('Failed to upload image. Please try again.');
+        return;
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(fileName);
+
+      // Add to image_urls array and set first image as primary
+      setNewProduct(prev => ({
+        ...prev,
+        image_urls: [...prev.image_urls, publicUrl],
+        image_url: prev.image_urls.length === 0 ? publicUrl : prev.image_url // Set first image as primary
+      }));
+      console.log('✅ Image uploaded successfully:', publicUrl);
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      alert('Failed to upload image');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  // Remove image from array
+  const handleRemoveImage = (indexToRemove: number) => {
+    setNewProduct(prev => {
+      const newImageUrls = prev.image_urls.filter((_, index) => index !== indexToRemove);
+      return {
+        ...prev,
+        image_urls: newImageUrls,
+        image_url: newImageUrls[0] || '' // Update primary image
+      };
+    });
+  };
+
+  // Handle edit product
+  const handleEditProduct = (product: Product) => {
+    setEditingProduct(product);
+    setNewProduct({
+      item_name: product.item_name || product.name || '',
+      variation_name: product.variation_name || '',
+      description: product.description || '',
+      sku: product.sku,
+      price: product.price.toString(),
+      cost: product.cost?.toString() || '',
+      category: product.category || '',
+      barcode: product.barcode || '',
+      weight: product.weight?.toString() || '',
+      tax_name: product.tax_name || '',
+      tax_rate: product.tax_rate?.toString() || '',
+      image_url: product.image_url || '',
+      image_urls: product.image_urls || [],
+      features: product.metadata?.features?.join('\n') || '',
+      stock_quantity: product.stock_quantity?.toString() || '',
+      is_active: product.is_active,
+      is_taxable: product.is_taxable || false,
+      track_inventory: product.track_inventory || false,
+      allow_backorders: product.allow_backorders || false
+    });
+    setShowEditModal(true);
+  };
+
+  // Handle update product
+  const handleUpdateProduct = async () => {
+    if (!userData?.merchant_id || !editingProduct) return;
+    
+    try {
+      // Validate required fields
+      if (!newProduct.item_name || !newProduct.price) {
+        alert('Please fill in all required fields: Item Name and Price');
+        return;
+      }
+
+      // Convert features string to array
+      const featuresArray = newProduct.features
+        ? newProduct.features.split('\n').filter(f => f.trim())
+        : undefined;
+
+      const productToUpdate = {
+        item_name: newProduct.item_name,
+        variation_name: newProduct.variation_name || null,
+        sku: newProduct.sku,
+        description: newProduct.description || null,
+        category: newProduct.category || null,
+        price: parseFloat(newProduct.price) || 0,
+        cost: newProduct.cost ? parseFloat(newProduct.cost) : null,
+        barcode: newProduct.barcode || null,
+        weight: newProduct.weight ? parseFloat(newProduct.weight) : null,
+        tax_name: newProduct.tax_name || null,
+        tax_rate: newProduct.tax_rate ? parseFloat(newProduct.tax_rate) : 0,
+        image_url: newProduct.image_url || null,
+        image_urls: newProduct.image_urls.length > 0 ? newProduct.image_urls : null,
+        stock_quantity: newProduct.stock_quantity ? parseInt(newProduct.stock_quantity) : null,
+        is_active: newProduct.is_active,
+        is_taxable: newProduct.is_taxable,
+        track_inventory: newProduct.track_inventory,
+        allow_backorders: newProduct.allow_backorders,
+        is_variation: !!newProduct.variation_name,
+        metadata: featuresArray ? { features: featuresArray } : null,
+        updated_at: new Date().toISOString()
+      };
+
+      console.log('📝 Updating product:', productToUpdate);
+
+      // Update in database
+      const { data, error } = await supabase
+        .from('products')
+        .update(productToUpdate)
+        .eq('product_id', editingProduct.product_id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Error updating product:', error);
+        alert(`Failed to update product: ${error.message}`);
+        return;
+      }
+
+      console.log('✅ Product updated:', data);
+
+      // Update local state
+      setProducts(prev => prev.map(p => 
+        p.product_id === editingProduct.product_id ? data : p
+      ));
+      
+      // Reset form and close modal
+      setNewProduct({
+        item_name: '',
+        variation_name: '',
+        description: '',
+        sku: '',
+        price: '',
+        cost: '',
+        category: '',
+        barcode: '',
+        weight: '',
+        tax_name: '',
+        tax_rate: '',
+        image_url: '',
+        image_urls: [] as string[],
+        features: '',
+        stock_quantity: '',
+        is_active: true,
+        is_taxable: true,
+        track_inventory: true,
+        allow_backorders: false
+      });
+      setShowEditModal(false);
+      setEditingProduct(null);
+      setShowOptionalFields(false);
+      
+      console.log('✅ Product updated successfully');
+    } catch (error) {
+      console.error('❌ Error updating product:', error);
+      alert('Failed to update product. Please try again.');
     }
   };
 
@@ -233,30 +385,64 @@ const Products: React.FC = () => {
     
     try {
       // Validate required fields
-      if (!newProduct.item_name || !newProduct.sku || !newProduct.price) {
-        alert('Please fill in all required fields: Item Name, SKU, and Price');
+      if (!newProduct.item_name || !newProduct.price) {
+        alert('Please fill in all required fields: Item Name and Price');
         return;
       }
 
-      const productToAdd: Product = {
-        ...newProduct,
-        product_id: `manual-${Date.now()}`,
+      // Auto-generate SKU if not provided (useful for services)
+      const finalSku = newProduct.sku || `SKU-${Date.now()}`;
+
+      // Convert features string to array (split by newlines)
+      const featuresArray = newProduct.features
+        ? newProduct.features.split('\n').filter(f => f.trim())
+        : undefined;
+
+      const productToAdd = {
         merchant_id: userData.merchant_id,
-        name: newProduct.item_name, // For backward compatibility
+        item_name: newProduct.item_name,
+        variation_name: newProduct.variation_name || null,
+        sku: finalSku,
+        description: newProduct.description || null,
+        category: newProduct.category || null,
         price: parseFloat(newProduct.price) || 0,
-        cost: parseFloat(newProduct.cost) || 0,
-        weight: parseFloat(newProduct.weight) || 0,
-        tax_rate: parseFloat(newProduct.tax_rate) || 0,
-        stock_quantity: 0,
-        low_stock_threshold: 5,
+        cost: newProduct.cost ? parseFloat(newProduct.cost) : null,
+        barcode: newProduct.barcode || null,
+        weight: newProduct.weight ? parseFloat(newProduct.weight) : null,
+        tax_name: newProduct.tax_name || null,
+        tax_rate: newProduct.tax_rate ? parseFloat(newProduct.tax_rate) : 0,
+        image_url: newProduct.image_url || null,
+        image_urls: newProduct.image_urls.length > 0 ? newProduct.image_urls : null,
+        is_active: newProduct.is_active,
+        is_taxable: newProduct.is_taxable,
+        track_inventory: newProduct.track_inventory,
+        allow_backorders: newProduct.allow_backorders,
         is_variation: !!newProduct.variation_name,
         import_source: 'manual',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        metadata: featuresArray ? { features: featuresArray } : null
+        // created_by removed - foreign key constraint issue
       };
 
-      // Add to local state (in production, would save to database)
-      setProducts(prev => [...prev, productToAdd]);
+      console.log('📦 Product data being sent to database:', productToAdd);
+      console.log('📝 Description value:', newProduct.description);
+
+      // Save to database
+      const { data, error } = await supabase
+        .from('products')
+        .insert([productToAdd])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Error saving product:', error);
+        alert(`Failed to save product: ${error.message}`);
+        return;
+      }
+
+      console.log('✅ Product saved to database:', data);
+
+      // Add to local state for immediate UI update
+      setProducts(prev => [data, ...prev]);
       
       // Reset form and close modal
       setNewProduct({
@@ -271,6 +457,10 @@ const Products: React.FC = () => {
         weight: '',
         tax_name: '',
         tax_rate: '',
+        image_url: '',
+        image_urls: [] as string[],
+        features: '',
+        stock_quantity: '',
         is_active: true,
         is_taxable: true,
         track_inventory: true,
@@ -656,15 +846,27 @@ const Products: React.FC = () => {
                   {paginatedProducts.map((product) => (
                     <tr key={product.product_id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {product.name}
-                          </div>
-                          {product.description && (
-                            <div className="text-sm text-gray-500 truncate max-w-xs">
-                              {product.description}
-                            </div>
+                        <div className="flex items-center gap-3">
+                          {product.image_url && (
+                            <img 
+                              src={product.image_url} 
+                              alt={product.item_name || product.name || ''}
+                              className="w-10 h-10 rounded-lg object-cover"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
                           )}
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {product.item_name || product.name}
+                            </div>
+                            {product.description && (
+                              <div className="text-sm text-gray-500 truncate max-w-xs">
+                                {product.description}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -681,7 +883,7 @@ const Products: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <span className="text-sm text-gray-900 mr-2">
-                            {product.stock_quantity || 0}
+                            {product.stock_quantity !== null && product.stock_quantity !== undefined ? product.stock_quantity : 'N/A'}
                           </span>
                           {product.low_stock_threshold && 
                            (product.stock_quantity || 0) <= product.low_stock_threshold && (
@@ -699,7 +901,11 @@ const Products: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex justify-end space-x-2">
-                          <Button size="sm" variant="outline">
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleEditProduct(product)}
+                          >
                             <Edit className="h-3 w-3" />
                           </Button>
                           <Button size="sm" variant="outline" className="text-red-600 hover:text-red-800">
@@ -841,6 +1047,10 @@ const Products: React.FC = () => {
                     weight: '',
                     tax_name: '',
                     tax_rate: '',
+                    image_url: '',
+                    image_urls: [] as string[],
+                    features: '',
+                    stock_quantity: '',
                     is_active: true,
                     is_taxable: true,
                     track_inventory: true,
@@ -870,15 +1080,18 @@ const Products: React.FC = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    SKU <span className="text-red-500">*</span>
+                    SKU
                   </label>
                   <input
                     type="text"
                     value={newProduct.sku}
                     onChange={(e) => setNewProduct(prev => ({ ...prev, sku: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter SKU"
+                    placeholder="Auto-generated if empty"
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Leave empty for services - will auto-generate
+                  </p>
                 </div>
 
                 <div>
@@ -1033,6 +1246,92 @@ const Products: React.FC = () => {
                         placeholder="0.00"
                       />
                     </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Stock Quantity
+                      </label>
+                      <input
+                        type="number"
+                        value={newProduct.stock_quantity}
+                        onChange={(e) => setNewProduct(prev => ({ ...prev, stock_quantity: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Image Upload */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Product Images (Up to 3)
+                    </label>
+                    
+                    {/* Image Preview Grid */}
+                    {newProduct.image_urls.length > 0 && (
+                      <div className="grid grid-cols-3 gap-3 mb-3">
+                        {newProduct.image_urls.map((url, index) => (
+                          <div key={index} className="relative group">
+                            <img 
+                              src={url} 
+                              alt={`Product ${index + 1}`} 
+                              className="w-full h-24 object-cover rounded-lg border-2 border-gray-200"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveImage(index)}
+                              className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                            {index === 0 && (
+                              <span className="absolute bottom-1 left-1 bg-blue-500 text-white text-xs px-2 py-0.5 rounded">
+                                Primary
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Upload Button */}
+                    {newProduct.image_urls.length < 3 && (
+                      <div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          disabled={uploadingImage}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          {uploadingImage ? 'Uploading...' : `${newProduct.image_urls.length}/3 images. Max 5MB each. JPG, PNG, or WebP`}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {newProduct.image_urls.length >= 3 && (
+                      <p className="text-xs text-gray-600 bg-gray-100 p-2 rounded">
+                        Maximum 3 images reached. Remove an image to add a new one.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Features */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Features (for storefront)
+                    </label>
+                    <textarea
+                      value={newProduct.features}
+                      onChange={(e) => setNewProduct(prev => ({ ...prev, features: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      rows={4}
+                      placeholder="Enter features, one per line:&#10;✓ Feature 1&#10;✓ Feature 2&#10;✓ Feature 3"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Add one feature per line. These will appear as bullet points on your storefront.
+                    </p>
                   </div>
 
                   {/* Checkboxes */}
@@ -1111,6 +1410,10 @@ const Products: React.FC = () => {
                       weight: '',
                       tax_name: '',
                       tax_rate: '',
+                      image_url: '',
+                      image_urls: [] as string[],
+                      features: '',
+                      stock_quantity: '',
                       is_active: true,
                       is_taxable: true,
                       track_inventory: true,
@@ -1123,10 +1426,357 @@ const Products: React.FC = () => {
                 <Button
                   onClick={handleAddProduct}
                   className="bg-blue-600 hover:bg-blue-700"
-                  disabled={!newProduct.item_name || !newProduct.sku || !newProduct.price}
+                  disabled={!newProduct.item_name || !newProduct.price}
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Product
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Product Modal */}
+      {showEditModal && editingProduct && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold">Edit Product</h2>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditingProduct(null);
+                  setShowOptionalFields(false);
+                }}
+              >
+                ×
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Same form fields as Add Product */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Item Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newProduct.item_name}
+                    onChange={(e) => setNewProduct(prev => ({ ...prev, item_name: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter product name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    SKU
+                  </label>
+                  <input
+                    type="text"
+                    value={newProduct.sku}
+                    disabled
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600 cursor-not-allowed"
+                    placeholder="Product SKU"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    SKU cannot be changed after product creation
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Price <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={newProduct.price}
+                    onChange={(e) => setNewProduct(prev => ({ ...prev, price: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="0.00"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Category
+                  </label>
+                  <select
+                    value={newProduct.category}
+                    onChange={(e) => setNewProduct(prev => ({ ...prev, category: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select category</option>
+                    {categories.map((category) => (
+                      <option key={category} value={category}>
+                        {category}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={newProduct.description}
+                  onChange={(e) => setNewProduct(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={3}
+                  placeholder="Enter product description"
+                />
+              </div>
+
+              {/* Optional Fields Toggle */}
+              <div className="border-t pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowOptionalFields(!showOptionalFields)}
+                  className="w-full flex items-center justify-center"
+                >
+                  {showOptionalFields ? (
+                    <>
+                      <ChevronUp className="h-4 w-4 mr-2" />
+                      Hide Optional Fields
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="h-4 w-4 mr-2" />
+                      Show Optional Fields
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* Optional Fields */}
+              {showOptionalFields && (
+                <div className="space-y-4 border-t pt-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Variation Name
+                      </label>
+                      <input
+                        type="text"
+                        value={newProduct.variation_name}
+                        onChange={(e) => setNewProduct(prev => ({ ...prev, variation_name: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g., Size Large, Color Red"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Cost
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={newProduct.cost}
+                        onChange={(e) => setNewProduct(prev => ({ ...prev, cost: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="0.00"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Barcode
+                      </label>
+                      <input
+                        type="text"
+                        value={newProduct.barcode}
+                        onChange={(e) => setNewProduct(prev => ({ ...prev, barcode: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter barcode"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Weight (lbs)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={newProduct.weight}
+                        onChange={(e) => setNewProduct(prev => ({ ...prev, weight: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="0.00"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Stock Quantity
+                      </label>
+                      <input
+                        type="number"
+                        value={newProduct.stock_quantity}
+                        onChange={(e) => setNewProduct(prev => ({ ...prev, stock_quantity: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Image Upload */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Product Images (Up to 3)
+                    </label>
+                    
+                    {/* Image Preview Grid */}
+                    {newProduct.image_urls.length > 0 && (
+                      <div className="grid grid-cols-3 gap-3 mb-3">
+                        {newProduct.image_urls.map((url, index) => (
+                          <div key={index} className="relative group">
+                            <img 
+                              src={url} 
+                              alt={`Product ${index + 1}`} 
+                              className="w-full h-24 object-cover rounded-lg border-2 border-gray-200"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveImage(index)}
+                              className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                            {index === 0 && (
+                              <span className="absolute bottom-1 left-1 bg-blue-500 text-white text-xs px-2 py-0.5 rounded">
+                                Primary
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Upload Button */}
+                    {newProduct.image_urls.length < 3 && (
+                      <div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          disabled={uploadingImage}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          {uploadingImage ? 'Uploading...' : `${newProduct.image_urls.length}/3 images. Max 5MB each. JPG, PNG, or WebP`}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {newProduct.image_urls.length >= 3 && (
+                      <p className="text-xs text-gray-600 bg-gray-100 p-2 rounded">
+                        Maximum 3 images reached. Remove an image to add a new one.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Features */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Features (for storefront)
+                    </label>
+                    <textarea
+                      value={newProduct.features}
+                      onChange={(e) => setNewProduct(prev => ({ ...prev, features: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      rows={4}
+                      placeholder="Enter features, one per line:&#10;✓ Feature 1&#10;✓ Feature 2&#10;✓ Feature 3"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Add one feature per line. These will appear as bullet points on your storefront.
+                    </p>
+                  </div>
+
+                  {/* Checkboxes */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="edit_is_active"
+                        checked={newProduct.is_active}
+                        onChange={(e) => setNewProduct(prev => ({ ...prev, is_active: e.target.checked }))}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="edit_is_active" className="ml-2 block text-sm text-gray-700">
+                        Active Product
+                      </label>
+                    </div>
+
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="edit_is_taxable"
+                        checked={newProduct.is_taxable}
+                        onChange={(e) => setNewProduct(prev => ({ ...prev, is_taxable: e.target.checked }))}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="edit_is_taxable" className="ml-2 block text-sm text-gray-700">
+                        Taxable
+                      </label>
+                    </div>
+
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="edit_track_inventory"
+                        checked={newProduct.track_inventory}
+                        onChange={(e) => setNewProduct(prev => ({ ...prev, track_inventory: e.target.checked }))}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="edit_track_inventory" className="ml-2 block text-sm text-gray-700">
+                        Track Inventory
+                      </label>
+                    </div>
+
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="edit_allow_backorders"
+                        checked={newProduct.allow_backorders}
+                        onChange={(e) => setNewProduct(prev => ({ ...prev, allow_backorders: e.target.checked }))}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="edit_allow_backorders" className="ml-2 block text-sm text-gray-700">
+                        Allow Backorders
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex justify-end space-x-2 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingProduct(null);
+                    setShowOptionalFields(false);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleUpdateProduct}
+                  className="bg-blue-600 hover:bg-blue-700"
+                  disabled={!newProduct.item_name || !newProduct.price}
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Update Product
                 </Button>
               </div>
             </div>

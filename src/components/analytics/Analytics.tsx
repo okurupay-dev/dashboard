@@ -247,7 +247,7 @@ const Analytics: React.FC = () => {
   }, [userData?.auth_user_id]);
 
 
-  // Function to generate revenue trend chart
+  // Function to generate revenue trend chart with smart scaling
   const renderRevenueChart = () => {
     if (!data.monthlyTrends || data.monthlyTrends.length === 0) {
       return (
@@ -266,24 +266,79 @@ const Analytics: React.FC = () => {
         </div>
       );
     }
+
+    // Smart scaling thresholds
+    const getScaleMax = (maxValue: number): number => {
+      const thresholds = [
+        1000,    // $1k
+        2500,    // $2.5k
+        5000,    // $5k
+        10000,   // $10k
+        25000,   // $25k
+        50000,   // $50k
+        100000,  // $100k
+        250000,  // $250k
+        500000,  // $500k
+        1000000, // $1M
+        2500000, // $2.5M
+        5000000, // $5M
+        10000000 // $10M
+      ];
+      
+      // Find the first threshold that's greater than maxValue
+      const scaleMax = thresholds.find(threshold => threshold >= maxValue);
+      return scaleMax || Math.ceil(maxValue / 1000000) * 1000000; // Fallback for very large values
+    };
+
+    const scaleMax = getScaleMax(maxRevenue);
     
     return (
-      <div className="flex items-end h-64 gap-4 mt-4">
-        {data.monthlyTrends.map((item: MonthlyData, index: number) => {
-          const height = maxRevenue > 0 ? (item.revenue / maxRevenue) * 100 : 0;
-          return (
-            <div key={index} className="flex flex-col items-center flex-1">
-              <div 
-                className="w-full bg-blue-500 rounded-t-md" 
-                style={{ height: `${Math.max(height, 1)}%`, minHeight: '4px' }}
-              ></div>
-              <div className="mt-2 text-xs font-medium">{item.month}</div>
-              <div className="text-xs text-gray-500">
+      <div className="h-64 mt-4">
+        {/* Y-axis scale indicator */}
+        <div className="flex justify-end mb-2 px-2">
+          <span className="text-xs text-gray-400">
+            Scale: $0 - ${scaleMax >= 1000000 ? `${(scaleMax / 1000000).toFixed(1)}M` : scaleMax >= 1000 ? `${(scaleMax / 1000).toFixed(0)}k` : scaleMax}
+          </span>
+        </div>
+        
+        <div className="relative h-48 mb-4">
+          <div className="absolute bottom-0 left-0 right-0 flex items-end justify-between gap-3 px-2 h-full">
+            {data.monthlyTrends.map((item: MonthlyData, index: number) => {
+              const heightPercent = scaleMax > 0 ? Math.max((item.revenue / scaleMax) * 100, 3) : 3;
+              const heightPx = Math.max((heightPercent / 100) * 192, 6); // 192px = h-48
+              
+              return (
+                <div key={index} className="flex flex-col items-center flex-1">
+                  <div 
+                    className="w-full bg-gradient-to-t from-blue-600 to-blue-400 rounded-t-md shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer relative group mx-auto"
+                    style={{ 
+                      height: `${heightPx}px`,
+                      maxWidth: '40px',
+                      width: '100%'
+                    }}
+                  >
+                    {/* Tooltip on hover */}
+                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                      ${item.revenue >= 1000 ? `${(item.revenue / 1000).toFixed(1)}k` : item.revenue.toFixed(0)}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        
+        {/* Month labels and amounts */}
+        <div className="flex justify-between px-2">
+          {data.monthlyTrends.map((item: MonthlyData, index: number) => (
+            <div key={index} className="flex flex-col items-center flex-1 text-center">
+              <div className="text-xs font-medium text-gray-700">{item.month}</div>
+              <div className="text-xs text-gray-500 mt-1">
                 {item.revenue >= 1000 ? `$${(item.revenue / 1000).toFixed(1)}k` : `$${item.revenue.toFixed(0)}`}
               </div>
             </div>
-          );
-        })}
+          ))}
+        </div>
       </div>
     );
   };

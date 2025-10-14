@@ -126,40 +126,4 @@ export const getWalletSetupStatus = async (
   }
 };
 
-// Sample data for development (when API is not available)
-export const sampleWalletData: MerchantWallet = {
-  wallet_id: "wallet-123",
-  merchant_id: "merchant-123",
-  web3auth_user_id: "web3auth-user-123",
-  created_at: "2024-01-15T10:30:00Z",
-  addresses: [
-    {
-      chain_id: "1",
-      address: "0x742d35Cc6634C0532925a3b8D4B9C7CB4F2F3456",
-      status: "verified",
-      verified_at: "2024-01-15T11:00:00Z",
-      signature_ref: "sig-eth-123",
-      explorer_url: "https://etherscan.io/address/0x742d35Cc6634C0532925a3b8D4B9C7CB4F2F3456",
-      version: 1
-    },
-    {
-      chain_id: "137",
-      address: "0x742d35Cc6634C0532925a3b8D4B9C7CB4F2F3456",
-      status: "unverified",
-      version: 1
-    },
-    {
-      chain_id: "56",
-      address: "0x742d35Cc6634C0532925a3b8D4B9C7CB4F2F3456",
-      status: "unverified",
-      version: 1
-    }
-  ]
-};
-
-export const sampleWalletSetupStatus = {
-  wallet_created: true,
-  chains_verified: 1,
-  total_enabled_chains: 3,
-  is_complete: true
-};
+// Note: Sample data removed - use real wallet API integration only

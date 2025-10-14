@@ -41,11 +41,12 @@ const PublicInvoice: React.FC = () => {
     }
   };
 
-  const mockPaymentAddress = "0x742d35Cc6635C0532925a3b8D8B8F8D8E8F8D8E8";
-  const mockQRData = `ethereum:${mockPaymentAddress}?value=${invoice.total_amount}&token=USDC`;
+  // Payment data should come from the invoice object from backend
+  const paymentAddress = invoice.payment_address || "Payment address not available";
+  const qrData = invoice.qr_code_data || `Payment data not available`;
 
   const handleCopyAddress = () => {
-    navigator.clipboard.writeText(mockPaymentAddress);
+    navigator.clipboard.writeText(paymentAddress);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -313,7 +314,7 @@ const PublicInvoice: React.FC = () => {
                         <div className="bg-white/5 rounded-2xl p-8 text-center backdrop-blur-sm border border-white/10">
                           <div className="bg-white rounded-2xl p-6 inline-block mb-6">
                             <QRCodeSVG
-                              value={mockQRData}
+                              value={qrData}
                               size={200}
                               className="mx-auto"
                               includeMargin={true}
@@ -338,7 +339,7 @@ const PublicInvoice: React.FC = () => {
                           <div className="flex items-center space-x-3">
                             <input
                               type="text"
-                              value={mockPaymentAddress}
+                              value={paymentAddress}
                               readOnly
                               className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white font-mono text-sm backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
                             />

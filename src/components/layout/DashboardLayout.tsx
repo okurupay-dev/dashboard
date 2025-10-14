@@ -145,7 +145,6 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       items: [
         { path: '/storefronts', label: 'Storefronts', icon: Store, showIndicator: false, isSubItem: false },
         { path: '/invoices', label: 'Invoices', icon: FileText, showIndicator: false, isSubItem: false },
-        { path: '/staff', label: 'Staff', icon: Users, showIndicator: false, isSubItem: false },
         { path: '/terminals', label: 'Terminals', icon: Monitor, showIndicator: false, isSubItem: false },
         { path: '/terminals/virtual', label: 'Virtual Terminals', icon: Smartphone, showIndicator: false, isSubItem: false }
       ]
@@ -166,6 +165,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       icon: BarChart3,
       items: [
         { path: '/products', label: 'Products', icon: Package, showIndicator: false, isSubItem: false },
+        { path: '/staff', label: 'Staff', icon: Users, showIndicator: false, isSubItem: false },
         { path: '/analytics', label: 'Analytics', icon: BarChart3, showIndicator: false, isSubItem: false },
         { path: '/reports', label: 'Reports', icon: FileText, showIndicator: false, isSubItem: false }
       ]
@@ -371,10 +371,10 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
               <img 
                 src={merchantInfo.logoUrl} 
                 alt={`${merchantInfo.name} Logo`} 
-                className="h-5 w-auto mr-1.5" 
+                className="h-7 w-auto mr-2" 
               />
             ) : null}
-            <span className="text-sm font-medium text-gray-700">{merchantInfo.name}</span>
+            <span className="text-lg font-bold text-gray-800">{merchantInfo.name}</span>
           </div>
         </div>
         

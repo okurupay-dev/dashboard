@@ -257,10 +257,7 @@ const Dashboard = () => {
     merchant: {
       ...dashboardData.merchant,
       locations: dashboardData.locations,
-      contracts: [
-        { address: '0x1234...5678', name: 'Main Contract', rules: 3, explorer: 'https://etherscan.io/address/0x1234' },
-        { address: '0x8765...4321', name: 'Secondary Contract', rules: 1, explorer: 'https://etherscan.io/address/0x8765' }
-      ]
+      contracts: [] // Load real contract data from backend API
     },
     stats: dashboardData.stats,
     recentTransactions: dashboardData.recentTransactions,

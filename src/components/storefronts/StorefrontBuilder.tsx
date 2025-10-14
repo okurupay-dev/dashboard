@@ -17,12 +17,14 @@ import {
   Plus,
   Trash2,
   ExternalLink,
-  Store
+  Store,
+  Mail
 } from 'lucide-react';
 import { Card } from '../ui/card';
 import { productService, Product as DBProduct } from '../../services/productService';
 import { supabase } from '../../lib/supabase';
 import { storefrontService } from '../../services/storefrontService';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface StorefrontConfig {
   name: string;
@@ -45,6 +47,7 @@ interface StorefrontConfig {
 
 const StorefrontBuilder: React.FC = () => {
   const navigate = useNavigate();
+  const { userData } = useAuth();
   const [activeTab, setActiveTab] = useState<'design' | 'products' | 'settings'>('design');
   const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
   const [isSaving, setIsSaving] = useState(false);
@@ -70,11 +73,18 @@ const StorefrontBuilder: React.FC = () => {
   const [existingStorefrontId, setExistingStorefrontId] = useState<string | null>(null);
   const [storefrontStatus, setStorefrontStatus] = useState<'draft' | 'published' | 'unpublished'>('draft');
 
-  // Load products, merchant info, and existing storefront from database
+  // Load products, merchant info, and existing storefront in parallel
   useEffect(() => {
-    loadProducts();
-    loadMerchantInfo();
-    loadExistingStorefront();
+    const loadAllData = async () => {
+      // Load all data in parallel for faster loading
+      await Promise.all([
+        loadProducts(),
+        loadMerchantInfo(),
+        loadExistingStorefront()
+      ]);
+    };
+    
+    loadAllData();
   }, []);
 
   const loadProducts = async () => {
@@ -111,7 +121,9 @@ const StorefrontBuilder: React.FC = () => {
         const storefront = await storefrontService.getStorefront();
         
         if (storefront) {
-          console.log('✅ Loaded existing storefront from API:', storefront);
+          if (process.env.NODE_ENV === 'development') {
+            console.log('✅ Loaded existing storefront from API:', storefront);
+          }
           
           // Store the storefront ID and status for updates
           setExistingStorefrontId(storefront.storefront_id || null);
@@ -157,6 +169,11 @@ const StorefrontBuilder: React.FC = () => {
         setExistingStorefrontId(storefront.storefront_id || null);
         setStorefrontStatus(storefront.status || 'draft');
         
+        // Load storefront logo if it exists
+        if (storefront.logo_url) {
+          setMerchantLogo(storefront.logo_url);
+        }
+        
         // Populate form with existing data
         const loadedConfig = {
           name: storefront.name || '',
@@ -173,6 +190,23 @@ const StorefrontBuilder: React.FC = () => {
           refund_policy: storefront.refund_policy || '',
           terms: storefront.terms || ''
         };
+        
+        console.log('📋 Loaded config from database:', loadedConfig);
+        console.log('🛍️ Loaded selected products:', storefront.selected_products);
+        
+        // Load selected products from storefront_products table
+        const { data: storefrontProducts, error: productsError } = await supabase
+          .from('storefront_products')
+          .select('product_id')
+          .eq('storefront_id', storefront.storefront_id)
+          .order('display_order');
+
+        if (!productsError && storefrontProducts) {
+          const selectedProductIds = storefrontProducts.map(sp => sp.product_id);
+          console.log('🛍️ Loaded products from storefront_products table:', selectedProductIds);
+          loadedConfig.selectedProducts = selectedProductIds;
+        }
+
         console.log('📝 Setting config with loaded data:', loadedConfig);
         setConfig(loadedConfig);
       } else {
@@ -282,12 +316,13 @@ const StorefrontBuilder: React.FC = () => {
     try {
       // Prepare data for API
       const storefrontData = {
-        name: config.name || merchantName || 'My Store', // Backend requires this
+        name: config.name || merchantName || '', // Backend requires this
         slug: config.slug,
         description: config.description,
         tagline: config.tagline,
         theme: config.theme,
         primary_color: config.primaryColor,
+        logo_url: merchantLogo, // Include merchant logo
         contact_email: config.contact_email || '', // Backend requires this
         wallet_id: undefined, // Optional - backend will use default
         social_links: config.social_links,
@@ -296,15 +331,41 @@ const StorefrontBuilder: React.FC = () => {
         terms: config.terms
       };
 
-      // Check if storefront exists
-      const existingStorefront = await storefrontService.getStorefront();
-      
-      if (existingStorefront?.storefront_id) {
+      console.log('💾 Saving storefront with data:', storefrontData);
+      console.log('🛍️ Selected products:', config.selectedProducts);
+
+      // Use the existing storefront ID that was loaded on component mount
+      if (existingStorefrontId) {
         // Update existing storefront
-        await storefrontService.updateStorefront(existingStorefront.storefront_id, storefrontData);
+        console.log('🔄 Updating existing storefront:', existingStorefrontId);
+        try {
+          await storefrontService.updateStorefront(existingStorefrontId, storefrontData);
+          console.log('✅ Storefront update successful');
+          alert('Storefront saved successfully!');
+        } catch (updateError) {
+          console.error('❌ Storefront update failed:', updateError);
+          // Fallback: Update Supabase directly
+          console.log('🔄 Trying Supabase direct update...');
+          const { error: supabaseError } = await supabase
+            .from('storefronts')
+            .update(storefrontData)
+            .eq('storefront_id', existingStorefrontId);
+          
+          if (supabaseError) {
+            console.error('❌ Supabase update also failed:', supabaseError);
+            throw supabaseError;
+          } else {
+            console.log('✅ Supabase direct update successful');
+          }
+        }
+
+        // Update storefront_products table separately
+        console.log('🔄 Updating storefront products...');
+        await updateStorefrontProducts(existingStorefrontId, config.selectedProducts);
         alert('Storefront saved successfully!');
       } else {
         // Create new storefront
+        console.log('➕ Creating new storefront');
         await storefrontService.createStorefront(storefrontData);
         alert('Storefront created successfully!');
       }
@@ -328,12 +389,13 @@ const StorefrontBuilder: React.FC = () => {
 
       // Prepare storefront data
       const storefrontData = {
-        name: config.name || merchantName || 'My Store', // Backend requires this
+        name: config.name || merchantName || '', // Backend requires this
         slug: config.slug,
         description: config.description,
         tagline: config.tagline,
         theme: config.theme,
         primary_color: config.primaryColor,
+        logo_url: merchantLogo, // Include merchant logo
         contact_email: config.contact_email || '', // Backend requires this
         wallet_id: undefined, // Optional - backend will use default
         social_links: config.social_links,
@@ -382,6 +444,45 @@ const StorefrontBuilder: React.FC = () => {
 
   const generateSlug = (name: string) => {
     return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  };
+
+  const updateStorefrontProducts = async (storefrontId: string, selectedProductIds: string[]) => {
+    try {
+      // First, delete existing storefront_products for this storefront
+      const { error: deleteError } = await supabase
+        .from('storefront_products')
+        .delete()
+        .eq('storefront_id', storefrontId);
+
+      if (deleteError) {
+        console.error('❌ Error deleting existing storefront products:', deleteError);
+        throw deleteError;
+      }
+
+      // Then, insert new storefront_products
+      if (selectedProductIds.length > 0) {
+        const storefrontProducts = selectedProductIds.map((productId, index) => ({
+          storefront_id: storefrontId,
+          product_id: productId,
+          display_order: index,
+          is_featured: false
+        }));
+
+        const { error: insertError } = await supabase
+          .from('storefront_products')
+          .insert(storefrontProducts);
+
+        if (insertError) {
+          console.error('❌ Error inserting storefront products:', insertError);
+          throw insertError;
+        }
+
+        console.log('✅ Updated storefront products successfully');
+      }
+    } catch (error) {
+      console.error('❌ Error updating storefront products:', error);
+      throw error;
+    }
   };
 
   return (
@@ -810,92 +911,125 @@ const StorefrontBuilder: React.FC = () => {
                 previewMode === 'mobile' ? 'max-w-sm mx-auto' : 'w-full'
               }`}
             >
-              {/* Preview Content */}
-              <div className={config.theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}>
-                {/* Header */}
-                <div className="p-8 text-center border-b border-gray-700">
-                  {/* Logo - uses merchant logo from settings */}
-                  {merchantLogo ? (
-                    <img 
-                      src={merchantLogo} 
-                      alt={merchantName} 
-                      className="w-20 h-20 mx-auto rounded-2xl mb-4 object-cover"
-                    />
-                  ) : (
-                    <div className="w-20 h-20 mx-auto rounded-2xl bg-gray-700 mb-4 flex items-center justify-center">
-                      <Store className="w-10 h-10 text-gray-500" />
-                    </div>
-                  )}
-                  <h1 className="text-3xl font-bold mb-2">{config.name || merchantName || 'Your Store'}</h1>
-                  <p className={`text-lg mb-2 ${config.theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                    {config.description}
-                  </p>
-                  {config.tagline && (
-                    <p className={`text-sm ${config.theme === 'dark' ? 'text-gray-500' : 'text-gray-500'}`}>
-                      {config.tagline}
-                    </p>
-                  )}
-                </div>
-
-                {/* Products Section */}
-                <div className="p-8">
-                  <h2 className="text-2xl font-bold mb-6">Products</h2>
-                  {config.selectedProducts.length === 0 ? (
-                    <div className="text-center py-12 border-2 border-dashed border-gray-700 rounded-lg">
-                      <ShoppingBag className="w-12 h-12 mx-auto mb-4 text-gray-500" />
-                      <p className={config.theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}>
-                        No products selected yet
-                      </p>
-                      <p className="text-sm text-gray-500 mt-2">
-                        Go to Products tab to add items
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {availableProducts
-                        .filter(p => config.selectedProducts.includes(p.product_id))
-                        .map((product) => (
-                          <div
-                            key={product.product_id}
-                            className={`rounded-xl overflow-hidden border ${
-                              config.theme === 'dark' ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'
-                            }`}
-                          >
-                            <div className="h-48 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                              <ShoppingBag className="w-16 h-16 text-white opacity-50" />
-                            </div>
-                            <div className="p-6">
-                              <div className="flex items-start justify-between mb-2">
-                                <h3 className="text-xl font-bold">{product.item_name}</h3>
-                                <span
-                                  className="px-3 py-1 rounded-full text-sm font-semibold text-white"
-                                  style={{ backgroundColor: config.primaryColor }}
-                                >
-                                  ${Number(product.price).toFixed(2)}
-                                </span>
-                              </div>
-                              <p className={`text-sm mb-4 ${config.theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                                {product.description || 'No description'}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Footer */}
-                <div className={`p-8 border-t ${config.theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
-                  <div className="text-center">
-                    <p className="text-sm text-gray-500">
-                      Powered by <span className="font-semibold text-blue-600">OkuruPay</span>
-                    </p>
-                    {config.contact_email && (
-                      <p className="text-sm mt-2">
-                        Contact: {config.contact_email}
+              {/* Preview Content - Matches Public Storefront */}
+              <div className={config.theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}>
+                {/* Header - Whop Style */}
+                <div className="pt-16 pb-12 px-6">
+                  <div className="max-w-4xl mx-auto text-center">
+                    {/* Logo */}
+                    {merchantLogo ? (
+                      <div className="w-24 h-24 mx-auto mb-6 rounded-3xl overflow-hidden bg-gray-800 border border-gray-700">
+                        <img 
+                          src={merchantLogo} 
+                          alt={merchantName} 
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-24 h-24 mx-auto mb-6 rounded-3xl bg-gray-800 border border-gray-700 flex items-center justify-center">
+                        <Store className="w-12 h-12 text-gray-500" />
+                      </div>
+                    )}
+                    
+                    {/* Store Name */}
+                    <h1 className={`text-4xl font-bold mb-3 ${config.theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                      {config.name || merchantName || ''}
+                    </h1>
+                    
+                    {/* Description */}
+                    {config.description && (
+                      <p className={`text-base mb-4 ${config.theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                        {config.description}
                       </p>
                     )}
+                    
+                    {/* Contact Seller Button */}
+                    {config.contact_email && (
+                      <button
+                        className={`inline-flex items-center gap-2 px-6 py-2.5 ${config.theme === 'dark' ? 'bg-gray-800 hover:bg-gray-700 border-gray-700 text-gray-200' : 'bg-white hover:bg-gray-50 border-gray-300 text-gray-900'} border rounded-lg transition-colors text-sm font-medium`}
+                      >
+                        <Mail className="w-4 h-4" />
+                        Contact seller
+                      </button>
+                    )}
                   </div>
+                </div>
+
+                {/* Products Section - Whop Style */}
+                <div className="px-6 pb-16">
+                  <div className="max-w-4xl mx-auto">
+                    <h2 className={`text-2xl font-bold mb-8 text-center ${config.theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Products</h2>
+                    
+                    {config.selectedProducts.length === 0 ? (
+                      <div className={`text-center py-16 border-2 border-dashed ${config.theme === 'dark' ? 'border-gray-800' : 'border-gray-300'} rounded-2xl`}>
+                        <ShoppingBag className={`w-12 h-12 mx-auto mb-4 ${config.theme === 'dark' ? 'text-gray-700' : 'text-gray-400'}`} />
+                        <p className={config.theme === 'dark' ? 'text-gray-500' : 'text-gray-600'}>
+                          No products selected yet
+                        </p>
+                        <p className="text-sm text-gray-500 mt-2">
+                          Go to Products tab to add items
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {availableProducts
+                          .filter(p => config.selectedProducts.includes(p.product_id))
+                          .map((product) => (
+                            <div
+                              key={product.product_id}
+                              className={`rounded-2xl overflow-hidden border cursor-pointer transition-all hover:scale-[1.02] ${
+                                config.theme === 'dark' ? 'border-gray-800 bg-gray-800/50' : 'border-gray-200 bg-white'
+                              }`}
+                            >
+                              {/* Product Image */}
+                              <div className="relative h-64 overflow-hidden">
+                                {product.image_url ? (
+                                  <img 
+                                    src={product.image_url} 
+                                    alt={product.item_name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full bg-gradient-to-br from-red-500 via-pink-500 to-orange-500 flex items-center justify-center">
+                                    <div className="text-white text-6xl font-bold opacity-20">
+                                      {product.item_name.substring(0, 3).toUpperCase()}
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {/* Price Badge */}
+                                <div className="absolute bottom-4 right-4">
+                                  <div className="bg-blue-600 text-white px-4 py-1.5 rounded-full text-sm font-semibold shadow-lg">
+                                    ${Number(product.price).toFixed(2)}
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* Product Info */}
+                              <div className="p-5">
+                                <h3 className={`text-lg font-bold mb-2 ${config.theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                                  {product.item_name}
+                                </h3>
+                                <p className={`text-sm ${config.theme === 'dark' ? 'text-gray-400' : 'text-gray-600'} line-clamp-2`}>
+                                  {product.description || 'No description'}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Floating Footer Badge */}
+                <div className="flex justify-center pb-8">
+                  <a href="https://okurupay.com" target="_blank" rel="noopener noreferrer">
+                    <img 
+                      src="/poweredby.png" 
+                      alt="Powered by OkuruPay" 
+                      className="h-8 opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
+                    />
+                  </a>
                 </div>
               </div>
             </div>

@@ -309,8 +309,8 @@ const generateSeedInvoices = (): Invoice[] => {
 export const useInvoiceStore = create<InvoiceStore>()(
   persist(
     (set, get) => ({
-      invoices: generateSeedInvoices(),
-      mockWallets: generateMockWallets(),
+      invoices: [], // Remove seed data - use real invoices from API
+      mockWallets: [], // Remove mock wallets - use real wallet data
 
       generateInvoiceNumber: () => {
         const year = new Date().getFullYear();

@@ -68,10 +68,20 @@ export interface CheckoutRequest {
  * Get auth token from Supabase session
  */
 async function getAuthToken(): Promise<string> {
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session }, error } = await supabase.auth.getSession();
+  console.log('🔐 Supabase session check:', { 
+    hasSession: !!session, 
+    hasAccessToken: !!session?.access_token,
+    error: error?.message 
+  });
+  
   if (!session?.access_token) {
     throw new Error('No authentication token found');
   }
+  
+  // Log full token for debugging (remove in production)
+  console.log('🎫 Full token:', session.access_token);
+  
   return session.access_token;
 }
 
@@ -113,24 +123,52 @@ export const storefrontService = {
    */
   async getStorefront(): Promise<StorefrontConfig | null> {
     const token = await getAuthToken();
+    console.log('🔗 Making API call to:', `${API_BASE_URL}/storefronts`);
+    console.log('🔑 Auth token (first 20 chars):', token ? token.substring(0, 20) + '...' : 'NO TOKEN');
+    
+    const headers = {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'X-Debug-Auth': 'true'
+    };
+    
+    console.log('📤 Request headers:', headers);
     
     const response = await fetch(`${API_BASE_URL}/storefronts`, {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
+      headers
     });
 
+    console.log('📡 API response status:', response.status);
+    console.log('📋 Response headers:', Object.fromEntries(response.headers.entries()));
+
     if (response.status === 404) {
+      console.log('📭 No storefront found (404)');
+      // Try to get error details
+      try {
+        const errorText = await response.text();
+        console.log('📭 404 Response body:', errorText);
+      } catch (e) {
+        console.log('📭 Could not read 404 response body');
+      }
       return null; // No storefront exists
     }
 
     if (!response.ok) {
-      const error = await response.json();
+      const errorText = await response.text();
+      console.error('❌ API error response:', errorText);
+      let error;
+      try {
+        error = JSON.parse(errorText);
+      } catch {
+        error = { message: errorText };
+      }
+      console.error('❌ API error:', error);
       throw new Error(error.message || 'Failed to fetch storefront');
     }
 
     const result = await response.json();
+    console.log('✅ Storefront data received:', result);
     return result.data;
   },
 

@@ -20,48 +20,7 @@ interface Automation {
   transactionHash?: string;
 }
 
-const sampleAutomations: Automation[] = [
-  {
-    id: '1',
-    name: 'BTC Price Alert',
-    actionType: 'convert',
-    token: 'BTC',
-    condition: 'above',
-    threshold: 50000,
-    action: 'notification',
-    actionDescription: 'Sell 50% to USDC',
-    status: 'active',
-    createdAt: '2025-07-15T10:30:00Z',
-    lastTriggered: '2025-08-10T14:22:00Z',
-    transactionHash: '0x1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p7q8r9s0t'
-  },
-  {
-    id: '2',
-    name: 'ETH Balance Transfer',
-    actionType: 'transfer',
-    token: 'ETH',
-    condition: 'above',
-    threshold: 5,
-    action: 'transfer',
-    actionDescription: 'Transfer to cold wallet',
-    status: 'active',
-    createdAt: '2025-07-20T09:15:00Z',
-    lastTriggered: '2025-08-12T11:45:00Z',
-    transactionHash: '0x9s8r7q6p5o4n3m2l1k0j9i8h7g6f5e4d3c2b1a'
-  },
-  {
-    id: '3',
-    name: 'USDC Transaction Alert',
-    actionType: 'swap',
-    token: 'USDC',
-    condition: 'equals',
-    threshold: 1000,
-    action: 'notification',
-    actionDescription: 'Swap to ETH',
-    status: 'inactive',
-    createdAt: '2025-08-01T16:20:00Z'
-  }
-];
+// Note: Sample automations removed - load real automation data from API
 
 // Helper function to format action and condition in plain language
 const formatActionWithCondition = (automation: Automation): string => {
@@ -86,7 +45,7 @@ const formatActionWithCondition = (automation: Automation): string => {
 };
 
 const Automations: React.FC = () => {
-  const [automations, setAutomations] = useState<Automation[]>(sampleAutomations);
+  const [automations, setAutomations] = useState<Automation[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [filterToken, setFilterToken] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
