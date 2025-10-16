@@ -124,6 +124,23 @@ const InvoiceDetail: React.FC = () => {
     }
   };
 
+  // Format seconds into human readable time
+  const formatExpirationTime = (seconds: number) => {
+    if (!seconds || seconds <= 0) return 'No expiration';
+    
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainingSeconds = seconds % 60;
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${remainingSeconds}s`;
+    } else {
+      return `${remainingSeconds}s`;
+    }
+  };
+
   const handleCopyPayLink = () => {
     if (invoice.public_url) {
       navigator.clipboard.writeText(invoice.public_url);
@@ -183,65 +200,101 @@ const InvoiceDetail: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Customer Card */}
-            <Card className="p-4">
-              <h3 className="font-medium text-gray-900 mb-3">Customer</h3>
-              <div className="space-y-2">
-                <div>
-                  <span className="text-sm text-gray-600">Name:</span>
-                  <div className="font-medium">{invoice.customer_name || 'N/A'}</div>
-                </div>
-                <div>
-                  <span className="text-sm text-gray-600">Email:</span>
-                  <div className="font-medium">{invoice.customer_email}</div>
-                </div>
-                {invoice.billing_address && (
-                  <div>
-                    <span className="text-sm text-gray-600">Address:</span>
-                    <div className="text-sm">
-                      {invoice.billing_address.street}<br />
-                      {invoice.billing_address.city}, {invoice.billing_address.state} {invoice.billing_address.postal_code}<br />
-                      {invoice.billing_address.country}
-                    </div>
-                  </div>
-                )}
+          {/* Customer Information */}
+          <Card className="p-6">
+            <h3 className="font-medium text-gray-900 mb-4">Customer</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <span className="text-sm text-gray-600">Name:</span>
+                <div className="font-medium">{invoice.customer_name || 'N/A'}</div>
               </div>
-            </Card>
+              <div>
+                <span className="text-sm text-gray-600">Email:</span>
+                <div className="font-medium">{invoice.customer_email}</div>
+              </div>
+            </div>
+          </Card>
 
-            {/* Payment Card */}
-            <Card className="p-4">
-              <h3 className="font-medium text-gray-900 mb-3">Payment Details</h3>
-              <div className="space-y-2">
-                <div>
-                  <span className="text-sm text-gray-600">Mode:</span>
-                  <div className="font-medium capitalize">{invoice.currency_mode}</div>
-                </div>
-                {invoice.currency_mode === 'fiat' ? (
-                  <div>
-                    <span className="text-sm text-gray-600">Currency:</span>
-                    <div className="font-medium">{invoice.fiat_currency}</div>
-                  </div>
-                ) : (
-                  <>
-                    <div>
-                      <span className="text-sm text-gray-600">Asset:</span>
-                      <div className="font-medium">{invoice.crypto_asset}</div>
-                    </div>
-                    <div>
-                      <span className="text-sm text-gray-600">Chain:</span>
-                      <div className="font-medium">{invoice.chain}</div>
-                    </div>
-                  </>
-                )}
-                <div>
-                  <span className="text-sm text-gray-600">Price Lock:</span>
-                  <div className="font-medium">{invoice.price_lock_secs}s</div>
+          {/* Payment Status - Only shows what customer actually chose */}
+          <Card className="p-6">
+            <h3 className="font-medium text-gray-900 mb-4">Payment Status</h3>
+            <div className="space-y-3">
+              <div>
+                <span className="text-sm text-gray-600">Status:</span>
+                <div className="mt-1">
+                  <span className={`inline-flex px-3 py-1 text-sm font-medium rounded-full ${getStatusColor(getEffectiveStatus(invoice))}`}>
+                    {getStatusDisplayText(getEffectiveStatus(invoice))}
+                  </span>
                 </div>
               </div>
-            </Card>
-          </div>
+              
+              {/* Only show payment details AFTER customer has paid and chosen their method */}
+              {(invoice.status === 'paid' || invoice.status === 'overpaid' || invoice.status === 'underpaid') && (
+                <>
+                  <div>
+                    <span className="text-sm text-gray-600">Customer Paid With:</span>
+                    <div className="font-medium">
+                      {invoice.paid_currency || 'Unknown Currency'}
+                      {invoice.paid_chain && (
+                        <span className="text-sm text-gray-500 ml-1">on {invoice.paid_chain}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-sm text-gray-600">Amount Paid:</span>
+                    <div className="font-medium">
+                      {invoice.paid_amount ? `${invoice.paid_amount} ${invoice.paid_currency}` : `$${(invoice.total_amount || 0).toFixed(2)}`}
+                    </div>
+                  </div>
+                  {invoice.transaction_hash && (
+                    <div>
+                      <span className="text-sm text-gray-600">Transaction:</span>
+                      <div className="font-mono text-xs text-blue-600 break-all mt-1">
+                        <a 
+                          href={`https://basescan.org/tx/${invoice.transaction_hash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hover:underline"
+                        >
+                          {invoice.transaction_hash}
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                  {invoice.paid_at && (
+                    <div>
+                      <span className="text-sm text-gray-600">Paid At:</span>
+                      <div className="font-medium">{new Date(invoice.paid_at).toLocaleString()}</div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Simple pending state - customer hasn't chosen payment method yet */}
+              {(invoice.status === 'sent' || invoice.status === 'viewed' || invoice.status === 'pending_payment') && (
+                <div className="bg-yellow-50 p-4 rounded-lg">
+                  <div className="text-sm text-yellow-800 font-medium">
+                    Awaiting Customer Payment
+                  </div>
+                  <div className="text-xs text-yellow-700 mt-1">
+                    Customer will choose their preferred payment method. Details will appear here once payment is received.
+                  </div>
+                </div>
+              )}
+
+              {/* Expired state */}
+              {invoice.status === 'expired' && (
+                <div className="bg-red-50 p-4 rounded-lg">
+                  <div className="text-sm text-red-800 font-medium">
+                    Payment Expired
+                  </div>
+                  <div className="text-xs text-red-700 mt-1">
+                    This invoice has expired and can no longer receive payments.
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
 
           {/* Settlement & Totals */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -251,11 +304,13 @@ const InvoiceDetail: React.FC = () => {
               <div className="space-y-2">
                 <div>
                   <span className="text-sm text-gray-600">Wallet ID:</span>
-                  <div className="font-medium">{invoice.settlement_wallet_id || 'N/A'}</div>
+                  <div className="font-medium font-mono text-sm">
+                    {invoice.settlement_wallet_id || 'Auto-Generated'}
+                  </div>
                 </div>
                 <div>
                   <span className="text-sm text-gray-600">Fee Payer:</span>
-                  <div className="font-medium capitalize">{invoice.fee_payer || 'N/A'}</div>
+                  <div className="font-medium capitalize">{invoice.fee_payer || 'Merchant'}</div>
                 </div>
               </div>
             </Card>
@@ -332,7 +387,6 @@ const InvoiceDetail: React.FC = () => {
 
         {/* Sidebar */}
         <div className="space-y-6">
-d
           <Card className="p-4">
             <h3 className="font-medium text-gray-900 mb-4">Invoice Information</h3>
             <div className="space-y-3">

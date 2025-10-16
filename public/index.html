@@ -29,12 +29,49 @@
     
     <!-- Suppress browser extension errors -->
     <script>
-      // Prevent Cardano wallet extension errors from breaking the app
+      // Prevent browser extension errors from breaking the app
       window.addEventListener('error', function(e) {
-        if (e.filename && e.filename.includes('chrome-extension://') && 
-            e.message && e.message.includes('REQUEST_ID')) {
+        // Block all chrome extension errors
+        if (e.filename && e.filename.includes('chrome-extension://')) {
           e.preventDefault();
-          console.warn('Cardano wallet extension error suppressed');
+          console.warn('Browser extension error suppressed:', e.message);
+          return false;
+        }
+        
+        // Block specific wallet extension errors
+        if (e.message && (
+          e.message.includes('REQUEST_ID') ||
+          e.message.includes('cardano') ||
+          e.message.includes('wallet') ||
+          e.message.includes('extension')
+        )) {
+          e.preventDefault();
+          console.warn('Wallet extension error suppressed:', e.message);
+          return false;
+        }
+      });
+
+      // Also suppress unhandled promise rejections from extensions
+      window.addEventListener('unhandledrejection', function(e) {
+        if (e.reason && e.reason.toString().includes('chrome-extension://')) {
+          e.preventDefault();
+          console.warn('Extension promise rejection suppressed');
+          return false;
+        }
+      });
+
+      // Prevent extensions from accessing sensitive globals
+      const blockExtensionGlobals = ['cardano', 'eternl', 'lace', 'nami', 'flint', 'typhon'];
+      blockExtensionGlobals.forEach(globalName => {
+        try {
+          Object.defineProperty(window, globalName, {
+            get: function() { return undefined; },
+            set: function() { return false; },
+            configurable: false
+          });
+        } catch (e) {
+          // Some extensions might have already defined these, ignore errors
+          console.warn(`Could not block ${globalName} global:`, e.message);
         }
       });
     </script>

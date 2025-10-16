@@ -44,6 +44,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const [merchantInfo, setMerchantInfo] = useState<MerchantInfo>({ name: '' });
   const currentPath = location.pathname;
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState<{[key: string]: boolean}>({
     home: true,
     operations: false,
@@ -96,6 +97,15 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       });
     }
   };
+
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  // Close mobile menu when route changes
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
 
   const toggleSection = (section: string) => {
     // If sidebar is collapsed, navigate to first item in the category
@@ -174,8 +184,32 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100 overflow-hidden">
+      {/* Mobile Header */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center">
+          <img src={logo} alt="Okuru Logo" className="h-8 w-auto" />
+        </div>
+        <button
+          onClick={toggleMobileMenu}
+          className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+        >
+          <Menu className="h-6 w-6 text-gray-600" />
+        </button>
+      </div>
+
+      {/* Mobile Menu Overlay */}
+      {isMobileMenuOpen && (
+        <div className="lg:hidden fixed inset-0 z-40 bg-black bg-opacity-50" onClick={toggleMobileMenu} />
+      )}
+
       {/* Sidebar */}
-      <div className={`${isCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 shadow-lg flex flex-col flex-shrink-0 overflow-y-auto bg-white border-r border-gray-200`}>
+      <div className={`
+        ${isCollapsed ? 'w-16' : 'w-64'} 
+        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        fixed lg:relative top-0 left-0 h-full z-50 lg:z-auto
+        transition-all duration-300 shadow-lg flex flex-col flex-shrink-0 overflow-y-auto bg-white border-r border-gray-200
+        lg:top-auto lg:left-auto lg:h-auto lg:flex
+      `}>
         {/* Header */}
         <div className={`flex items-center ${isCollapsed ? 'justify-center p-4' : 'justify-between p-6'} border-b border-gray-200`}>
           {!isCollapsed && (
@@ -346,8 +380,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       </div>
       
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-white flex-shrink-0">
+      <div className="flex-1 flex flex-col overflow-hidden lg:mt-0 mt-16">
+        <div className="flex items-center justify-between p-4 lg:p-6 border-b border-gray-200 bg-white flex-shrink-0">
           <div>
             <h1 className="text-2xl font-bold text-gray-800 tracking-tight">
               {currentPath === '/' ? 'Dashboard' : ''}
@@ -378,7 +412,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
           </div>
         </div>
         
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4 lg:p-6">
           {children}
         </div>
       </div>

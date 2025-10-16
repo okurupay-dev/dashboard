@@ -54,6 +54,35 @@ interface InvoiceCreateModernProps {
   onSubmit?: (data: any, isDraft: boolean) => Promise<any>;
 }
 
+// Utility function to safely stringify objects avoiding circular references
+const safeStringify = (obj: any, maxDepth = 3, currentDepth = 0): any => {
+  if (currentDepth >= maxDepth) return '[Max Depth Reached]';
+  
+  if (obj === null || obj === undefined) return obj;
+  
+  if (typeof obj === 'string' || typeof obj === 'number' || typeof obj === 'boolean') {
+    return obj;
+  }
+  
+  if (obj instanceof HTMLElement) return '[HTMLElement]';
+  if (obj instanceof Date) return obj.toISOString();
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => safeStringify(item, maxDepth, currentDepth + 1));
+  }
+  
+  if (typeof obj === 'object') {
+    const result: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (key.startsWith('__react') || key.startsWith('_react')) continue;
+      result[key] = safeStringify(value, maxDepth, currentDepth + 1);
+    }
+    return result;
+  }
+  
+  return obj;
+};
+
 const InvoiceCreateModern: React.FC<InvoiceCreateModernProps> = ({ onSubmit }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -77,11 +106,82 @@ const InvoiceCreateModern: React.FC<InvoiceCreateModernProps> = ({ onSubmit }) =
     try {
       setLoading(true);
       
+      // Validate required auth data
+      if (!userData?.auth_user_id) {
+        throw new Error('User not authenticated. Please log in again.');
+      }
+      
+      if (!merchantData?.merchant_id) {
+        throw new Error('Merchant data not available. Please refresh the page and try again.');
+      }
+      
+      console.log('Invoice submission started:', {
+        isDraft,
+        userId: userData.auth_user_id,
+        merchantId: merchantData.merchant_id,
+        formDataKeys: Object.keys(data),
+        formDataSample: {
+          title: data.title,
+          customer_email: data.customer_email,
+          simple_amount: data.simple_amount
+        }
+      });
+      
+      // Ensure user exists in database before creating invoice
+      console.log('🔍 Checking if user exists in database:', userData.auth_user_id);
+      
+      try {
+        const { data: existingUser, error: userError } = await supabase
+          .from('users')
+          .select('auth_user_id, email, role')
+          .eq('auth_user_id', userData.auth_user_id)
+          .single();
+          
+        console.log('👤 User lookup result:', { existingUser, userError });
+          
+        if (userError && userError.code === 'PGRST116') {
+          // User doesn't exist, create user record
+          console.log('❌ User not found in database, creating user record...');
+          
+          const newUserData = {
+            auth_user_id: userData.auth_user_id,
+            email: userData.email || '',
+            name: userData.name || userData.email?.split('@')[0] || 'User',
+            role: userData.role || 'merchant',
+            approved: userData.approved || true,
+            merchant_id: merchantData.merchant_id
+          };
+          
+          console.log('📝 Creating user with data:', newUserData);
+          
+          const { data: createdUser, error: createUserError } = await supabase
+            .from('users')
+            .insert(newUserData)
+            .select()
+            .single();
+            
+          if (createUserError) {
+            console.error('❌ Failed to create user:', createUserError);
+            throw new Error(`Failed to create user record: ${createUserError.message} (Code: ${createUserError.code})`);
+          }
+          
+          console.log('✅ User record created successfully:', createdUser);
+        } else if (userError) {
+          console.error('❌ Database error checking user:', userError);
+          throw new Error(`Database error checking user: ${userError.message} (Code: ${userError.code})`);
+        } else {
+          console.log('✅ User already exists in database:', existingUser);
+        }
+      } catch (dbError) {
+        console.error('💥 Error ensuring user exists:', dbError);
+        throw new Error(`Database setup failed: ${dbError instanceof Error ? dbError.message : 'Unknown error'}`);
+      }
+      
       if (isDraft) {
         // Save as draft using Supabase
         const draftData = {
-          merchant_id: merchantData?.merchant_id,
-          created_by: userData?.auth_user_id || '',
+          merchant_id: merchantData.merchant_id,
+          created_by: userData.auth_user_id,
           title: data.title,
           description: data.description,
           notes: data.notes,
@@ -93,8 +193,9 @@ const InvoiceCreateModern: React.FC<InvoiceCreateModernProps> = ({ onSubmit }) =
           status: 'draft'
         };
         
-        const result = await invoiceService.saveDraft(draftData as any, merchantData?.merchant_id || '', userData?.auth_user_id || '');
-        console.log('Draft saved:', result);
+        console.log('Saving draft with data:', draftData);
+        const result = await invoiceService.saveDraft(draftData as any, merchantData.merchant_id, userData.auth_user_id);
+        console.log('Draft saved successfully:', result);
         navigate('/invoices');
         return result;
       } else {
@@ -110,8 +211,8 @@ const InvoiceCreateModern: React.FC<InvoiceCreateModernProps> = ({ onSubmit }) =
           customer_name: data.customer_name || '',
           
           // Merchant context (critical for backend)
-          merchant_id: merchantData?.merchant_id,
-          created_by: userData?.auth_user_id,
+          merchant_id: merchantData.merchant_id,
+          created_by: userData.auth_user_id,
           
           // Amount and payment fields
           simple_amount: isUsingLineItems ? subtotal : (data.simple_amount || 0),
@@ -207,6 +308,20 @@ const InvoiceCreateModern: React.FC<InvoiceCreateModernProps> = ({ onSubmit }) =
       }
     } catch (error) {
       console.error('Error submitting invoice:', error);
+      
+      // Show user-friendly error message
+      let errorMessage = 'Failed to save invoice';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null) {
+        try {
+          errorMessage = JSON.stringify(safeStringify(error));
+        } catch (stringifyError) {
+          errorMessage = 'Unknown error (could not serialize error details)';
+        }
+      }
+      
+      alert(`Error: ${errorMessage}`);
       throw error;
     } finally {
       setLoading(false);
@@ -353,12 +468,24 @@ const InvoiceCreateModern: React.FC<InvoiceCreateModernProps> = ({ onSubmit }) =
     form.handleSubmit((data) => {
       handleSubmit(data, true);
     }, (errors) => {
-      console.log('Form validation errors:', JSON.stringify(errors, null, 2));
+      console.log('Form validation errors:', JSON.stringify(safeStringify(errors), null, 2));
     })();
   };
 
   const handlePublish = () => {
     console.log('Publish Invoice clicked');
+    
+    // Validate auth data before attempting to publish
+    if (!userData?.auth_user_id) {
+      alert('Error: User not authenticated. Please log in again.');
+      return;
+    }
+    
+    if (!merchantData?.merchant_id) {
+      alert('Error: Merchant data not available. Please refresh the page and try again.');
+      return;
+    }
+    
     form.handleSubmit((data) => {
       // Create invoice and set status to 'sent' (published)
       const modifiedData = { ...data, send_email: false };
@@ -370,12 +497,21 @@ const InvoiceCreateModern: React.FC<InvoiceCreateModernProps> = ({ onSubmit }) =
           setPaymentLink(link);
           setPublishedInvoice(result);
           setIsPublished(true);
+          console.log('Invoice published successfully:', result);
+        } else {
+          throw new Error('Invoice was created but no public_id was returned');
         }
       }).catch((error: any) => {
         console.error('Error publishing invoice:', error);
+        let errorMessage = 'Failed to publish invoice';
+        if (error instanceof Error) {
+          errorMessage = error.message;
+        }
+        alert(`Publish Error: ${errorMessage}`);
       });
     }, (errors) => {
-      console.log('Form validation errors:', JSON.stringify(errors, null, 2));
+      console.log('Form validation errors:', JSON.stringify(safeStringify(errors), null, 2));
+      alert('Please fix the form errors before publishing the invoice.');
     })();
   };
 

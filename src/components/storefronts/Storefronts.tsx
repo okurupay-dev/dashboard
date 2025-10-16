@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Store, 
@@ -41,18 +41,12 @@ interface Storefront {
 
 const Storefronts: React.FC = () => {
   const navigate = useNavigate();
-  const { userData } = useAuth();
+  const { userData, merchantData } = useAuth();
   const [storefront, setStorefront] = useState<StorefrontConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [showDropdown, setShowDropdown] = useState<boolean>(false);
 
-  useEffect(() => {
-    if (userData?.merchant_id) {
-      loadStorefront();
-    }
-  }, [userData?.merchant_id]);
-
-  const loadStorefront = async () => {
+  const loadStorefront = useCallback(async () => {
     if (!userData?.merchant_id) return;
     
     try {
@@ -118,7 +112,17 @@ const Storefronts: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userData?.merchant_id]);
+
+  useEffect(() => {
+    loadStorefront();
+  }, [loadStorefront]);
+
+  // Debug merchant data
+  useEffect(() => {
+    console.log('🏪 Merchant data in Storefronts:', merchantData);
+    console.log('🖼️ Merchant logo URL:', merchantData?.logo_url);
+  }, [merchantData]);
 
   const loadStorefrontProducts = async (storefront: any) => {
     try {
@@ -273,12 +277,12 @@ const Storefronts: React.FC = () => {
           {/* Left Column - Store Info & Actions */}
           <div className="lg:col-span-1">
             <Card className="overflow-hidden border-0 shadow-lg">
-              <div className="p-5">
+              <div className="p-4 lg:p-5">
                 {/* Logo & Status */}
                 <div className="flex items-start justify-between mb-4">
                   <div>
-                    {storefront.merchant_logo ? (
-                      <img src={storefront.merchant_logo} alt="" className="w-16 h-16 rounded-xl object-cover border-2 border-gray-200" />
+                    {merchantData?.logo_url ? (
+                      <img src={merchantData.logo_url} alt="" className="w-16 h-16 rounded-xl object-cover border-2 border-gray-200" />
                     ) : (
                       <div className="w-16 h-16 bg-gray-100 rounded-xl flex items-center justify-center border-2 border-gray-200">
                         <Store className="h-8 w-8 text-gray-400" />
@@ -293,7 +297,7 @@ const Storefronts: React.FC = () => {
                 {/* Store Name & URL */}
                 <div className="mb-4">
                   <h3 className="text-lg font-bold text-gray-900 mb-1">{storefront.name || ''}</h3>
-                  <p className="text-xs text-gray-500">okurupay.com/s/{storefront.slug}</p>
+                  <p className="text-xs text-gray-500">shop.okurupay.com/{storefront.slug}</p>
                   {storefront.description && (
                     <p className="text-sm text-gray-600 mt-2">{storefront.description}</p>
                   )}
@@ -397,7 +401,7 @@ const Storefronts: React.FC = () => {
             </Card>
 
             {/* Quick Actions Grid */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Card className="p-4 border-0 shadow-lg hover:shadow-xl transition-shadow cursor-pointer" onClick={handleEditStorefront}>
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">

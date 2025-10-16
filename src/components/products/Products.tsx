@@ -1,28 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { 
-  Package, 
-  Upload, 
-  Download, 
-  Search, 
   Plus, 
-  Filter, 
+  Search, 
+  Download, 
+  Upload, 
   Edit, 
   Trash2, 
+  X, 
+  Package, 
+  AlertTriangle, 
+  CheckCircle, 
+  Clock, 
+  FileText, 
+  Tag,
+  Filter,
   ExternalLink,
-  FileText,
   Zap,
   AlertCircle,
-  CheckCircle,
   Loader2,
   ChevronDown,
-  ChevronUp,
-  X
+  ChevronUp
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
+import CustomDropdown from '../ui/CustomDropdown';
 
 interface Product {
   product_id: string;
@@ -39,8 +43,6 @@ interface Product {
   weight?: number;
   tax_name?: string;
   tax_rate?: number;
-  stock_quantity?: number;
-  low_stock_threshold?: number;
   image_url?: string;
   image_urls?: string[]; // Support multiple images
   is_active: boolean;
@@ -52,6 +54,43 @@ interface Product {
   metadata?: any;
   created_at: string;
   updated_at: string;
+  // Inventory data from product_location_inventory table
+  inventory?: ProductInventory[];
+}
+
+interface ProductInventory {
+  inventory_id: string;
+  product_id: string;
+  location_id: string;
+  merchant_id: string;
+  stock_quantity: number;
+  low_stock_threshold: number;
+  is_enabled: boolean;
+  last_counted_at?: string;
+  location_name?: string; // From locations table join
+}
+
+interface ProductFormData {
+  item_name: string;
+  variation_name: string;
+  description: string;
+  sku: string;
+  price: string;
+  cost: string;
+  category: string;
+  barcode: string;
+  weight: string;
+  tax_name: string;
+  tax_rate: string;
+  image_url: string;
+  image_urls: string[];
+  features: string;
+  stock_quantity: string; // Form field for initial stock
+  low_stock_threshold: string; // Form field for threshold
+  is_active: boolean;
+  is_taxable: boolean;
+  track_inventory: boolean;
+  allow_backorders: boolean;
 }
 
 interface POSIntegration {
@@ -78,7 +117,7 @@ const Products: React.FC = () => {
   const [importing, setImporting] = useState(false);
   const [showOptionalFields, setShowOptionalFields] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [newProduct, setNewProduct] = useState({
+  const [newProduct, setNewProduct] = useState<ProductFormData>({
     item_name: '',
     variation_name: '',
     description: '',
@@ -94,6 +133,7 @@ const Products: React.FC = () => {
     image_urls: [] as string[],
     features: '',
     stock_quantity: '',
+    low_stock_threshold: '',
     is_active: true,
     is_taxable: true,
     track_inventory: true,
@@ -134,22 +174,33 @@ const Products: React.FC = () => {
     }
   ]);
 
-  // Load products from database
-  useEffect(() => {
-    loadProducts();
-  }, [userData]);
-
-  const loadProducts = async () => {
-    if (!userData?.merchant_id) return;
+  const loadProducts = useCallback(async () => {
+    console.log('🔍 loadProducts called, userData:', userData?.merchant_id);
+    if (!userData?.merchant_id) {
+      console.log('❌ No merchant_id, skipping product load');
+      setLoading(false);
+      return;
+    }
 
     try {
       setLoading(true);
       setError(null);
 
-      // Try to load from database first
+      // Load products with inventory data
       const { data: dbProducts, error: dbError } = await supabase
         .from('products')
-        .select('*')
+        .select(`
+          *,
+          inventory:product_location_inventory(
+            inventory_id,
+            location_id,
+            stock_quantity,
+            low_stock_threshold,
+            is_enabled,
+            last_counted_at,
+            location:locations(name)
+          )
+        `)
         .eq('merchant_id', userData.merchant_id)
         .order('created_at', { ascending: false });
 
@@ -158,7 +209,7 @@ const Products: React.FC = () => {
         setError('Failed to load products from database');
         setProducts([]);
       } else {
-        console.log(`✅ Loaded ${dbProducts?.length || 0} products from database`);
+        console.log(`✅ Loaded ${dbProducts?.length || 0} products with inventory data`);
         setProducts(dbProducts || []);
       }
     } catch (error) {
@@ -167,6 +218,75 @@ const Products: React.FC = () => {
       setProducts([]);
     } finally {
       setLoading(false);
+    }
+  }, [userData?.merchant_id]);
+
+  // Load products from database
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
+
+  // Update inventory for a product at a specific location
+  const updateInventory = async (productId: string, locationId: string, stockQuantity: number, lowStockThreshold: number) => {
+    if (!userData?.merchant_id) return;
+
+    try {
+      const { error } = await supabase
+        .from('product_location_inventory')
+        .upsert({
+          product_id: productId,
+          location_id: locationId,
+          merchant_id: userData.merchant_id,
+          stock_quantity: stockQuantity,
+          low_stock_threshold: lowStockThreshold,
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) {
+        console.error('❌ Error updating inventory:', error);
+        alert(`Failed to update inventory: ${error.message}`);
+        return;
+      }
+
+      console.log('✅ Inventory updated successfully');
+      // Reload products to show updated inventory
+      loadProducts();
+    } catch (error) {
+      console.error('❌ Error in updateInventory:', error);
+      alert('Failed to update inventory');
+    }
+  };
+
+  // Get total stock across all locations for a product
+  const getTotalStock = (product: Product): number | null => {
+    if (!product.inventory || product.inventory.length === 0) return null; // No inventory tracking
+    return product.inventory.reduce((total, inv) => total + (inv.stock_quantity || 0), 0);
+  };
+
+  // Get stock display string
+  const getStockDisplay = (product: Product): string => {
+    const totalStock = getTotalStock(product);
+    if (totalStock === null) return 'N/A';
+    return `${totalStock} units`;
+  };
+
+  // Get stock status for display
+  const getStockStatus = (product: Product): { status: 'in_stock' | 'low_stock' | 'out_of_stock' | 'no_tracking', color: string } => {
+    const totalStock = getTotalStock(product);
+    
+    if (totalStock === null) {
+      return { status: 'no_tracking', color: 'text-gray-500' };
+    }
+    
+    const lowestThreshold = product.inventory?.reduce((min, inv) => 
+      Math.min(min, inv.low_stock_threshold || 5), Infinity) || 5;
+
+    if (totalStock === 0) {
+      return { status: 'out_of_stock', color: 'text-red-600' };
+    } else if (totalStock <= lowestThreshold) {
+      return { status: 'low_stock', color: 'text-yellow-600' };
+    } else {
+      return { status: 'in_stock', color: 'text-green-600' };
     }
   };
 
@@ -262,9 +382,10 @@ const Products: React.FC = () => {
       tax_name: product.tax_name || '',
       tax_rate: product.tax_rate?.toString() || '',
       image_url: product.image_url || '',
-      image_urls: product.image_urls || [],
+      image_urls: product.metadata?.image_urls || (product.image_url ? [product.image_url] : []),
       features: product.metadata?.features?.join('\n') || '',
-      stock_quantity: product.stock_quantity?.toString() || '',
+      stock_quantity: product.inventory?.[0]?.stock_quantity?.toString() || '',
+      low_stock_threshold: product.inventory?.[0]?.low_stock_threshold?.toString() || '',
       is_active: product.is_active,
       is_taxable: product.is_taxable || false,
       track_inventory: product.track_inventory || false,
@@ -301,16 +422,16 @@ const Products: React.FC = () => {
         weight: newProduct.weight ? parseFloat(newProduct.weight) : null,
         tax_name: newProduct.tax_name || null,
         tax_rate: newProduct.tax_rate ? parseFloat(newProduct.tax_rate) : 0,
-        image_url: newProduct.image_url || null,
-        image_urls: newProduct.image_urls.length > 0 ? newProduct.image_urls : null,
-        stock_quantity: newProduct.stock_quantity ? parseInt(newProduct.stock_quantity) : null,
+        image_url: newProduct.image_urls.length > 0 ? newProduct.image_urls[0] : (newProduct.image_url || editingProduct.image_url),
         is_active: newProduct.is_active,
         is_taxable: newProduct.is_taxable,
         track_inventory: newProduct.track_inventory,
         allow_backorders: newProduct.allow_backorders,
         is_variation: !!newProduct.variation_name,
-        metadata: featuresArray ? { features: featuresArray } : null,
-        updated_at: new Date().toISOString()
+        metadata: {
+          ...(featuresArray ? { features: featuresArray } : {}),
+          ...(newProduct.image_urls.length > 0 ? { image_urls: newProduct.image_urls } : {})
+        }
       };
 
       console.log('📝 Updating product:', productToUpdate);
@@ -353,6 +474,7 @@ const Products: React.FC = () => {
         image_urls: [] as string[],
         features: '',
         stock_quantity: '',
+        low_stock_threshold: '',
         is_active: true,
         is_taxable: true,
         track_inventory: true,
@@ -411,15 +533,17 @@ const Products: React.FC = () => {
         weight: newProduct.weight ? parseFloat(newProduct.weight) : null,
         tax_name: newProduct.tax_name || null,
         tax_rate: newProduct.tax_rate ? parseFloat(newProduct.tax_rate) : 0,
-        image_url: newProduct.image_url || null,
-        image_urls: newProduct.image_urls.length > 0 ? newProduct.image_urls : null,
+        image_url: newProduct.image_urls.length > 0 ? newProduct.image_urls[0] : null,
         is_active: newProduct.is_active,
         is_taxable: newProduct.is_taxable,
         track_inventory: newProduct.track_inventory,
         allow_backorders: newProduct.allow_backorders,
         is_variation: !!newProduct.variation_name,
         import_source: 'manual',
-        metadata: featuresArray ? { features: featuresArray } : null
+        metadata: {
+          ...(featuresArray ? { features: featuresArray } : {}),
+          ...(newProduct.image_urls.length > 0 ? { image_urls: newProduct.image_urls } : {})
+        }
         // created_by removed - foreign key constraint issue
       };
 
@@ -441,6 +565,54 @@ const Products: React.FC = () => {
 
       console.log('✅ Product saved to database:', data);
 
+      // Create inventory record if stock quantity was provided
+      if (newProduct.stock_quantity && parseInt(newProduct.stock_quantity) >= 0) {
+        try {
+          // First, get or create a default location for this merchant
+          let { data: locations, error: locationError } = await supabase
+            .from('locations')
+            .select('location_id')
+            .eq('merchant_id', userData.merchant_id)
+            .limit(1);
+
+          let locationId;
+          if (locationError || !locations || locations.length === 0) {
+            // Create a default location
+            const { data: newLocation, error: createLocationError } = await supabase
+              .from('locations')
+              .insert({
+                merchant_id: userData.merchant_id,
+                name: 'Main Location',
+                is_default: true
+              })
+              .select('location_id')
+              .single();
+
+            if (createLocationError) {
+              console.error('❌ Error creating default location:', createLocationError);
+            } else {
+              locationId = newLocation.location_id;
+            }
+          } else {
+            locationId = locations[0].location_id;
+          }
+
+          // Create inventory record if we have a location
+          if (locationId) {
+            await updateInventory(
+              data.product_id, 
+              locationId, 
+              parseInt(newProduct.stock_quantity), 
+              parseInt(newProduct.low_stock_threshold) || 5
+            );
+            console.log('✅ Initial inventory created');
+          }
+        } catch (inventoryError) {
+          console.error('❌ Error creating initial inventory:', inventoryError);
+          // Don't fail the whole operation if inventory creation fails
+        }
+      }
+
       // Add to local state for immediate UI update
       setProducts(prev => [data, ...prev]);
       
@@ -461,6 +633,7 @@ const Products: React.FC = () => {
         image_urls: [] as string[],
         features: '',
         stock_quantity: '',
+        low_stock_threshold: '',
         is_active: true,
         is_taxable: true,
         track_inventory: true,
@@ -600,8 +773,6 @@ const Products: React.FC = () => {
             barcode: row['Barcode'] || row['barcode'] || '',
             tax_name: taxHeader || 'Default Tax',
             tax_rate: taxRate,
-            stock_quantity: 0,
-            low_stock_threshold: 5,
             is_variation: !!(row['Variation Name'] || row['variation name']),
             is_active: true,
             is_taxable: true,
@@ -667,7 +838,7 @@ const Products: React.FC = () => {
   });
 
   // Get unique categories
-  const categories = Array.from(new Set(products.map(p => p.category).filter(Boolean)));
+  const categories = Array.from(new Set(products.map(p => p.category).filter((category): category is string => Boolean(category))));
 
   // Pagination
   const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
@@ -702,6 +873,26 @@ const Products: React.FC = () => {
     );
   }
 
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="text-red-500 mb-4">⚠️</div>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button 
+            onClick={() => {
+              setError(null);
+              loadProducts();
+            }}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -711,33 +902,51 @@ const Products: React.FC = () => {
           <p className="text-gray-600">Manage your inventory and sync with POS systems</p>
         </div>
         <div className="flex gap-2">
-          <div className="relative">
-            <select
-              onChange={(e) => {
-                const value = e.target.value;
-                if (value === 'csv') {
-                  setShowImportModal(true);
-                } else if (value.startsWith('pos-')) {
-                  const posType = value.replace('pos-', '');
-                  alert(`${posType.charAt(0).toUpperCase() + posType.slice(1)} integration coming soon!`);
-                }
-                e.target.value = ''; // Reset selection
-              }}
-              className="appearance-none bg-white border border-gray-300 rounded-md px-4 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-gray-50"
-            >
-              <option value="">Import Products</option>
-              <option value="csv">Upload CSV File</option>
-              <option disabled>──────────────</option>
-              <option value="pos-square">Square POS</option>
-              <option value="pos-shopify">Shopify</option>
-              <option value="pos-clover">Clover</option>
-              <option value="pos-toast">Toast POS</option>
-              <option value="pos-lightspeed">Lightspeed</option>
-            </select>
-            <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-              <Upload className="h-4 w-4 text-gray-400" />
-            </div>
-          </div>
+          <CustomDropdown
+            options={[
+              { 
+                value: 'csv', 
+                label: 'Upload CSV File',
+                icon: <FileText className="h-4 w-4 text-gray-500" />
+              },
+              { 
+                value: 'pos-square', 
+                label: 'Square POS',
+                icon: <ExternalLink className="h-4 w-4 text-gray-500" />
+              },
+              { 
+                value: 'pos-shopify', 
+                label: 'Shopify',
+                icon: <ExternalLink className="h-4 w-4 text-gray-500" />
+              },
+              { 
+                value: 'pos-clover', 
+                label: 'Clover',
+                icon: <ExternalLink className="h-4 w-4 text-gray-500" />
+              },
+              { 
+                value: 'pos-toast', 
+                label: 'Toast POS',
+                icon: <ExternalLink className="h-4 w-4 text-gray-500" />
+              },
+              { 
+                value: 'pos-lightspeed', 
+                label: 'Lightspeed',
+                icon: <ExternalLink className="h-4 w-4 text-gray-500" />
+              }
+            ]}
+            value=""
+            onChange={(value) => {
+              if (value === 'csv') {
+                setShowImportModal(true);
+              } else if (value.startsWith('pos-')) {
+                const posType = value.replace('pos-', '');
+                alert(`${posType.charAt(0).toUpperCase() + posType.slice(1)} integration coming soon!`);
+              }
+            }}
+            placeholder="Import Products"
+            className="min-w-[160px]"
+          />
           <Button 
             onClick={() => {
               console.log('🔥 Add Product button clicked');
@@ -769,18 +978,23 @@ const Products: React.FC = () => {
               </div>
             </div>
             <div className="sm:w-48">
-              <select
+              <CustomDropdown
+                options={[
+                  { 
+                    value: 'all', 
+                    label: 'All Categories',
+                    icon: <Tag className="h-4 w-4 text-gray-500" />
+                  },
+                  ...categories.map((category) => ({
+                    value: category,
+                    label: category,
+                    icon: <Tag className="h-4 w-4 text-gray-500" />
+                  }))
+                ]}
                 value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="all">All Categories</option>
-                {categories.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
+                onChange={setSelectedCategory}
+                className="w-full"
+              />
             </div>
           </div>
         </CardContent>
@@ -882,14 +1096,21 @@ const Products: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <span className="text-sm text-gray-900 mr-2">
-                            {product.stock_quantity !== null && product.stock_quantity !== undefined ? product.stock_quantity : 'N/A'}
+                          <span className={`text-sm mr-2 ${getStockStatus(product).color}`}>
+                            {getStockDisplay(product)}
                           </span>
-                          {product.low_stock_threshold && 
-                           (product.stock_quantity || 0) <= product.low_stock_threshold && (
+                          {getStockStatus(product).status === 'low_stock' && (
+                            <AlertCircle className="h-4 w-4 text-yellow-500" />
+                          )}
+                          {getStockStatus(product).status === 'out_of_stock' && (
                             <AlertCircle className="h-4 w-4 text-red-500" />
                           )}
                         </div>
+                        {product.inventory && product.inventory.length > 1 && (
+                          <div className="text-xs text-gray-500">
+                            {product.inventory.length} locations
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Badge className={product.is_active 
@@ -1051,6 +1272,7 @@ const Products: React.FC = () => {
                     image_urls: [] as string[],
                     features: '',
                     stock_quantity: '',
+                    low_stock_threshold: '',
                     is_active: true,
                     is_taxable: true,
                     track_inventory: true,
@@ -1414,6 +1636,7 @@ const Products: React.FC = () => {
                       image_urls: [] as string[],
                       features: '',
                       stock_quantity: '',
+                      low_stock_threshold: '',
                       is_active: true,
                       is_taxable: true,
                       track_inventory: true,

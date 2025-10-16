@@ -8,7 +8,26 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Select } from '../ui/select';
 import TransactionDetailsModal from './TransactionDetailsModal';
-import { Transaction, TransactionStatus, TransactionFilter } from './types';
+import { Transaction, TransactionStatus, TransactionFilter, PaymentType } from './types';
+
+// Function to determine payment type based on transaction data
+const getPaymentType = (transaction: Transaction): PaymentType => {
+  // If paymentType is already set, use it
+  if (transaction.paymentType) {
+    return transaction.paymentType;
+  }
+  
+  // Infer payment type based on transaction characteristics
+  if (transaction.id.includes('INV-')) {
+    return 'Invoice';
+  } else if (transaction.terminal && transaction.terminal.includes('Virtual')) {
+    return 'VT';
+  } else if (transaction.terminal && transaction.location) {
+    return 'PT';
+  } else {
+    return 'Web';
+  }
+};
 
 // Fallback transaction data for loading states
 const fallbackTransactions: Transaction[] = [
@@ -27,7 +46,8 @@ const fallbackTransactions: Transaction[] = [
     txHash: '3a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u',
     confirmations: 6,
     fee: 0.50,
-    tip: 5.00
+    tip: 5.00,
+    paymentType: 'PT' as PaymentType
   },
   {
     id: 'TX12345677',
@@ -44,7 +64,8 @@ const fallbackTransactions: Transaction[] = [
     txHash: '4b5c6d7e8f9g0h1i2j3k4l5m6n7o8p9q0r1s2t3u4v',
     confirmations: 6,
     fee: 0.35,
-    tip: 0.00
+    tip: 0.00,
+    paymentType: 'VT' as PaymentType
   },
   {
     id: 'TX12345676',
@@ -61,7 +82,8 @@ const fallbackTransactions: Transaction[] = [
     txHash: '5c6d7e8f9g0h1i2j3k4l5m6n7o8p9q0r1s2t3u4v5w',
     confirmations: 2,
     fee: 0.60,
-    tip: 10.00
+    tip: 10.00,
+    paymentType: 'Invoice' as PaymentType
   },
   {
     id: 'TX12345675',
@@ -77,7 +99,8 @@ const fallbackTransactions: Transaction[] = [
     chain: 'Bitcoin',
     txHash: '6d7e8f9g0h1i2j3k4l5m6n7o8p9q0r1s2t3u4v5w6x',
     confirmations: 0,
-    fee: 0.40
+    fee: 0.40,
+    paymentType: 'Web' as PaymentType
   },
   {
     id: 'TX12345674',
@@ -94,7 +117,8 @@ const fallbackTransactions: Transaction[] = [
     txHash: '7e8f9g0h1i2j3k4l5m6n7o8p9q0r1s2t3u4v5w6x7y',
     confirmations: 6,
     fee: 0.55,
-    tip: 7.25
+    tip: 7.25,
+    paymentType: 'PT' as PaymentType
   },
   {
     id: 'TX12345673',
@@ -111,35 +135,40 @@ const fallbackTransactions: Transaction[] = [
     txHash: '8f9g0h1i2j3k4l5m6n7o8p9q0r1s2t3u4v5w6x7y8z',
     confirmations: 6,
     fee: 0.30,
-    tip: 3.40
+    tip: 3.40,
+    paymentType: 'VT' as PaymentType
   },
   {
     id: 'TX12345672',
     date: 'Aug 12, 2025 01:30 PM',
     amount: 210.45,
     crypto: '0.0053 BTC',
-    status: 'completed' as 'completed'
+    status: 'completed' as 'completed',
+    paymentType: 'Invoice' as PaymentType
   },
   {
     id: 'TX12345671',
     date: 'Aug 12, 2025 11:22 AM',
     amount: 95.60,
     crypto: '0.0024 BTC',
-    status: 'completed' as 'completed'
+    status: 'completed' as 'completed',
+    paymentType: 'Web' as PaymentType
   },
   {
     id: 'TX12345670',
     date: 'Aug 11, 2025 05:17 PM',
     amount: 132.25,
     crypto: '0.0033 BTC',
-    status: 'completed' as 'completed'
+    status: 'completed' as 'completed',
+    paymentType: 'PT' as PaymentType
   },
   {
     id: 'TX12345669',
     date: 'Aug 11, 2025 03:42 PM',
     amount: 178.90,
     crypto: '0.0045 BTC',
-    status: 'completed' as 'completed'
+    status: 'completed' as 'completed',
+    paymentType: 'VT' as PaymentType
   }
 ];
 
@@ -287,10 +316,29 @@ const Transactions = () => {
         }
       } catch (err) {
         console.error('Error loading transactions:', err);
-        setError('Failed to load transactions');
-        setTransactions(fallbackTransactions);
-        setFilteredTransactions(fallbackTransactions);
-        setHasRealTransactions(false);
+        console.error('Error details:', {
+          message: err instanceof Error ? err.message : 'Unknown error',
+          userData: userData,
+          merchantId: userData?.merchant_id,
+          userContext: {
+            userId: userData?.auth_user_id,
+            merchantId: userData?.merchant_id,
+            role: userData?.role,
+            approved: userData?.approved
+          }
+        });
+        
+        // Show the actual error to help debug
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        setError(`Failed to load transactions: ${errorMessage}`);
+        
+        // Also show an alert to make the error more visible
+        alert(`Database Error: ${errorMessage}\n\nCheck console for more details. The transactions shown are mock data because the real data failed to load.`);
+        
+        // For now, show empty state instead of fallback data to make it clear there's an issue
+        setTransactions([]);
+        setFilteredTransactions([]);
+        setHasRealTransactions(true); // Set to true to show empty state instead of fallback
       } finally {
         setLoading(false);
       }
@@ -409,7 +457,9 @@ const Transactions = () => {
   };
 
   const handleViewTransaction = (transaction: Transaction) => {
+    console.log('Opening transaction details for:', transaction);
     setSelectedTransaction(transaction);
+    setIsModalOpen(true);
   };
 
   const handleExport = () => {
@@ -542,59 +592,93 @@ const Transactions = () => {
             </div>
           ) : hasRealTransactions ? (
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 text-gray-700">
-                  <tr>
-                    <th className="py-3 px-4 text-left">Transaction ID</th>
-                    <th className="py-3 px-4 text-left">Date</th>
-                    <th className="py-3 px-4 text-left">Location</th>
-                    <th className="py-3 px-4 text-left">Terminal</th>
-                    <th className="py-3 px-4 text-left">Staff</th>
-                    <th className="py-3 px-4 text-left">Amount</th>
-                    <th className="py-3 px-4 text-left">Crypto</th>
-                    <th className="py-3 px-4 text-left">Chain</th>
-                    <th className="py-3 px-4 text-left">Status</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {paginatedTransactions.length > 0 ? (
-                    paginatedTransactions.map((transaction) => (
-                      <tr key={transaction.id} className="hover:bg-gray-50">
-                        <td className="py-3 px-4 font-medium">{transaction.id}</td>
-                        <td className="py-3 px-4">{transaction.date}</td>
-                        <td className="py-3 px-4">{transaction.location || 'N/A'}</td>
-                        <td className="py-3 px-4">{transaction.terminal || 'N/A'}</td>
-                        <td className="py-3 px-4">{transaction.staff || 'N/A'}</td>
-                        <td className="py-3 px-4">${transaction.amount.toFixed(2)}</td>
-                        <td className="py-3 px-4">{transaction.crypto}</td>
-                        <td className="py-3 px-4">{transaction.chain || 'N/A'}</td>
-                        <td className="py-3 px-4">
-                          <StatusBadge status={transaction.status} />
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => handleViewTransaction(transaction)}
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                              <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                              <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+              {/* Compact Linear Table */}
+              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transaction ID</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {paginatedTransactions.length > 0 ? (
+                      paginatedTransactions.map((transaction) => (
+                        <tr key={transaction.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <StatusBadge status={transaction.status} />
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <div className="text-sm font-semibold text-gray-900">
+                              ${transaction.amount.toFixed(2)}
+                            </div>
+                            <div className="text-xs text-gray-500 font-mono">
+                              {transaction.crypto}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <Badge variant="outline" className="text-xs">
+                                {getPaymentType(transaction)}
+                              </Badge>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <div className="text-sm font-mono text-gray-900">
+                              {transaction.id}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {transaction.date}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {transaction.location || 'Main Store'}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {transaction.terminal || 'Main Terminal'}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-right">
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => handleViewTransaction(transaction)}
+                              className="text-gray-400 hover:text-gray-600"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                                <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                              </svg>
+                            </Button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-12 text-center">
+                          <div className="w-12 h-12 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                            <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                             </svg>
-                          </Button>
+                          </div>
+                          <h3 className="text-sm font-medium text-gray-900 mb-1">No Transactions Found</h3>
+                          <p className="text-xs text-gray-500">
+                            Transactions will appear here as they come in
+                          </p>
                         </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={10} className="py-8 text-center text-gray-500">
-                        No transactions found matching your filters
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ) : (
             <div className="text-center py-8 text-gray-500">
@@ -722,10 +806,13 @@ const Transactions = () => {
       )}
 
       {/* Transaction Details Modal */}
-      {selectedTransaction && (
+      {selectedTransaction && isModalOpen && (
         <TransactionDetailsModal 
           transaction={selectedTransaction}
-          onClose={() => setSelectedTransaction(null)}
+          onClose={() => {
+            setSelectedTransaction(null);
+            setIsModalOpen(false);
+          }}
         />
       )}
     </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -75,6 +75,8 @@ const StorefrontBuilder: React.FC = () => {
 
   // Load products, merchant info, and existing storefront in parallel
   useEffect(() => {
+    if (!userData?.merchant_id) return;
+    
     const loadAllData = async () => {
       // Load all data in parallel for faster loading
       await Promise.all([
@@ -85,113 +87,86 @@ const StorefrontBuilder: React.FC = () => {
     };
     
     loadAllData();
-  }, []);
+  }, [userData?.merchant_id]);
 
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
+    if (!userData?.merchant_id) {
+      console.log('❌ No merchant_id for product loading');
+      return;
+    }
+    
     try {
+      console.log('🛍️ Loading products for storefront builder...');
       setLoadingProducts(true);
       const products = await productService.getActiveProducts();
+      console.log('📦 Loaded products:', products);
       setAvailableProducts(products);
     } catch (error) {
-      console.error('Error loading products:', error);
+      console.error('❌ Error loading products:', error);
     } finally {
       setLoadingProducts(false);
     }
-  };
+  }, [userData?.merchant_id]);
 
-  const loadExistingStorefront = async () => {
+  const loadExistingStorefront = useCallback(async () => {
+    if (!userData?.merchant_id) {
+      console.log('❌ No merchant_id available for storefront loading');
+      return;
+    }
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Get user's merchant_id
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('merchant_id')
-        .eq('auth_user_id', user.id)
-        .single();
-
-      if (userError || !userData?.merchant_id) {
-        console.error('Error getting merchant_id:', userError);
-        return;
-      }
-
+      console.log('🔍 Loading existing storefront for merchant:', userData.merchant_id);
+      
+      let storefront = null;
+      
       // Try to load from backend API first (proper architecture)
       try {
-        const storefront = await storefrontService.getStorefront();
+        storefront = await storefrontService.getStorefront();
+        console.log('📊 Storefront API response:', storefront);
+      } catch (apiError) {
+        console.log('⚠️ Backend API failed, trying Supabase fallback...');
+        console.error('🚨 API Error details:', apiError);
         
-        if (storefront) {
-          if (process.env.NODE_ENV === 'development') {
-            console.log('✅ Loaded existing storefront from API:', storefront);
-          }
-          
-          // Store the storefront ID and status for updates
-          setExistingStorefrontId(storefront.storefront_id || null);
-          setStorefrontStatus(storefront.status || 'draft');
-          
-          // Populate form with existing data
-          setConfig({
-            name: storefront.merchant_name || storefront.name || '',
-            slug: storefront.slug || '',
-            description: storefront.description || '',
-            tagline: storefront.tagline || '',
-            theme: storefront.theme || 'dark',
-            primaryColor: storefront.primary_color || '#3B82F6',
-            contact_email: storefront.contact_email || '',
-            social_links: storefront.social_links || {},
-            selectedProducts: storefront.selected_products || [],
-            refund_policy: storefront.refund_policy || '',
-            terms: storefront.terms || ''
-          });
-          return;
+        // Fallback: Query Supabase directly
+        const { data: storefronts, error: sfError } = await supabase
+          .from('storefronts')
+          .select('*')
+          .eq('merchant_id', userData.merchant_id)
+          .single();
+
+        if (!sfError && storefronts) {
+          console.log('✅ Loaded storefront from Supabase fallback:', storefronts);
+          storefront = storefronts;
+        } else {
+          console.log('📭 No storefront found in Supabase either:', sfError);
         }
-      } catch (apiError: any) {
-        console.warn('⚠️ Backend API failed, falling back to direct DB query:', apiError.message);
       }
-
-      // Fallback: Query Supabase directly if backend API is broken
-      // TODO: Remove this once backend GET endpoint is fixed
-      const { data: storefronts, error: sfError } = await supabase
-        .from('storefronts')
-        .select('*')
-        .eq('merchant_id', userData.merchant_id);
-
-      if (sfError) {
-        console.log('Could not load storefront from database:', sfError);
-        return;
-      }
-
-      if (storefronts && storefronts.length > 0) {
-        const storefront = storefronts[0];
-        console.log('✅ Loaded existing storefront from database (fallback):', storefront);
+      
+      if (storefront) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('✅ Loaded existing storefront from API:', storefront);
+        }
         
         // Store the storefront ID and status for updates
         setExistingStorefrontId(storefront.storefront_id || null);
         setStorefrontStatus(storefront.status || 'draft');
         
-        // Load storefront logo if it exists
-        if (storefront.logo_url) {
-          setMerchantLogo(storefront.logo_url);
-        }
-        
         // Populate form with existing data
         const loadedConfig = {
-          name: storefront.name || '',
+          name: storefront.merchant_name || storefront.name || '',
           slug: storefront.slug || '',
           description: storefront.description || '',
           tagline: storefront.tagline || '',
           theme: storefront.theme || 'dark',
           primaryColor: storefront.primary_color || '#3B82F6',
           contact_email: storefront.contact_email || '',
-          social_links: typeof storefront.social_links === 'string' 
-            ? JSON.parse(storefront.social_links) 
-            : (storefront.social_links || {}),
+          social_links: storefront.social_links || {},
           selectedProducts: storefront.selected_products || [],
           refund_policy: storefront.refund_policy || '',
           terms: storefront.terms || ''
         };
         
-        console.log('📋 Loaded config from database:', loadedConfig);
+        console.log('📋 Loaded config from API:', loadedConfig);
         console.log('🛍️ Loaded selected products:', storefront.selected_products);
         
         // Load selected products from storefront_products table
@@ -209,35 +184,25 @@ const StorefrontBuilder: React.FC = () => {
 
         console.log('📝 Setting config with loaded data:', loadedConfig);
         setConfig(loadedConfig);
+        console.log('✅ Config state updated successfully');
       } else {
-        console.log('No existing storefront found - will create new one');
+        console.log('❌ No existing storefront found - will create new one');
       }
     } catch (error) {
       console.error('Error loading existing storefront:', error);
     }
-  };
+  }, [userData?.merchant_id]);
 
-  const loadMerchantInfo = async () => {
+  // Debug config state
+  useEffect(() => {
+    console.log('🔧 Current config state:', config);
+  }, [config]);
+
+  const loadMerchantInfo = useCallback(async () => {
+    if (!userData?.merchant_id) return;
+    
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        console.log('No user found');
-        return;
-      }
-
-      // Get user's merchant_id first
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('merchant_id')
-        .eq('auth_user_id', user.id)
-        .single();
-
-      if (userError || !userData?.merchant_id) {
-        console.error('Error getting merchant_id:', userError);
-        return;
-      }
-
-      // Get merchant info from database
+      // Get merchant info from database using context merchant_id
       const { data: merchant, error } = await supabase
         .from('merchants')
         .select('name, logo_url, business_email')
@@ -300,7 +265,7 @@ const StorefrontBuilder: React.FC = () => {
     } catch (error) {
       console.error('Error loading merchant info:', error);
     }
-  };
+  }, [userData?.merchant_id, config.contact_email]);
 
   const updateConfig = (updates: Partial<StorefrontConfig>) => {
     setConfig(prev => ({ ...prev, ...updates }));
@@ -488,8 +453,8 @@ const StorefrontBuilder: React.FC = () => {
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Top Bar */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="bg-white border-b border-gray-200 px-4 lg:px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-2 lg:gap-4">
           <button
             onClick={() => navigate('/storefronts')}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -497,8 +462,8 @@ const StorefrontBuilder: React.FC = () => {
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Storefront Builder</h1>
-            <p className="text-sm text-gray-500">Build your store visually</p>
+            <h1 className="text-lg lg:text-xl font-bold text-gray-900">Storefront Builder</h1>
+            <p className="text-xs lg:text-sm text-gray-500 hidden sm:block">Build your store visually</p>
           </div>
         </div>
 
@@ -572,9 +537,9 @@ const StorefrontBuilder: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         {/* Left Panel - Editor */}
-        <div className="w-96 bg-white border-r border-gray-200 overflow-y-auto">
+        <div className="w-full lg:w-96 bg-white border-b lg:border-b-0 lg:border-r border-gray-200 overflow-y-auto">
           {/* Tabs */}
           <div className="border-b border-gray-200">
             <div className="flex">
@@ -904,7 +869,7 @@ const StorefrontBuilder: React.FC = () => {
         </div>
 
         {/* Right Panel - Live Preview */}
-        <div className="flex-1 bg-gray-100 p-8 overflow-y-auto">
+        <div className="flex-1 bg-gray-100 p-4 lg:p-8 overflow-y-auto">
           <div className="max-w-6xl mx-auto">
             <div
               className={`bg-white rounded-lg shadow-xl overflow-hidden transition-all ${
@@ -914,11 +879,11 @@ const StorefrontBuilder: React.FC = () => {
               {/* Preview Content - Matches Public Storefront */}
               <div className={config.theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}>
                 {/* Header - Whop Style */}
-                <div className="pt-16 pb-12 px-6">
+                <div className="pt-8 lg:pt-16 pb-6 lg:pb-12 px-4 lg:px-6">
                   <div className="max-w-4xl mx-auto text-center">
                     {/* Logo */}
                     {merchantLogo ? (
-                      <div className="w-24 h-24 mx-auto mb-6 rounded-3xl overflow-hidden bg-gray-800 border border-gray-700">
+                      <div className="w-16 h-16 lg:w-24 lg:h-24 mx-auto mb-4 lg:mb-6 rounded-2xl lg:rounded-3xl overflow-hidden bg-gray-800 border border-gray-700">
                         <img 
                           src={merchantLogo} 
                           alt={merchantName} 
@@ -926,13 +891,13 @@ const StorefrontBuilder: React.FC = () => {
                         />
                       </div>
                     ) : (
-                      <div className="w-24 h-24 mx-auto mb-6 rounded-3xl bg-gray-800 border border-gray-700 flex items-center justify-center">
-                        <Store className="w-12 h-12 text-gray-500" />
+                      <div className="w-16 h-16 lg:w-24 lg:h-24 mx-auto mb-4 lg:mb-6 rounded-2xl lg:rounded-3xl bg-gray-800 border border-gray-700 flex items-center justify-center">
+                        <Store className="w-8 h-8 lg:w-12 lg:h-12 text-gray-500" />
                       </div>
                     )}
                     
                     {/* Store Name */}
-                    <h1 className={`text-4xl font-bold mb-3 ${config.theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                    <h1 className={`text-2xl lg:text-4xl font-bold mb-2 lg:mb-3 ${config.theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                       {config.name || merchantName || ''}
                     </h1>
                     

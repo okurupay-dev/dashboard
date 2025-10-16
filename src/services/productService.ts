@@ -25,9 +25,31 @@ export const productService = {
    */
   async getActiveProducts(): Promise<Product[]> {
     try {
+      // Get current user's merchant_id
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.log('❌ No authenticated user for getActiveProducts');
+        return [];
+      }
+
+      // Get user's merchant_id from the users table
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('merchant_id')
+        .eq('auth_user_id', user.id)
+        .single();
+
+      if (userError || !userData?.merchant_id) {
+        console.error('❌ Error getting merchant_id for products:', userError);
+        return [];
+      }
+
+      console.log('🔍 Fetching products for merchant:', userData.merchant_id);
+
       const { data, error } = await supabase
         .from('products')
         .select('*')
+        .eq('merchant_id', userData.merchant_id)
         .eq('is_active', true)
         .order('item_name', { ascending: true });
 

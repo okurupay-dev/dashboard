@@ -157,6 +157,14 @@ export interface Invoice {
   created_at: string;
   updated_at: string;
   public_url?: string;
+  
+  // Payment tracking fields - what customer actually paid with
+  paid_currency?: string;        // The actual currency/token customer paid with
+  paid_chain?: string;          // The actual blockchain used for payment
+  paid_amount?: number;         // The actual amount paid in the paid_currency
+  transaction_hash?: string;    // The blockchain transaction hash
+  paid_at?: string;            // When the payment was received
+  
   // Legacy fields for compatibility
   fiat_currency?: string;
   notes?: string;
@@ -182,18 +190,34 @@ class InvoiceApiService {
     
     console.log('📤 Sending invoice payload:', JSON.stringify(sanitizedPayload, null, 2));
     
-    const response = await fetch(`${API_BASE_URL}/dashboard-invoices`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token && { 'Authorization': `Bearer ${token}` })
-      },
-      body: JSON.stringify(sanitizedPayload)
-    });
+    console.log('🌐 Making API request to:', `${API_BASE_URL}/dashboard-invoices`);
+    console.log('🔑 Using auth token:', token ? 'Present' : 'Missing');
+    
+    let response;
+    try {
+      response = await fetch(`${API_BASE_URL}/dashboard-invoices`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        },
+        body: JSON.stringify(sanitizedPayload)
+      });
+    } catch (networkError) {
+      console.error('Network error calling invoice API:', networkError);
+      throw new Error(`Network error: Unable to reach invoice API at ${API_BASE_URL}. Please check if the backend is running.`);
+    }
+
+    console.log('📡 API Response status:', response.status);
+    console.log('📡 API Response headers:', Object.fromEntries(response.headers.entries()));
 
     if (!response.ok) {
       // Clone the response to avoid "body stream already read" error
       const responseClone = response.clone();
+      
+      if (response.status === 404) {
+        throw new Error(`API endpoint not found: ${API_BASE_URL}/dashboard-invoices. Please verify the backend is running and the endpoint exists.`);
+      }
       
       try {
         const errorData = await response.json();

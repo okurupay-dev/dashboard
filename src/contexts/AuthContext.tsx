@@ -31,6 +31,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [merchantData, setMerchantData] = useState<Merchant | null>(null)
   const [loading, setLoading] = useState(true)
   
+  // Loading guards to prevent concurrent requests
+  const [fetchingUserData, setFetchingUserData] = useState(false)
+  const [fetchingMerchantData, setFetchingMerchantData] = useState(false)
+  
   // Cache to avoid repeated queries
   const [userDataCache, setUserDataCache] = useState<Map<string, User>>(new Map())
   const [merchantDataCache, setMerchantDataCache] = useState<Map<string, Merchant>>(new Map())
@@ -43,7 +47,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       return userDataCache.get(authUserId)!
     }
     
+    // Prevent concurrent requests
+    if (fetchingUserData) {
+      console.log('⏳ Already fetching user data, skipping...')
+      return null
+    }
+    
     try {
+      setFetchingUserData(true)
       console.log('🔍 Fetching user data for auth_user_id:', authUserId)
       
       // Add timeout to prevent hanging
@@ -90,6 +101,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error) {
       console.error('❌ Error in fetchUserData:', error)
       return null
+    } finally {
+      setFetchingUserData(false)
     }
   }
 
@@ -101,7 +114,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       return merchantDataCache.get(merchantId)!
     }
     
+    // Prevent concurrent requests
+    if (fetchingMerchantData) {
+      console.log('⏳ Already fetching merchant data, skipping...')
+      return null
+    }
+    
     try {
+      setFetchingMerchantData(true)
       console.log('🔍 Fetching merchant data for ID:', merchantId)
       
       // Add timeout to prevent hanging
@@ -149,6 +169,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error) {
       console.error('Error in fetchMerchantData:', error)
       return null
+    } finally {
+      setFetchingMerchantData(false)
     }
   }
 

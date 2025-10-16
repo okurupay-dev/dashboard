@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src 'self';
+        script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net;
+        style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+        font-src 'self' https://fonts.gstatic.com;
+        img-src 'self' data: https:;
+        connect-src 'self' https://okurutest.up.railway.app https://*.supabase.co wss://*.supabase.co;
+        frame-src 'none';
+        object-src 'none';
+        base-uri 'self';
+        form-action 'self';
+        upgrade-insecure-requests;
+    ">
+    <title>Okuru Dashboard - Content Security Policy</title>
+</head>
+<body>
+    <h1>Content Security Policy Active</h1>
+    <p>This page helps prevent unauthorized script injection from browser extensions.</p>
+</body>
+</html>

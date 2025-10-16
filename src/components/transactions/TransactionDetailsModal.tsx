@@ -67,19 +67,57 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
             </Badge>
           </div>
           
-          <div>
-            <p className="text-sm text-gray-500">Customer</p>
-            <p className="font-medium">John Doe</p>
-            <p className="text-sm text-gray-500">john.doe@example.com</p>
-          </div>
-          
-          <div>
-            <p className="text-sm text-gray-500">Payment Method</p>
-            <div className="flex items-center">
-              <div className="w-8 h-8 rounded-full bg-yellow-500 flex items-center justify-center text-white font-bold mr-2">₿</div>
-              <span>Bitcoin</span>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm text-gray-500">Location</p>
+              <p className="font-medium">{transaction.location || 'Unknown'}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Terminal</p>
+              <p className="font-medium">{transaction.terminal || 'Unknown'}</p>
             </div>
           </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm text-gray-500">Staff Member</p>
+              <p className="font-medium">{transaction.staff || 'Unknown'}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Chain</p>
+              <p className="font-medium">{transaction.chain || 'Unknown'}</p>
+            </div>
+          </div>
+          
+          {transaction.txHash && (
+            <div>
+              <p className="text-sm text-gray-500">Transaction Hash</p>
+              <p className="font-mono text-xs break-all">{transaction.txHash}</p>
+              <button 
+                onClick={() => window.open(`https://basescan.org/tx/${transaction.txHash}`, '_blank')}
+                className="text-blue-600 hover:text-blue-800 text-sm mt-1"
+              >
+                View on Blockchain →
+              </button>
+            </div>
+          )}
+          
+          {(transaction.fee || transaction.tip) && (
+            <div className="grid grid-cols-2 gap-4">
+              {transaction.fee && (
+                <div>
+                  <p className="text-sm text-gray-500">Network Fee</p>
+                  <p className="font-medium">${transaction.fee.toFixed(2)}</p>
+                </div>
+              )}
+              {transaction.tip && transaction.tip > 0 && (
+                <div>
+                  <p className="text-sm text-gray-500">Tip</p>
+                  <p className="font-medium">${transaction.tip.toFixed(2)}</p>
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
         <CardFooter className="flex justify-between">
           <Button variant="outline" onClick={onClose}>Close</Button>

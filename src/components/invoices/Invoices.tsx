@@ -1,11 +1,11 @@
-import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
-import { Card } from '../ui/card';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Eye, Copy, Send, Trash2, Edit, Plus, Search, Calendar, FileText } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
+import { Plus, Search, Filter, Eye, Edit, Trash2, Download, Send, Copy, ExternalLink, Clock, CheckCircle, AlertCircle, XCircle, Calendar, FileText } from 'lucide-react';
+import CustomDropdown from '../ui/CustomDropdown';
+import { supabase } from '../../lib/supabase';
 import { useInvoiceStore, InvoiceStatus } from '../../stores/invoiceStore';
 import { invoiceApi, Invoice } from '../../services/invoiceApi';
 import SavedContacts from './SavedContacts';
@@ -413,22 +413,48 @@ const Invoices: React.FC = () => {
           {/* Status Filter - Only show for Overview tab */}
           {activeTab === 'overview' && (
             <div className="w-full lg:w-48">
-              <select
+              <CustomDropdown
+                options={[
+                  { 
+                    value: 'all', 
+                    label: 'All Statuses',
+                    icon: <Filter className="h-4 w-4 text-gray-500" />
+                  },
+                  { 
+                    value: 'sent', 
+                    label: 'Sent',
+                    icon: <Send className="h-4 w-4 text-blue-500" />
+                  },
+                  { 
+                    value: 'viewed', 
+                    label: 'Viewed',
+                    icon: <Eye className="h-4 w-4 text-purple-500" />
+                  },
+                  { 
+                    value: 'pending_payment', 
+                    label: 'Pending Payment',
+                    icon: <Clock className="h-4 w-4 text-yellow-500" />
+                  },
+                  { 
+                    value: 'paid', 
+                    label: 'Paid',
+                    icon: <CheckCircle className="h-4 w-4 text-green-500" />
+                  },
+                  { 
+                    value: 'overdue', 
+                    label: 'Overdue',
+                    icon: <AlertCircle className="h-4 w-4 text-red-500" />
+                  },
+                  { 
+                    value: 'cancelled', 
+                    label: 'Cancelled',
+                    icon: <XCircle className="h-4 w-4 text-gray-500" />
+                  }
+                ]}
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as InvoiceStatus | 'all')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="all">All Statuses</option>
-                <option value="sent">Sent</option>
-                <option value="viewed">Viewed</option>
-                <option value="pending_payment">Pending Payment</option>
-                <option value="paid">Paid</option>
-                <option value="expired">Expired</option>
-                <option value="canceled">Canceled</option>
-                <option value="underpaid">Underpaid</option>
-                <option value="overpaid">Overpaid</option>
-                <option value="refunded">Refunded</option>
-              </select>
+                onChange={(value) => setStatusFilter(value as InvoiceStatus | 'all')}
+                className="w-full"
+              />
             </div>
           )}
 

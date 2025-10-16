@@ -1,6 +1,9 @@
 // Define transaction status type
 export type TransactionStatus = 'completed' | 'pending' | 'failed';
 
+// Define payment type
+export type PaymentType = 'PT' | 'VT' | 'Invoice' | 'Web';
+
 // Define transaction interface
 export interface Transaction {
   id: string;
@@ -19,6 +22,7 @@ export interface Transaction {
   fee?: number;
   tip?: number;
   notes?: string;
+  paymentType?: PaymentType;
 }
 
 // Define transaction filter type
