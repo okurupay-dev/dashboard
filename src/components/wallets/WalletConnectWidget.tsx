@@ -460,17 +460,6 @@ export const WalletConnectWidget: React.FC<WalletConnectWidgetProps> = ({
             </div>
           )}
 
-          {/* Supported Wallets */}
-          <div className="mb-6 grid grid-cols-2 md:grid-cols-4 gap-3">
-            {supportedWallets.map((wallet) => (
-              <div key={wallet.name} className="text-center p-3 bg-gray-50 rounded-lg">
-                <div className="w-8 h-8 mx-auto mb-2 bg-white rounded-full flex items-center justify-center">
-                  <Wallet className="w-4 h-4 text-gray-600" />
-                </div>
-                <p className="text-xs font-medium text-gray-900">{wallet.name}</p>
-              </div>
-            ))}
-          </div>
 
           {/* Connect Button */}
           <div className="space-y-4">

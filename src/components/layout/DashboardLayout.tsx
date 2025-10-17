@@ -19,8 +19,9 @@ import {
   Home, Activity, DollarSign, Monitor, UserCheck, Menu, Search, Store
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useWalletStatus } from '../../hooks/useWalletStatus';
+import { supabase } from '../../lib/supabase';
 import logo from '../../logo.svg';
+import WalletSetupBanner from '../common/WalletSetupBanner';
 
 // Check if we're in development mode
 const isDevelopment = process.env.NODE_ENV === 'development';
@@ -36,7 +37,7 @@ interface DashboardLayoutProps {
 }
 
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
-  const { shouldShowIndicator } = useWalletStatus();
+  const shouldShowIndicator = false; // Will be handled by WalletSetupBanner
   const location = useLocation();
   const navigate = useNavigate();
   const { userData, merchantData, signOut } = useAuth();
@@ -165,8 +166,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       icon: CreditCard,
       items: [
         { path: '/wallets', label: 'Wallets', icon: CreditCard, showIndicator: shouldShowIndicator, isSubItem: false },
-        { path: '/taxes', label: 'Taxes', icon: Calculator, showIndicator: false, isSubItem: false },
-        { path: '/payroll', label: 'Payroll', icon: UserCheck, showIndicator: false, isSubItem: false }
+        { path: '/taxes', label: 'Taxes', icon: Calculator, showIndicator: false, isSubItem: false }
       ]
     },
     {
@@ -183,7 +183,11 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   ];
   
   return (
-    <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100 overflow-hidden">
+    <div className="flex flex-col h-screen bg-gradient-to-br from-gray-50 to-gray-100 overflow-hidden">
+      {/* Wallet Setup Banner */}
+      <WalletSetupBanner />
+      
+      <div className="flex flex-1 overflow-hidden">
       {/* Mobile Header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center">
@@ -392,7 +396,6 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
               {currentPath === '/products' ? 'Products' : ''}
               {currentPath === '/wallets' ? 'Wallets' : ''}
               {currentPath === '/taxes' ? 'Taxes' : ''}
-              {currentPath === '/payroll' ? 'Payroll' : ''}
               {currentPath === '/terminals' ? 'Terminals' : ''}
               {currentPath === '/terminals/virtual' ? 'Virtual Terminals' : ''}
               {currentPath === '/staff' ? 'Staff' : ''}
@@ -415,6 +418,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         <div className="flex-1 overflow-y-auto p-4 lg:p-6">
           {children}
         </div>
+      </div>
       </div>
     </div>
   );

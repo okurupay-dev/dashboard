@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Select } from '../ui/select';
+import DatePicker from '../ui/DatePicker';
 import TransactionDetailsModal from './TransactionDetailsModal';
 import { Transaction, TransactionStatus, TransactionFilter, PaymentType } from './types';
 
@@ -413,14 +414,42 @@ const Transactions = () => {
   // Apply filtering to transactions
   useEffect(() => {
     const filtered = transactions.filter(transaction => {
+      // Status filter
       const matchesStatus = filter.status === 'all' || transaction.status === filter.status;
+      
+      // Location filter
       const matchesLocation = filter.location === 'all' || transaction.location === filter.location;
       
-      return matchesStatus && matchesLocation;
+      // Search term filter
+      const matchesSearch = !searchTerm || 
+        transaction.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        transaction.crypto.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        transaction.date.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (transaction.location && transaction.location.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      // Date range filter
+      let matchesDateRange = true;
+      if (dateRange.from || dateRange.to) {
+        const transactionDate = new Date(transaction.date);
+        
+        if (dateRange.from) {
+          const fromDate = new Date(dateRange.from);
+          matchesDateRange = matchesDateRange && transactionDate >= fromDate;
+        }
+        
+        if (dateRange.to) {
+          const toDate = new Date(dateRange.to);
+          // Set to end of day for inclusive filtering
+          toDate.setHours(23, 59, 59, 999);
+          matchesDateRange = matchesDateRange && transactionDate <= toDate;
+        }
+      }
+      
+      return matchesStatus && matchesLocation && matchesSearch && matchesDateRange;
     });
     
     setFilteredTransactions(filtered);
-  }, [transactions, filter]);
+  }, [transactions, filter, searchTerm, dateRange]);
 
   // Filter handlers
   const handleStatusFilter = (status: string) => {
@@ -514,34 +543,46 @@ const Transactions = () => {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
               <input
                 type="text"
                 placeholder="Search by ID, date, or crypto..."
-                className="w-full p-2 border rounded-md"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white shadow-sm hover:border-gray-400 transition-colors"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
-              <input
-                type="date"
-                className="w-full p-2 border rounded-md"
-                value={dateRange.from}
-                onChange={(e) => setDateRange({ ...dateRange, from: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
-              <input
-                type="date"
-                className="w-full p-2 border rounded-md"
-                value={dateRange.to}
-                onChange={(e) => setDateRange({ ...dateRange, to: e.target.value })}
-              />
-            </div>
+            <DatePicker
+              label="From Date"
+              value={dateRange.from}
+              onChange={(date) => setDateRange({ ...dateRange, from: date })}
+              placeholder="Select start date"
+            />
+            <DatePicker
+              label="To Date"
+              value={dateRange.to}
+              onChange={(date) => setDateRange({ ...dateRange, to: date })}
+              placeholder="Select end date"
+            />
           </div>
+          
+          {/* Clear Filters Button */}
+          {(searchTerm || dateRange.from || dateRange.to || filter.status !== 'all' || filter.location !== 'all') && (
+            <div className="mb-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSearchTerm('');
+                  setDateRange({ from: '', to: '' });
+                  setFilter({ status: 'all', location: 'all', dateRange: 'all' });
+                }}
+                className="text-gray-600 hover:text-gray-800"
+              >
+                Clear All Filters
+              </Button>
+            </div>
+          )}
           
           <div className="flex flex-wrap gap-2">
             <Button 

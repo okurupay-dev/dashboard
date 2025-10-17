@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { Plus, Search, Filter, Eye, Edit, Trash2, Download, Send, Copy, ExternalLink, Clock, CheckCircle, AlertCircle, XCircle, Calendar, FileText } from 'lucide-react';
+import DatePicker from '../ui/DatePicker';
+import { Calendar, Filter, Plus, Search, Eye, Trash2, Download, Send, Copy, ExternalLink, Clock, CheckCircle, AlertCircle, XCircle, FileText, Edit, Pencil } from 'lucide-react';
 import CustomDropdown from '../ui/CustomDropdown';
 import { supabase } from '../../lib/supabase';
 import { useInvoiceStore, InvoiceStatus } from '../../stores/invoiceStore';
@@ -474,21 +475,19 @@ const Invoices: React.FC = () => {
           <div className="mt-4 pt-4 border-t border-gray-200">
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
-                <input
-                  type="date"
+                <DatePicker
+                  label="From Date"
                   value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={setDateFrom}
+                  placeholder="Select start date"
                 />
               </div>
               <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
-                <input
-                  type="date"
+                <DatePicker
+                  label="To Date"
                   value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={setDateTo}
+                  placeholder="Select end date"
                 />
               </div>
               <div className="flex items-end">
@@ -612,7 +611,7 @@ const Invoices: React.FC = () => {
                               onClick={() => navigate(`/invoices/create?edit=${invoice.id}`)}
                               title="Edit Draft"
                             >
-                              <Edit className="h-3 w-3" />
+                              <Pencil className="h-3 w-3" />
                             </Button>
                             <Button 
                               size="sm" 

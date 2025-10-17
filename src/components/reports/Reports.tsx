@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import DatePicker from '../ui/DatePicker';
 import { 
   Eye, 
   Download, 
@@ -828,24 +829,22 @@ const Reports: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Date Range
                   </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      type="date"
+                  <div className="grid grid-cols-2 gap-4">
+                    <DatePicker
                       value={builderConfig.dateRange.start}
-                      onChange={(e) => setBuilderConfig(prev => ({
+                      onChange={(date) => setBuilderConfig(prev => ({
                         ...prev,
-                        dateRange: { ...prev.dateRange, start: e.target.value }
+                        dateRange: { ...prev.dateRange, start: date }
                       }))}
-                      className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+                      placeholder="Start date"
                     />
-                    <input 
-                      type="date"
+                    <DatePicker
                       value={builderConfig.dateRange.end}
-                      onChange={(e) => setBuilderConfig(prev => ({
+                      onChange={(date) => setBuilderConfig(prev => ({
                         ...prev,
-                        dateRange: { ...prev.dateRange, end: e.target.value }
+                        dateRange: { ...prev.dateRange, end: date }
                       }))}
-                      className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+                      placeholder="End date"
                     />
                   </div>
                 </div>
